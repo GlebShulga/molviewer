@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary Meta Tags -->
+    <meta name="description" content="Interactive 3D molecule viewer built with React and Three.js. View PDB, SDF, and XYZ molecular structures." />
+    <meta name="keywords" content="molecular visualization, protein viewer, PDB viewer, 3D structure, molecule viewer, React, Three.js, open source, chemistry, biology">
+    <meta name="author" content="MolViewer">
+    <meta name="robots" content="index, follow">
+    <title>MolViewer - Interactive 3D Molecule Viewer</title>
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="MolViewer - Interactive 3D Molecular Viewer">
+    <meta property="og:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules. Load PDB files, measure distances, compare structures.">
+
+    <!-- Twitter Card -->
+    <meta property="twitter:card" content="summary">
+    <meta property="twitter:title" content="MolViewer - Interactive 3D Molecular Viewer">
+    <meta property="twitter:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules.">
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "MolViewer",
+      "alternateName": "Mol Viewer",
+      "description": "Interactive 3D molecular visualization tool for viewing protein structures and molecules. Supports PDB files, multiple representations (cartoon, ball-and-stick, surface), distance/angle measurements, and multi-structure comparison.",
+      "applicationCategory": "ScienceApplication",
+      "operatingSystem": "Web Browser",
+      "browserRequirements": "Requires WebGL support",
+      "author": {
+        "@type": "Organization",
+        "name": "MolViewer"
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Load PDB files or fetch from RCSB database",
+        "Multiple representations: Ball & Stick, Cartoon, Spacefill, Surface",
+        "Color schemes: CPK, Chain, Secondary Structure, B-factor, Rainbow",
+        "Measurement tools: Distance, Angle, Dihedral",
+        "Sequence viewer with secondary structure annotation",
+        "Multi-structure comparison (up to 10 structures)",
+        "Undo/Redo support",
+        "Dark/Light theme"
+      ],
+      "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

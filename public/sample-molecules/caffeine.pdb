@@ -1,0 +1,31 @@
+HEADER    CAFFEINE
+COMPND    CAFFEINE
+HETATM    1  N1  CAF A   1       0.000   1.400   0.000  1.00  0.00           N
+HETATM    2  C2  CAF A   1       1.200   0.700   0.000  1.00  0.00           C
+HETATM    3  N3  CAF A   1       1.200  -0.700   0.000  1.00  0.00           N
+HETATM    4  C4  CAF A   1       0.000  -1.400   0.000  1.00  0.00           C
+HETATM    5  C5  CAF A   1      -1.200  -0.700   0.000  1.00  0.00           C
+HETATM    6  C6  CAF A   1      -1.200   0.700   0.000  1.00  0.00           C
+HETATM    7  O7  CAF A   1       2.300   1.200   0.000  1.00  0.00           O
+HETATM    8  N8  CAF A   1      -2.400  -1.200   0.000  1.00  0.00           N
+HETATM    9  C9  CAF A   1      -3.500  -0.400   0.000  1.00  0.00           C
+HETATM   10  N10 CAF A   1      -3.200   0.900   0.000  1.00  0.00           N
+HETATM   11  C11 CAF A   1      -2.000   1.400   0.000  1.00  0.00           C
+HETATM   12  O12 CAF A   1      -1.800   2.600   0.000  1.00  0.00           O
+HETATM   13  C13 CAF A   1       0.000   2.900   0.000  1.00  0.00           C
+HETATM   14  C14 CAF A   1       0.000  -2.900   0.000  1.00  0.00           C
+CONECT    1    2    6   13
+CONECT    2    1    3    7
+CONECT    3    2    4
+CONECT    4    3    5   14
+CONECT    5    4    6    8
+CONECT    6    1    5   11
+CONECT    7    2
+CONECT    8    5    9
+CONECT    9    8   10
+CONECT   10    9   11
+CONECT   11    6   10   12
+CONECT   12   11
+CONECT   13    1
+CONECT   14    4
+END

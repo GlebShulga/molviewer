@@ -1,0 +1,40 @@
+.collapsibleSection {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background-color: var(--bg-tertiary);
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.collapsibleHeader:hover {
+  background-color: var(--bg-secondary);
+}
+
+.collapsibleTitle {
+  flex: 1;
+  text-align: left;
+}
+
+.collapsibleContent {
+  padding: 12px;
+  background-color: var(--bg-secondary);
+}
+
+.collapsibleContentHidden {
+  display: none;
+}

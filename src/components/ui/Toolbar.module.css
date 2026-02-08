@@ -1,0 +1,108 @@
+.toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 50;
+}
+
+.toolbarGroup {
+  display: flex;
+  gap: 2px;
+}
+
+.toolbarDivider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--border-color);
+  margin: 0 4px;
+}
+
+.toolbarButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbarButton:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.toolbarButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.active {
+  background-color: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+/* ========================================
+   RESPONSIVE STYLES - MOBILE
+   ======================================== */
+
+/* Help group - hidden on mobile (no keyboard shortcuts on touch) */
+.helpGroup {
+  display: flex;
+  gap: 2px;
+}
+
+/* Mobile: < 768px - toolbar moves to bottom */
+@media (max-width: 768px) {
+  .toolbar {
+    top: auto;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 32px);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Hide shortcuts button and its divider on mobile */
+  .helpGroup,
+  .helpDivider {
+    display: none;
+  }
+}
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+  .toolbarButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .toolbar {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .toolbarGroup {
+    gap: 4px;
+  }
+
+  .toolbarDivider {
+    height: 32px;
+    margin: 0 6px;
+  }
+}

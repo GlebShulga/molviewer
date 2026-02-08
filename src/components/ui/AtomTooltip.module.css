@@ -1,0 +1,75 @@
+.atomTooltip {
+  position: fixed;
+  z-index: 1000;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.tooltipHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tooltipElement {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.tooltipElementInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.tooltipName {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.tooltipAtomic {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.75rem;
+  padding: 2px 0;
+}
+
+.tooltipLabel {
+  color: var(--text-secondary);
+}
+
+.tooltipValue {
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.tooltipResidue {
+  color: var(--accent-color);
+}
+
+.tooltipDivider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 6px 0;
+}
+
+.tooltipCoords {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+  margin-top: 4px;
+}
+
+.coordsValue {
+  font-size: 0.7rem;
+}

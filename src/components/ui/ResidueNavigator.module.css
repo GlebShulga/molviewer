@@ -1,0 +1,127 @@
+.residueNavigator {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.residueSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.residueSearch svg {
+  color: var(--text-secondary);
+}
+
+.residueSearchInput {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.residueSearchInput:focus {
+  outline: none;
+}
+
+.residueSearchInput::placeholder {
+  color: var(--text-secondary);
+}
+
+.chainList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.chainItem {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.chainHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.chainHeader:hover {
+  background-color: var(--bg-secondary);
+}
+
+.chainBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+}
+
+.chainInfo {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.residueList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 4px;
+  padding: 8px;
+  background-color: var(--bg-secondary);
+}
+
+.residueItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.residueItem:hover,
+.hovered {
+  border-color: var(--accent-color);
+  background-color: rgba(88, 166, 255, 0.1);
+}
+
+.residueCode {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.residueNumber {
+  font-size: 0.7rem;
+  color: var(--accent-color);
+  font-family: monospace;
+}
+
+.residueName {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}

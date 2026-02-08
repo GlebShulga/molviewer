@@ -1,0 +1,191 @@
+.sequenceViewer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Structure selector */
+.structureSelector {
+  margin-bottom: 4px;
+}
+
+.structureSelect {
+  width: 100%;
+  padding: 6px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.structureSelect:hover {
+  border-color: var(--accent-color);
+}
+
+.structureSelect:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+/* Chain tabs */
+.chainTabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chainTab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chainTab:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--chain-color);
+}
+
+.activeChainTab {
+  background-color: var(--bg-secondary);
+  border-color: var(--chain-color);
+  color: var(--text-primary);
+}
+
+.chainBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background-color: var(--chain-color);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: white;
+}
+
+.chainLength {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* Secondary structure bar */
+.ssBar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+}
+
+.ssBlock {
+  flex: 1;
+  min-width: 2px;
+  transition: opacity 0.15s ease;
+}
+
+.ssBlock:hover {
+  opacity: 0.8;
+}
+
+/* Sequence container */
+.sequenceContainer {
+  max-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.sequence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* Individual residue */
+.residue {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 18px;
+  padding: 2px 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.residue:hover,
+.hovered {
+  background-color: rgba(88, 166, 255, 0.15);
+  border-color: var(--accent-color);
+}
+
+.highlighted {
+  background-color: rgba(88, 166, 255, 0.3);
+  border-color: var(--accent-color);
+}
+
+.residue.helix {
+  border-bottom: 2px solid #ff69b4;
+}
+
+.residue.sheet {
+  border-bottom: 2px solid #ffd700;
+}
+
+.residueCode {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.residueNumber {
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.legendColor {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

@@ -1,0 +1,5 @@
+HEADER    INVALID MOLECULE
+REMARK    This is a malformed PDB file for error testing
+ATOM      1  CA  ALA A   1       INVALID COORDINATES
+ATOM      2  C   ALA A   1
+END

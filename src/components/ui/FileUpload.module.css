@@ -1,0 +1,195 @@
+.fileUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Add/Replace mode toggle */
+.modeToggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.modeButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modeButton:hover:not(:disabled) {
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+}
+
+.modeButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.modeButton.active {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.dropZone {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.dropZone:hover,
+.dragging {
+  border-color: var(--accent-color);
+  background-color: rgba(88, 166, 255, 0.1);
+}
+
+.dropZone:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-color: var(--accent-color);
+}
+
+.fileInput {
+  display: none;
+}
+
+.fileLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.uploadIcon {
+  font-size: 2rem;
+  color: var(--accent-color);
+}
+
+.fileTypes {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.pdbFetch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pdbLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.pdbInputRow {
+  display: flex;
+  gap: 8px;
+}
+
+.pdbInput {
+  flex: 1;
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+.pdbInput::placeholder {
+  color: var(--text-secondary);
+  text-transform: none;
+}
+
+.pdbInput:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.pdbInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdbFetchBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  background-color: var(--accent-color);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  min-width: 0;
+}
+
+.pdbFetchBtn:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.pdbFetchBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sampleMolecules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sampleLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.sampleButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sampleButton {
+  padding: 6px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.sampleButton:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.sampleButton:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}

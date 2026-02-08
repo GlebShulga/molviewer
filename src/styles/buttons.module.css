@@ -1,0 +1,65 @@
+/* Shared button styles used across multiple components */
+
+.controlButton {
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.controlButton:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+
+.controlButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.controlButtonActive {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.controlButtonDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.controlButtonSmall {
+  padding: 4px;
+  min-width: 20px;
+  height: 20px;
+}
+
+.controlButtonDanger:hover {
+  background-color: rgba(248, 81, 73, 0.2);
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+.controlButtonUpdate {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.controlButtonUpdate:hover {
+  background-color: rgba(88, 166, 255, 0.2);
+}
+
+.controlButtonUpdateSuccess {
+  color: var(--success-color);
+  border-color: var(--success-color);
+  background-color: rgba(63, 185, 80, 0.2);
+}
+
+/* Focus indicators for accessibility */
+.controlButton:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}

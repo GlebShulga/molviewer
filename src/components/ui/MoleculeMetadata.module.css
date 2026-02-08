@@ -1,0 +1,67 @@
+.moleculeMetadata {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metadataContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metadataRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.metadataLabel {
+  color: var(--text-secondary);
+}
+
+.metadataValue {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.formula {
+  font-family: monospace;
+}
+
+.metadataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.metadataTable th,
+.metadataTable td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.metadataTable th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.metadataTable td {
+  color: var(--text-primary);
+}
+
+.metadataTable tfoot td {
+  border-top: 2px solid var(--border-color);
+  border-bottom: none;
+}
+
+.elementBadge {
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.elementName {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}

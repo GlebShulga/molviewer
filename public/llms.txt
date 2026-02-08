@@ -1,0 +1,41 @@
+# MolViewer
+
+> Interactive 3D molecular visualization tool built with React and Three.js
+
+## What This Application Does
+
+MolViewer is a free, open-source web application for visualizing 3D molecular structures. It allows scientists, students, and researchers to:
+
+- Load molecular structures from PDB files or fetch directly from RCSB PDB database by ID
+- View molecules in multiple representations (Ball & Stick, Stick, Cartoon, Spacefill, Surface)
+- Apply various color schemes (CPK elements, Chain, Residue Type, Secondary Structure, B-factor, Rainbow)
+- Measure distances, angles, and dihedral angles between atoms
+- Compare multiple structures side-by-side or overlaid
+- View amino acid sequences with secondary structure annotations
+
+## Key Features
+
+- **File Support**: PDB, SDF, XYZ molecular formats
+- **RCSB Integration**: Enter a PDB ID (e.g., "1crn", "4hhb") to fetch structures directly
+- **Representations**: Ball & Stick, Stick, Cartoon (ribbon), Spacefill (CPK), Surface
+- **Color Schemes**: Element (CPK), Chain, Residue Type, Secondary Structure, B-factor, Rainbow
+- **Measurements**: Distance (Angstroms), Angle (degrees), Dihedral angle
+- **Multi-Structure**: Load up to 10 structures, overlay or side-by-side comparison
+- **Sequence Viewer**: Interactive amino acid sequence with secondary structure color coding
+- **3D Labels**: Add persistent labels to atoms
+- **Undo/Redo**: Full history support (Ctrl+Z / Ctrl+Y)
+
+## Technology Stack
+
+- React 19
+- Three.js / React Three Fiber
+- TypeScript
+- Vite
+
+## Usage Examples
+
+1. Open the application
+2. Click "Load from RCSB" and enter "1crn" (crambin protein)
+3. Select "Cartoon" representation to see secondary structure
+4. Use "Secondary Structure" color scheme
+5. Click the sequence viewer to highlight residues in 3D

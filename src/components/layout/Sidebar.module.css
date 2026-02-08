@@ -1,0 +1,12 @@
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.sidebar > :global(*) + :global(*) {
+  margin-top: 24px;
+}

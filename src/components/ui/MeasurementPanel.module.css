@@ -1,0 +1,143 @@
+.measurementPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.measurementModes {
+  display: flex;
+  gap: 6px;
+}
+
+.controlButton {
+  composes: controlButton from '../../styles/buttons.module.css';
+}
+
+.active {
+  composes: controlButtonActive from '../../styles/buttons.module.css';
+}
+
+.measurementModeBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  padding: 8px 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.measurementStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.statusText {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.statusAtoms {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.measurementsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.measurementsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.clearAllBtn {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.clearAllBtn:hover {
+  text-decoration: underline;
+}
+
+.measurementItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.measurementItem:hover {
+  background-color: var(--bg-secondary);
+}
+
+.highlighted {
+  background-color: var(--accent-color);
+  color: white;
+  box-shadow: 0 0 8px var(--accent-color);
+}
+
+.highlighted .measurementIcon,
+.highlighted .measurementAtoms,
+.highlighted .measurementValue {
+  color: white;
+}
+
+.measurementIcon {
+  color: var(--accent-color);
+}
+
+.measurementAtoms {
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.measurementValue {
+  flex: 1;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: monospace;
+}
+
+.measurementDelete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.measurementDelete:hover {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: var(--error-color);
+}

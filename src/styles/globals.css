@@ -1,0 +1,16 @@
+/* ============================================
+   Global Styles (non-scoped)
+   ============================================ */
+
+/* Focus Indicators for Accessibility */
+.control-button:focus-visible,
+.sample-button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.drop-zone:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-color: var(--accent-color);
+}

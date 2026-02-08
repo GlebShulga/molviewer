@@ -1,0 +1,60 @@
+.controlPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.controlSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.controlTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.controlOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.controlButton {
+  composes: controlButton from '../../styles/buttons.module.css';
+}
+
+.controlButton:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+
+.controlButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.active {
+  composes: controlButtonActive from '../../styles/buttons.module.css';
+}
+
+.moleculeInfo {
+  padding: 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.moleculeInfo p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.moleculeInfo strong {
+  color: var(--text-primary);
+}
+

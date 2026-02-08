@@ -1,0 +1,158 @@
+.structureList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.item:hover {
+  background-color: var(--bg-secondary);
+}
+
+.item:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.item.active {
+  border-color: var(--accent-color);
+  background-color: rgba(88, 166, 255, 0.1);
+}
+
+.item.hidden {
+  opacity: 0.5;
+}
+
+.itemContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activeIndicator {
+  font-size: 0.6rem;
+  color: var(--accent-color);
+}
+
+.name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-left: 12px;
+}
+
+.atomCount {
+  color: var(--text-tertiary);
+}
+
+.itemActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.actionButton:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.actionButton.danger:hover {
+  background-color: rgba(248, 81, 73, 0.2);
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+/* Layout controls */
+.layoutControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.layoutLabel {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.layoutButtons {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.layoutButton {
+  flex: 1;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.layoutButton:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.layoutButton.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+}

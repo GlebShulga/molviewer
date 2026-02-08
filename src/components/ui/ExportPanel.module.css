@@ -1,0 +1,66 @@
+.exportPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exportField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exportLabel {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.exportInput {
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.exportInput:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.exportOptions {
+  display: flex;
+  gap: 6px;
+}
+
+.controlButton {
+  composes: controlButton from '../../styles/buttons.module.css';
+}
+
+.active {
+  composes: controlButtonActive from '../../styles/buttons.module.css';
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  background-color: var(--accent-color);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.exportButton:hover {
+  opacity: 0.9;
+}

@@ -1,0 +1,188 @@
+.savedMoleculesPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.exportButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  background-color: var(--accent-color);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.exportButton:hover {
+  opacity: 0.9;
+}
+
+.exportButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.savedList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.savedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.savedItemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.savedItemName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editable:hover {
+  color: var(--accent-color);
+}
+
+.editIcon {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.editable:hover .editIcon {
+  opacity: 0.7;
+}
+
+.savedItemEdit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.savedItemInput {
+  flex: 1;
+  padding: 4px 6px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  min-width: 0;
+}
+
+.savedItemInput:focus {
+  outline: none;
+}
+
+.controlButton {
+  composes: controlButton from '../../styles/buttons.module.css';
+}
+
+.small {
+  composes: controlButtonSmall from '../../styles/buttons.module.css';
+}
+
+.savedItemMeta {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.savedItemDate {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.savedItemActions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.savedItemActions .controlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.danger:hover {
+  background-color: rgba(248, 81, 73, 0.2);
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+.update {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.update:hover {
+  background-color: rgba(88, 166, 255, 0.2);
+}
+
+.success {
+  color: var(--success-color);
+  border-color: var(--success-color);
+  background-color: rgba(63, 185, 80, 0.2);
+}
+
+.storageWarning {
+  padding: 8px;
+  background-color: rgba(248, 81, 73, 0.15);
+  border: 1px solid var(--error-color);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--error-color);
+  text-align: center;
+}
+
+.clearAll {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+}
+
+.confirm {
+  background-color: var(--error-color);
+  border-color: var(--error-color);
+  color: white;
+}
+
+.emptySaved {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
