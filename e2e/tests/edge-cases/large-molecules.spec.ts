@@ -69,6 +69,7 @@ test.describe('Large Molecules', () => {
     });
 
     test('[LM-05] should maintain interactivity with large molecule', async () => {
+      test.setTimeout(120000);
       await moleculeViewer.uploadFile(molecules.crambin);
 
       // Test various interactions

@@ -259,6 +259,8 @@ test.describe('Collapsible Panel Persistence', () => {
   });
 
   test.describe('All Panels', () => {
+    test.setTimeout(60000);
+
     test('[CP-09] should persist state for Structures panel', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 

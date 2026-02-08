@@ -3,6 +3,9 @@ import { MoleculeViewerPage } from '../../page-objects';
 import { molecules } from '../../fixtures';
 
 test.describe('Molecule Metadata', () => {
+  // Molecule loading on CI with software WebGL can take 20-30s
+  test.setTimeout(60000);
+
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {
@@ -108,7 +111,7 @@ test.describe('Molecule Metadata', () => {
         .locator('button, [role="button"]')
         .filter({ hasText: 'Atom Counts' });
       if (await atomCountsHeader.isVisible()) {
-        await atomCountsHeader.click({ force: true });
+        await atomCountsHeader.click();
         await moleculeViewer.page.waitForTimeout(200);
       }
 
@@ -287,7 +290,7 @@ test.describe('Molecule Metadata', () => {
       const initialState = await atomCountsHeader.getAttribute('aria-expanded');
 
       // Click to toggle
-      await atomCountsHeader.click({ force: true });
+      await atomCountsHeader.click();
       await moleculeViewer.page.waitForTimeout(200);
 
       // State should change
@@ -308,7 +311,7 @@ test.describe('Molecule Metadata', () => {
       const initialState = await bondCountsHeader.getAttribute('aria-expanded');
 
       // Click to toggle
-      await bondCountsHeader.click({ force: true });
+      await bondCountsHeader.click();
       await moleculeViewer.page.waitForTimeout(200);
 
       // State should change

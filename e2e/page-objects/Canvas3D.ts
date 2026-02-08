@@ -269,7 +269,7 @@ export class Canvas3DPage {
     await this.page.waitForTimeout(100); // Wait for stability
     await this.page.mouse.down();
     await this.page.waitForTimeout(50); // Wait after mousedown
-    await this.page.mouse.move(centerX + deltaX, centerY + deltaY, { steps: 10 });
+    await this.page.mouse.move(centerX + deltaX, centerY + deltaY, { steps: 5 });
     await this.page.mouse.up();
   }
 

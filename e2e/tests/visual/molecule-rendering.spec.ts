@@ -147,6 +147,7 @@ test.describe('Molecule Rendering Visual Tests', () => {
 
   test.describe('Rotated Views', () => {
     test('[MR-10] should match snapshot after rotation', async () => {
+      test.setTimeout(120000);
       await moleculeViewer.loadSampleMolecule('caffeine');
 
       // Apply a consistent rotation
