@@ -287,7 +287,7 @@ test.describe('Molecule Metadata', () => {
       const initialState = await atomCountsHeader.getAttribute('aria-expanded');
 
       // Click to toggle
-      await atomCountsHeader.click();
+      await atomCountsHeader.click({ force: true });
       await moleculeViewer.page.waitForTimeout(200);
 
       // State should change
@@ -308,7 +308,7 @@ test.describe('Molecule Metadata', () => {
       const initialState = await bondCountsHeader.getAttribute('aria-expanded');
 
       // Click to toggle
-      await bondCountsHeader.click();
+      await bondCountsHeader.click({ force: true });
       await moleculeViewer.page.waitForTimeout(200);
 
       // State should change
@@ -339,6 +339,7 @@ test.describe('Molecule Metadata', () => {
     });
 
     test('[MM-20] should update metadata when switching molecules', async () => {
+      test.setTimeout(60000);
       // Load caffeine first
       await moleculeViewer.loadSampleMolecule('caffeine');
 

@@ -2,7 +2,7 @@ import type { Atom } from '../types';
 import { EDGE_VERTICES, TRI_TABLE, EDGE_TABLE } from './marchingCubesTable';
 import { getVdwRadius } from '../constants/elements';
 import { laplacianSmooth } from './meshSmoothing';
-import { computeGaussianDensityGPU, isGPUDensitySupported } from './gpuDensity';
+import { computeGaussianDensityGPU, isGPUDensitySupported, MAX_ATOMS as GPU_MAX_ATOMS } from './gpuDensity';
 
 export interface SurfaceOptions {
   probeRadius?: number;
@@ -38,6 +38,16 @@ interface SDFResult {
 
 const DEFAULT_PROBE_RADIUS = 1.4; // Water molecule radius in Angstroms
 const MAX_GRID_CELLS = 120; // Max cells per dimension for high-quality surfaces
+const MAX_SURFACE_ATOMS = 100_000; // Bail out above this count
+
+function emptySurface(): SurfaceData {
+  return {
+    vertices: new Float32Array(0),
+    normals: new Float32Array(0),
+    indices: new Uint32Array(0),
+    nearestAtomIndices: new Int32Array(0),
+  };
+}
 
 // Gaussian density parameters for smooth surface blending
 const GAUSSIAN_BETA = 2.0;      // Sharpness: higher = tighter surface around atoms
@@ -93,6 +103,11 @@ export function generateSurface(
 ): SurfaceData {
   const { probeRadius = DEFAULT_PROBE_RADIUS, resolution, type } = options;
 
+  // Bail out for extremely large molecules
+  if (atoms.length > MAX_SURFACE_ATOMS) {
+    return emptySurface();
+  }
+
   // Compute atom radii (with probe radius for SAS)
   const effectiveProbeRadius = type === 'sas' ? probeRadius : 0;
   const atomRadii = atoms.map((a) => getVdwRadius(a.element) + effectiveProbeRadius);
@@ -110,18 +125,22 @@ export function generateSurface(
   // Small molecules need finer resolution to capture atomic detail and avoid fragmentation
   // Large molecules can use coarser resolution for performance
   const adaptiveResolution =
-    maxSize < 20 ? 0.4 :  // Small molecules (water, caffeine, ligands): high detail
-    maxSize < 50 ? 0.6 :  // Medium molecules (peptides, small proteins): moderate detail
-    1.0;                  // Large proteins: performance priority
+    maxSize < 20 ? 0.4 :          // Small molecules (water, caffeine, ligands): high detail
+    maxSize < 50 ? 0.6 :          // Medium molecules (peptides, small proteins): moderate detail
+    atoms.length > 20000 ? 2.5 :  // Very large proteins: very coarse for performance
+    atoms.length > 10000 ? 2.0 :  // Large proteins: coarse
+    atoms.length > 5000 ? 1.5 :   // Medium-large proteins: reduced detail
+    1.0;                           // Standard proteins: performance priority
 
   // Use user-specified resolution if provided, otherwise use adaptive
   const baseResolution = resolution ?? adaptiveResolution;
 
-  // Cap at MAX_GRID_CELLS to prevent excessive memory usage
-  const step = Math.max(baseResolution, maxSize / MAX_GRID_CELLS);
+  // Cap grid size — smaller limit for large molecules to prevent excessive memory usage
+  const effectiveMaxGrid = atoms.length > 5000 ? 80 : MAX_GRID_CELLS;
+  const step = Math.max(baseResolution, maxSize / effectiveMaxGrid);
 
   // Compute SDF - use GPU for large proteins, CPU for small molecules
-  const useGPU = isGPUDensitySupported() && atoms.length >= 500;
+  const useGPU = isGPUDensitySupported() && atoms.length >= 500 && atoms.length <= GPU_MAX_ATOMS;
 
   let sdfResult: SDFResult;
   if (useGPU) {
@@ -151,7 +170,10 @@ function buildSpatialGrid(
   atomRadii: number[],
   bounds: Bounds
 ): Map<string, number[]> {
-  const maxRadius = Math.max(...atomRadii, 2.0);
+  let maxRadius = 2.0;
+  for (let i = 0; i < atomRadii.length; i++) {
+    if (atomRadii[i] > maxRadius) maxRadius = atomRadii[i];
+  }
   const cellSize = maxRadius * 2.5; // Slightly larger to ensure coverage
   const grid = new Map<string, number[]>();
 
@@ -255,7 +277,10 @@ function computeSignedDistanceField(
   console.log(`[Surface Debug] Computing SDF for ${atoms.length} atoms...`);
 
   // Build spatial acceleration structure
-  const maxRadius = Math.max(...atomRadii, 2.0);
+  let maxRadius = 2.0;
+  for (let i = 0; i < atomRadii.length; i++) {
+    if (atomRadii[i] > maxRadius) maxRadius = atomRadii[i];
+  }
   const cellSize = maxRadius * 2.5;
   const spatialGrid = buildSpatialGrid(atoms, atomRadii, bounds);
 
@@ -266,6 +291,11 @@ function computeSignedDistanceField(
   console.log(`[Surface Debug] Using ${useGaussianDensity ? 'Gaussian density' : 'hard sphere'} SDF`);
 
   let fallbackCount = 0;
+
+  // Pre-allocated dedup structures to avoid per-voxel Set/Array allocations
+  const visited = new Uint8Array(atoms.length);
+  let visitGen = 0;
+  const nearbyBuffer: number[] = [];
 
   // For each voxel, compute minimum signed distance to any atom surface
   for (let iz = 0; iz < d; iz++) {
@@ -283,8 +313,10 @@ function computeSignedDistanceField(
         const cellY = Math.floor((vy - bounds.minY) / cellSize);
         const cellZ = Math.floor((vz - bounds.minZ) / cellSize);
 
-        // Collect all nearby atom indices from spatial grid
-        const nearbyAtomSet = new Set<number>();
+        // Collect nearby atom indices using visited marker instead of Set
+        visitGen++;
+        if (visitGen > 255) { visited.fill(0); visitGen = 1; }
+        nearbyBuffer.length = 0;
         for (let dcx = -2; dcx <= 2; dcx++) {
           for (let dcy = -2; dcy <= 2; dcy++) {
             for (let dcz = -2; dcz <= 2; dcz++) {
@@ -292,13 +324,16 @@ function computeSignedDistanceField(
               const atomIndices = spatialGrid.get(key);
               if (atomIndices) {
                 for (const i of atomIndices) {
-                  nearbyAtomSet.add(i);
+                  if (visited[i] !== visitGen) {
+                    visited[i] = visitGen;
+                    nearbyBuffer.push(i);
+                  }
                 }
               }
             }
           }
         }
-        const nearbyAtomIndices = Array.from(nearbyAtomSet);
+        const nearbyAtomIndices = nearbyBuffer;
 
         let signedDist: number;
         let nearestAtom: number;

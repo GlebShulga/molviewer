@@ -17,7 +17,7 @@ import type { Atom } from '../types';
 const GAUSSIAN_BETA = 2.0;
 
 // Maximum atoms supported (GLSL loop limit)
-const MAX_ATOMS = 16384;
+export const MAX_ATOMS = 16384;
 
 // Shaders as inline strings
 const VERTEX_SHADER = `#version 300 es

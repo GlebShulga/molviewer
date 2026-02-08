@@ -10,7 +10,7 @@ const REPRESENTATIONS: { value: RepresentationType; label: string; description?:
   { value: 'stick', label: 'Stick', description: 'Bonds only' },
   { value: 'spacefill', label: 'Spacefill', description: 'Van der Waals spheres' },
   { value: 'cartoon', label: 'Cartoon', description: 'Protein/nucleic acid backbone', disabledDescription: 'Requires backbone atoms (CA or P)' },
-  { value: 'surface-vdw', label: 'Surface', description: 'Van der Waals molecular surface' },
+  { value: 'surface-vdw', label: 'Surface', description: 'Van der Waals molecular surface', disabledDescription: 'Too many atoms for surface visualization' },
 ];
 
 const COLOR_SCHEMES: { value: ColorScheme; label: string; description: string; disabledDescription: string; notForCartoon?: boolean }[] = [
@@ -85,6 +85,11 @@ export function ControlPanel() {
     const atomCount = molecule?.atoms.length ?? 0;
     const isComplexProtein = hasBackbone && atomCount > 500;
 
+    // Disable surface for very large molecules (>100K atoms)
+    if (rep.value === 'surface-vdw' && atomCount > 100_000) {
+      return false;
+    }
+
     if (isComplexProtein) {
       // For complex proteins: only Cartoon and Surface make sense
       return rep.value === 'cartoon' || rep.value === 'surface-vdw';
@@ -99,6 +104,15 @@ export function ControlPanel() {
     return true;
   };
 
+  const atomCount = molecule.atoms.length;
+
+  const getRepTitle = (rep: typeof REPRESENTATIONS[0], available: boolean) => {
+    if (!visible) return 'Structure is hidden';
+    if (!available) return rep.disabledDescription;
+    if (rep.value === 'surface-vdw' && atomCount > 20_000) return 'Surface quality reduced for large molecules';
+    return rep.description;
+  };
+
   return (
     <div className={styles.controlPanel}>
       {/* Representation Section */}
@@ -107,13 +121,14 @@ export function ControlPanel() {
         <div className={styles.controlOptions}>
           {REPRESENTATIONS.map((rep) => {
             const available = isRepAvailable(rep);
+            const title = getRepTitle(rep, available);
             return (
               <button
                 key={rep.value}
                 className={clsx(styles.controlButton, representation === rep.value && styles.active)}
                 onClick={() => setRepresentation(rep.value)}
                 aria-pressed={representation === rep.value}
-                title={!visible ? 'Structure is hidden' : (available ? rep.description : rep.disabledDescription)}
+                title={title}
                 disabled={!available}
               >
                 {rep.label}

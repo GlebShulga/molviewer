@@ -347,7 +347,13 @@ export class Canvas3DPage {
   async screenshot(name?: string): Promise<Buffer> {
     await this.waitForSceneReady();
     await this.page.waitForTimeout(200);
-    return this.canvas.screenshot({ path: name ? `${name}.png` : undefined });
+    // Use page.screenshot with clip to bypass Playwright's element stability check
+    // which hangs on WebGL canvas due to continuous 60fps repainting
+    const box = await this.getBoundingBox();
+    return this.page.screenshot({
+      clip: { x: box.x, y: box.y, width: box.width, height: box.height },
+      path: name ? `${name}.png` : undefined,
+    });
   }
 
   /**

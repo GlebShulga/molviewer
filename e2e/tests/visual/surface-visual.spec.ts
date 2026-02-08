@@ -61,8 +61,6 @@ test.describe('Surface Representation Visual Tests', () => {
 
   test.describe('Protein Surface (GPU Path)', () => {
     test('[VS-03] should match snapshot for 1CRN surface', async () => {
-      test.setTimeout(90000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       // Skip if representation section not visible (smart defaults active)
@@ -71,7 +69,7 @@ test.describe('Surface Representation Visual Tests', () => {
 
       await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
       // Wait for surface generation (1CRN is small protein, uses CPU)
-      await moleculeViewer.page.waitForTimeout(5000);
+      await moleculeViewer.page.waitForTimeout(8000);
 
       await moleculeViewer.toolbar.homeView();
       await moleculeViewer.page.waitForTimeout(500);

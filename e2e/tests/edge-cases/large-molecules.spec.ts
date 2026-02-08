@@ -55,8 +55,6 @@ test.describe('Large Molecules', () => {
 
   test.describe('Quality Adaptation', () => {
     test('[LM-04] should apply quality settings based on atom count', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.uploadFile(molecules.crambin);
 
       // The app should adapt quality for larger molecules
@@ -71,8 +69,6 @@ test.describe('Large Molecules', () => {
     });
 
     test('[LM-05] should maintain interactivity with large molecule', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.uploadFile(molecules.crambin);
 
       // Test various interactions

@@ -51,7 +51,8 @@
       "Bash(ls:*)",
       "Read(//c/Users/olesy/OneDrive/Documents/Gleb/Apps/react-mol3d/**)",
       "Bash(git check-ignore:*)",
-      "Bash(for dir in e2e-snapshots/visual/*-snapshots)"
+      "Bash(for dir in e2e-snapshots/visual/*-snapshots)",
+      "WebFetch(domain:data.rcsb.org)"
     ]
   },
   "enableAllProjectMcpServers": true,
