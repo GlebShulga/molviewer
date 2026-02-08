@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, MAX_STRUCTURES } from '../../store/moleculeStore';
 import { parsePDB, parseSDF, parseXYZ, parseMMCIF } from '../../parsers';
 import { SAMPLE_MOLECULES } from '../../config';
-import { validateFile, getFileExtension, decompressGzip } from '../../utils';
+import { validateFile, getFileExtension, decompressGzip, detectFormat } from '../../utils';
 import type { Molecule } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/errorReporter';
@@ -53,12 +53,8 @@ export function FileUpload() {
   const hasStructures = structureOrder.length > 0;
   const canAddMore = structureOrder.length < MAX_STRUCTURES;
 
-  const parseFile = useCallback((content: string, filename: string) => {
-    // Handle .cif.gz by stripping .gz first
-    const normalizedFilename = filename.replace(/\.gz$/i, '');
-    const extension = getFileExtension(normalizedFilename);
-
-    switch (extension) {
+  const parseByFormat = useCallback((content: string, format: string): Molecule => {
+    switch (format) {
       case 'pdb':
         return parsePDB(content);
       case 'cif':
@@ -70,9 +66,28 @@ export function FileUpload() {
       case 'xyz':
         return parseXYZ(content);
       default:
-        throw new Error(`Unsupported file format: .${extension}`);
+        throw new Error(`Unsupported file format: .${format}`);
     }
   }, []);
+
+  const parseFile = useCallback((content: string, filename: string) => {
+    // Handle .cif.gz by stripping .gz first
+    const normalizedFilename = filename.replace(/\.gz$/i, '');
+    const extension = getFileExtension(normalizedFilename);
+
+    try {
+      return parseByFormat(content, extension);
+    } catch {
+      // Extension-based parsing failed — try content-based format detection
+      const detected = detectFormat(content);
+      if (detected && detected !== extension) {
+        return parseByFormat(content, detected);
+      }
+      throw new Error(
+        `Could not parse file. The file may be empty, corrupted, or in a format that doesn't match its .${extension} extension. Supported formats: PDB, mmCIF, SDF, MOL, XYZ.`
+      );
+    }
+  }, [parseByFormat]);
 
   const loadMolecule = useCallback((molecule: Molecule, name?: string) => {
     if (hasStructures && addMode && canAddMore) {

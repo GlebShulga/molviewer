@@ -249,16 +249,13 @@ export function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.Buffe
 
   let totalPositions = 0;
   let totalNormals = 0;
-  let totalIndices = 0;
 
   for (const geom of geometries) {
     const pos = geom.getAttribute('position');
     const norm = geom.getAttribute('normal');
-    const idx = geom.getIndex();
 
     if (pos) totalPositions += pos.count * 3;
     if (norm) totalNormals += norm.count * 3;
-    if (idx) totalIndices += idx.count;
   }
 
   const positions = new Float32Array(totalPositions);

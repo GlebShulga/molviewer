@@ -46,10 +46,7 @@ function ThemeToggle() {
 
 function AppContent() {
   const { theme } = useTheme();
-
-  if (!isWebGL2Supported()) {
-    return <WebGLFallback />;
-  }
+  const webgl2Supported = isWebGL2Supported();
 
   // Use selectors for stable references
   const activeStructure = useMoleculeStore(selectActiveStructure);
@@ -206,6 +203,10 @@ function AppContent() {
       setHoveredAtom(null, null, null, null);
     }
   }, [molecule, activeStructureId, setHoveredAtom]);
+
+  if (!webgl2Supported) {
+    return <WebGLFallback />;
+  }
 
   // ARIA live status message
   const statusMessage = isLoading

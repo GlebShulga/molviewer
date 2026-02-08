@@ -14,7 +14,9 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : undefined,
-  reporter: [['html', { outputFolder: './playwright-report' }], ['list']],
+  reporter: process.env.CI
+    ? [['blob'], ['list']]
+    : [['html', { outputFolder: './playwright-report' }], ['list']],
 
   // Global test settings
   use: {

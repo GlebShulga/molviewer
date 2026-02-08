@@ -2,7 +2,7 @@ export { inferBondsFromDistance } from './bondInference';
 export { SpatialHashGrid, createSpatialIndex } from './spatialIndex';
 export { getAtomColor, calculateColorSchemeContext, type ColorSchemeContext } from './atomColor';
 export { createSphereGeometry, createCylinderGeometry } from './geometryFactory';
-export { validateFile, getFileExtension, FileValidationError } from './fileValidation';
+export { validateFile, getFileExtension, FileValidationError, detectFormat } from './fileValidation';
 export { detectAromaticRings } from './aromaticDetection';
 export { detectSecondaryStructure } from './secondaryStructureDetection';
 export { extractBackbone, hasBackboneData, type BackboneResidue, type BackboneChain } from './backboneExtraction';

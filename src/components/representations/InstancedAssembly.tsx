@@ -268,6 +268,17 @@ export function InstancedAssembly({
     });
   });
 
+  // Log symmetry info
+  useEffect(() => {
+    if (symmetry && symmetry.copyCount > 1) {
+      console.log(
+        `[InstancedAssembly] Rendering ${symmetry.type} assembly: ` +
+          `${atomsData.length} atoms × ${symmetry.copyCount} copies = ` +
+          `${atomsData.length * symmetry.copyCount} effective atoms`
+      );
+    }
+  }, [symmetry, atomsData.length]);
+
   if (!isWebGL2) {
     console.warn('InstancedAssembly requires WebGL2');
     return null;
@@ -277,15 +288,6 @@ export function InstancedAssembly({
     // No useful symmetry - render nothing (caller should use regular renderer)
     return null;
   }
-
-  // Log symmetry info
-  useEffect(() => {
-    console.log(
-      `[InstancedAssembly] Rendering ${symmetry.type} assembly: ` +
-        `${atomsData.length} atoms × ${symmetry.copyCount} copies = ` +
-        `${atomsData.length * symmetry.copyCount} effective atoms`
-    );
-  }, [symmetry, atomsData.length]);
 
   return (
     <group>

@@ -105,7 +105,7 @@ export class MoleculeViewerPage {
    */
   async goto(): Promise<void> {
     await this.page.goto('/');
-    await this.page.waitForLoadState('networkidle');
+    await this.title.waitFor({ state: 'visible', timeout: 15000 });
   }
 
   /**

@@ -513,7 +513,7 @@ export async function getStorageInfoAsync(): Promise<{
 }> {
   const localStorageUsed = getStorageUsage().used;
 
-  let indexedDBInfo = {
+  const indexedDBInfo = {
     used: 0,
     available: isIndexedDBAvailable(),
     moleculeCount: 0,

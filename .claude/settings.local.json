@@ -43,7 +43,8 @@
       "Bash(npx --yes pnpm test -- --run)",
       "Bash(cmd.exe /c \"where pnpm\")",
       "Bash(npx --yes pnpm lint)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(npx eslint:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
