@@ -18,7 +18,7 @@ export default defineConfig({
 
   // Global test settings
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -38,13 +38,15 @@ export default defineConfig({
     },
   },
 
-  // Start dev server before tests
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  // Start dev server before tests (disabled when testing external URL)
+  webServer: process.env.BASE_URL
+    ? undefined
+    : {
+        command: 'pnpm dev',
+        url: 'http://localhost:3000',
+        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+      },
 
   projects: [
     // ===== CORE TESTS - Chromium Only =====

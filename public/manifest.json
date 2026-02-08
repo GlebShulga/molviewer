@@ -1,0 +1,16 @@
+{
+  "name": "MolViewer",
+  "short_name": "MolViewer",
+  "description": "Interactive 3D molecular visualization tool for proteins and molecules",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

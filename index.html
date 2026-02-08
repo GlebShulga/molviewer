@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://molviewer.bio/" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d1117" />
 
     <!-- Primary Meta Tags -->
     <meta name="description" content="Interactive 3D molecule viewer built with React and Three.js. View PDB, SDF, and XYZ molecular structures." />
@@ -14,13 +18,18 @@
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
+    <meta property="og:url" content="https://molviewer.bio/">
+    <meta property="og:site_name" content="MolViewer">
+    <meta property="og:locale" content="en_US">
     <meta property="og:title" content="MolViewer - Interactive 3D Molecular Viewer">
     <meta property="og:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules. Load PDB files, measure distances, compare structures.">
+    <meta property="og:image" content="https://molviewer.bio/og-image.png">
 
     <!-- Twitter Card -->
-    <meta property="twitter:card" content="summary">
+    <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:title" content="MolViewer - Interactive 3D Molecular Viewer">
     <meta property="twitter:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules.">
+    <meta property="twitter:image" content="https://molviewer.bio/og-image.png">
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -52,6 +61,8 @@
         "Undo/Redo support",
         "Dark/Light theme"
       ],
+      "url": "https://molviewer.bio",
+      "screenshot": "https://molviewer.bio/og-image.png",
       "license": "https://opensource.org/licenses/MIT"
     }
     </script>
