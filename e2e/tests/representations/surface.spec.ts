@@ -21,40 +21,27 @@ test.describe('Surface Representation', () => {
     await moleculeViewer.goto();
   });
 
-  test.describe('Small Molecule (CPU Path)', () => {
+  test.describe('Small Molecule (<100 atoms)', () => {
     test.beforeEach(async () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
     });
 
-    test('[SU-01] should switch to surface representation', async () => {
+    test('[SU-01] should disable surface for small molecules', async () => {
       // Skip if representation section not visible (smart defaults active)
       const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
       test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
 
-      await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      await moleculeViewer.page.waitForTimeout(500);
-
-      const isActive = await moleculeViewer.controlPanel.isRepresentationActive('surface-vdw');
-      expect(isActive).toBe(true);
-
-      await moleculeViewer.canvas.expectMoleculeRendered();
+      const isAvailable = await moleculeViewer.controlPanel.isRepresentationAvailable('surface-vdw');
+      expect(isAvailable).toBe(false);
     });
 
-    test('[SU-02] should use CPU path for small molecules (<500 atoms)', async () => {
+    test('[SU-02] should show correct tooltip for disabled surface', async () => {
       // Skip if representation section not visible (smart defaults active)
       const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
       test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
 
-      await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      // Wait for surface generation to complete
-      await moleculeViewer.page.waitForTimeout(2000);
-
-      // Verify NO GPU messages appear for small molecules
-      const hasGPUMessage = consoleMessages.some((m) => m.includes('[GPU Density]'));
-      expect(hasGPUMessage).toBe(false);
-
-      // Surface should still render correctly
-      await moleculeViewer.canvas.expectMoleculeRendered();
+      const title = await moleculeViewer.controlPanel.surfaceButton.getAttribute('title');
+      expect(title).toBe('Surface not useful for small molecules');
     });
   });
 

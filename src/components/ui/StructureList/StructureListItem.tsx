@@ -68,7 +68,7 @@ export function StructureListItem({
           {useSmartDefaults ? (
             <span>Smart Defaults</span>
           ) : (
-            <span>{representationLabel} \u2022 {colorSchemeLabel}</span>
+            <span>{representationLabel} • {colorSchemeLabel}</span>
           )}
           <span className={styles.atomCount}>{atomCount.toLocaleString()} atoms</span>
         </div>

@@ -52,7 +52,16 @@
       "Read(//c/Users/olesy/OneDrive/Documents/Gleb/Apps/react-mol3d/**)",
       "Bash(git check-ignore:*)",
       "Bash(for dir in e2e-snapshots/visual/*-snapshots)",
-      "WebFetch(domain:data.rcsb.org)"
+      "WebFetch(domain:data.rcsb.org)",
+      "WebFetch(domain:www.rcsb.org)",
+      "Bash(npx vite:*)",
+      "Bash(timeout:*)",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_run_code",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_take_screenshot"
     ]
   },
   "enableAllProjectMcpServers": true,

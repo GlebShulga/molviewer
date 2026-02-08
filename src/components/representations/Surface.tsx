@@ -7,6 +7,10 @@ import { getAtomColor, calculateColorSchemeContext } from '../../utils/atomColor
 import { DEFAULT_SURFACE_COLOR } from '../../colors';
 import { logError } from '../../utils/errorReporter';
 
+// Module-scope cache: survives component unmount/remount cycles
+const surfaceCache = new Map<string, SurfaceData>();
+const MAX_CACHE_SIZE = 10;
+
 export interface SurfaceProps {
   molecule: Molecule;
   type?: 'vdw' | 'sas';
@@ -86,7 +90,6 @@ export function Surface({
   visible = true,
 }: SurfaceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const cacheRef = useRef<Map<string, SurfaceData>>(new Map());
 
   // Generate stable molecule hash for cache key
   const moleculeHash = useMemo(() => {
@@ -112,11 +115,10 @@ export function Surface({
   const { geometry, useVertexColors } = useMemo(() => {
     if (!molecule.atoms.length) return { geometry: null, useVertexColors: false };
 
-    // Check cache first
-    const cached = cacheRef.current.get(cacheKey);
+    // Check module-scope cache first (survives unmount/remount)
+    const cached = surfaceCache.get(cacheKey);
 
     let surfaceData: SurfaceData;
-    const MAX_CACHE_SIZE = 10; // Keep max 10 surfaces
 
     if (cached) {
       surfaceData = cached;
@@ -132,12 +134,12 @@ export function Surface({
         surfaceData = generateSurface(molecule.atoms, options);
 
         // Store in cache
-        cacheRef.current.set(cacheKey, surfaceData);
+        surfaceCache.set(cacheKey, surfaceData);
 
         // Enforce cache size limit (LRU eviction)
-        if (cacheRef.current.size >= MAX_CACHE_SIZE) {
-          const firstKey = Array.from(cacheRef.current.keys())[0];
-          cacheRef.current.delete(firstKey);
+        if (surfaceCache.size > MAX_CACHE_SIZE) {
+          const firstKey = surfaceCache.keys().next().value;
+          if (firstKey !== undefined) surfaceCache.delete(firstKey);
         }
       } catch (error) {
         console.error('Failed to generate surface:', error);

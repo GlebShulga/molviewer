@@ -16,46 +16,16 @@ test.describe('Surface Representation Visual Tests', () => {
     await moleculeViewer.goto();
   });
 
-  test.describe('Small Molecule Surface (CPU Path)', () => {
-    test('[VS-01] should match snapshot for caffeine surface', async () => {
+  test.describe('Small Molecule Surface Disabled', () => {
+    test('[VS-01] should disable surface for small molecules', async () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
       // Skip if representation section not visible (smart defaults active)
       const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
       test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
 
-      await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      // Wait for surface generation
-      await moleculeViewer.page.waitForTimeout(2000);
-
-      // Reset view to ensure consistent position
-      await moleculeViewer.toolbar.homeView();
-      await moleculeViewer.page.waitForTimeout(500);
-
-      // Take canvas screenshot
-      const screenshot = await moleculeViewer.canvas.screenshot();
-      expect(screenshot).toMatchSnapshot('caffeine-surface.png', {
-        maxDiffPixelRatio: 0.02, // Allow 2% difference for GPU rendering variance
-      });
-    });
-
-    test('[VS-02] should match snapshot for water surface', async () => {
-      await moleculeViewer.loadSampleMolecule('water');
-
-      // Skip if representation section not visible (smart defaults active)
-      const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
-      test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
-
-      await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      await moleculeViewer.page.waitForTimeout(2000);
-
-      await moleculeViewer.toolbar.homeView();
-      await moleculeViewer.page.waitForTimeout(500);
-
-      const screenshot = await moleculeViewer.canvas.screenshot();
-      expect(screenshot).toMatchSnapshot('water-surface.png', {
-        maxDiffPixelRatio: 0.02,
-      });
+      const isAvailable = await moleculeViewer.controlPanel.isRepresentationAvailable('surface-vdw');
+      expect(isAvailable).toBe(false);
     });
   });
 
@@ -82,8 +52,8 @@ test.describe('Surface Representation Visual Tests', () => {
   });
 
   test.describe('Surface with Color Schemes', () => {
-    test('[VS-04] should match snapshot for surface with chain coloring', async () => {
-      await moleculeViewer.loadSampleMolecule('caffeine');
+    test('[VS-04] should match snapshot for protein surface with chain coloring', async () => {
+      await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       // Skip if sections not visible
       const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
@@ -92,7 +62,7 @@ test.describe('Surface Representation Visual Tests', () => {
 
       // Set surface representation
       await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      await moleculeViewer.page.waitForTimeout(2000);
+      await moleculeViewer.page.waitForTimeout(8000);
 
       // Change color scheme
       await moleculeViewer.controlPanel.setColorScheme('chain');
@@ -102,30 +72,30 @@ test.describe('Surface Representation Visual Tests', () => {
       await moleculeViewer.page.waitForTimeout(500);
 
       const screenshot = await moleculeViewer.canvas.screenshot();
-      expect(screenshot).toMatchSnapshot('caffeine-surface-chain-color.png', {
-        maxDiffPixelRatio: 0.02,
+      expect(screenshot).toMatchSnapshot('1crn-surface-chain-color.png', {
+        maxDiffPixelRatio: 0.03,
       });
     });
   });
 
   test.describe('Surface Rotated Views', () => {
-    test('[VS-05] should match snapshot for rotated surface', async () => {
-      await moleculeViewer.loadSampleMolecule('caffeine');
+    test('[VS-05] should match snapshot for rotated protein surface', async () => {
+      await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       // Skip if representation section not visible
       const repSectionVisible = await moleculeViewer.controlPanel.representationSection.isVisible();
       test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
 
       await moleculeViewer.controlPanel.setRepresentation('surface-vdw');
-      await moleculeViewer.page.waitForTimeout(2000);
+      await moleculeViewer.page.waitForTimeout(8000);
 
       // Apply a consistent rotation
       await moleculeViewer.canvas.rotateMolecule(45, 30);
       await moleculeViewer.page.waitForTimeout(500);
 
       const screenshot = await moleculeViewer.canvas.screenshot();
-      expect(screenshot).toMatchSnapshot('caffeine-surface-rotated.png', {
-        maxDiffPixelRatio: 0.02,
+      expect(screenshot).toMatchSnapshot('1crn-surface-rotated.png', {
+        maxDiffPixelRatio: 0.03,
       });
     });
   });

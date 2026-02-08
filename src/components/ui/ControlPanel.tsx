@@ -85,8 +85,8 @@ export function ControlPanel() {
     const atomCount = molecule?.atoms.length ?? 0;
     const isComplexProtein = hasBackbone && atomCount > 500;
 
-    // Disable surface for very large molecules (>100K atoms)
-    if (rep.value === 'surface-vdw' && atomCount > 100_000) {
+    // Disable surface for very small or very large molecules
+    if (rep.value === 'surface-vdw' && (atomCount < 100 || atomCount > 100_000)) {
       return false;
     }
 
@@ -108,6 +108,7 @@ export function ControlPanel() {
 
   const getRepTitle = (rep: typeof REPRESENTATIONS[0], available: boolean) => {
     if (!visible) return 'Structure is hidden';
+    if (rep.value === 'surface-vdw' && atomCount < 100) return 'Surface not useful for small molecules';
     if (!available) return rep.disabledDescription;
     if (rep.value === 'surface-vdw' && atomCount > 20_000) return 'Surface quality reduced for large molecules';
     return rep.description;

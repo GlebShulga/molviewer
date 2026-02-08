@@ -162,50 +162,73 @@ export function generateSurface(
   return laplacianSmooth(surface, 2, 0.5);
 }
 
+interface SpatialGrid {
+  cells: (number[] | undefined)[];
+  dimX: number;
+  dimY: number;
+  dimZ: number;
+  cellSize: number;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+}
+
 /**
- * Build spatial hash grid for fast atom lookups
+ * Build flat-array spatial grid for fast atom lookups.
+ * Uses integer indexing instead of string keys for zero allocation overhead.
+ * Atoms are inserted into ±1 neighboring cells (27 cells per atom).
  */
 function buildSpatialGrid(
   atoms: Atom[],
   atomRadii: number[],
   bounds: Bounds
-): Map<string, number[]> {
+): SpatialGrid {
   let maxRadius = 2.0;
   for (let i = 0; i < atomRadii.length; i++) {
     if (atomRadii[i] > maxRadius) maxRadius = atomRadii[i];
   }
-  const cellSize = maxRadius * 2.5; // Slightly larger to ensure coverage
-  const grid = new Map<string, number[]>();
+  const cellSize = maxRadius * 2.5;
+
+  // +4 padding (2 on each side) to safely handle ±1 lookups at grid edges
+  const dimX = Math.ceil((bounds.maxX - bounds.minX) / cellSize) + 4;
+  const dimY = Math.ceil((bounds.maxY - bounds.minY) / cellSize) + 4;
+  const dimZ = Math.ceil((bounds.maxZ - bounds.minZ) / cellSize) + 4;
+  // Offset so that cell 0 maps to -2 in raw coordinates (2-cell padding)
+  const offsetX = bounds.minX;
+  const offsetY = bounds.minY;
+  const offsetZ = bounds.minZ;
+
+  const cells = new Array<number[] | undefined>(dimX * dimY * dimZ);
 
   for (let i = 0; i < atoms.length; i++) {
     const atom = atoms[i];
+    // Center cell for this atom (+2 for padding offset)
+    const cx0 = Math.floor((atom.x - offsetX) / cellSize) + 2;
+    const cy0 = Math.floor((atom.y - offsetY) / cellSize) + 2;
+    const cz0 = Math.floor((atom.z - offsetZ) / cellSize) + 2;
 
-    // Find all cells that this atom's sphere overlaps
-    // Use atom's radius for small atoms, or cellSize * 2.0 for padding regions
-    // This balances coverage (5×5×5 neighborhood) with performance (~64 cells/atom vs 343)
-    const searchRadius = Math.max(atomRadii[i], cellSize * 2.0); // Covers ±2 cells with reasonable margin
-    const minCellX = Math.floor((atom.x - searchRadius - bounds.minX) / cellSize);
-    const maxCellX = Math.floor((atom.x + searchRadius - bounds.minX) / cellSize);
-    const minCellY = Math.floor((atom.y - searchRadius - bounds.minY) / cellSize);
-    const maxCellY = Math.floor((atom.y + searchRadius - bounds.minY) / cellSize);
-    const minCellZ = Math.floor((atom.z - searchRadius - bounds.minZ) / cellSize);
-    const maxCellZ = Math.floor((atom.z + searchRadius - bounds.minZ) / cellSize);
-
-    // Add atom to all overlapping cells
-    for (let cx = minCellX; cx <= maxCellX; cx++) {
-      for (let cy = minCellY; cy <= maxCellY; cy++) {
-        for (let cz = minCellZ; cz <= maxCellZ; cz++) {
-          const key = `${cx},${cy},${cz}`;
-          if (!grid.has(key)) {
-            grid.set(key, []);
+    // Insert into ±1 neighboring cells (3×3×3 = 27 cells per atom)
+    for (let dcx = -1; dcx <= 1; dcx++) {
+      const gx = cx0 + dcx;
+      if (gx < 0 || gx >= dimX) continue;
+      for (let dcy = -1; dcy <= 1; dcy++) {
+        const gy = cy0 + dcy;
+        if (gy < 0 || gy >= dimY) continue;
+        for (let dcz = -1; dcz <= 1; dcz++) {
+          const gz = cz0 + dcz;
+          if (gz < 0 || gz >= dimZ) continue;
+          const idx = gz * dimX * dimY + gy * dimX + gx;
+          if (!cells[idx]) {
+            cells[idx] = [i];
+          } else {
+            cells[idx]!.push(i);
           }
-          grid.get(key)!.push(i);
         }
       }
     }
   }
 
-  return grid;
+  return { cells, dimX, dimY, dimZ, cellSize, offsetX, offsetY, offsetZ };
 }
 
 /**
@@ -277,14 +300,11 @@ function computeSignedDistanceField(
   console.log(`[Surface Debug] Computing SDF for ${atoms.length} atoms...`);
 
   // Build spatial acceleration structure
-  let maxRadius = 2.0;
-  for (let i = 0; i < atomRadii.length; i++) {
-    if (atomRadii[i] > maxRadius) maxRadius = atomRadii[i];
-  }
-  const cellSize = maxRadius * 2.5;
   const spatialGrid = buildSpatialGrid(atoms, atomRadii, bounds);
+  const { cells, dimX, dimY, dimZ, cellSize, offsetX, offsetY, offsetZ } = spatialGrid;
+  const dimXY = dimX * dimY;
 
-  console.log(`[Surface Debug] Built spatial grid with cell size ${cellSize.toFixed(2)}Å`);
+  console.log(`[Surface Debug] Built spatial grid with cell size ${cellSize.toFixed(2)}Å, dims ${dimX}×${dimY}×${dimZ}`);
 
   // Use Gaussian density for small molecules (smoother), hard spheres for large (faster)
   const useGaussianDensity = atoms.length < 1000;
@@ -308,20 +328,26 @@ function computeSignedDistanceField(
         const vx = bounds.minX + (ix + 0.5) * step;
         const idx = iz * wh + iy * w + ix;
 
-        // Get cell coordinates for this voxel
-        const cellX = Math.floor((vx - bounds.minX) / cellSize);
-        const cellY = Math.floor((vy - bounds.minY) / cellSize);
-        const cellZ = Math.floor((vz - bounds.minZ) / cellSize);
+        // Get cell coordinates for this voxel (+2 for padding offset)
+        const cellX = Math.floor((vx - offsetX) / cellSize) + 2;
+        const cellY = Math.floor((vy - offsetY) / cellSize) + 2;
+        const cellZ = Math.floor((vz - offsetZ) / cellSize) + 2;
 
-        // Collect nearby atom indices using visited marker instead of Set
+        // Collect nearby atom indices using ±1 lookup (27 cells)
         visitGen++;
         if (visitGen > 255) { visited.fill(0); visitGen = 1; }
         nearbyBuffer.length = 0;
-        for (let dcx = -2; dcx <= 2; dcx++) {
-          for (let dcy = -2; dcy <= 2; dcy++) {
-            for (let dcz = -2; dcz <= 2; dcz++) {
-              const key = `${cellX + dcx},${cellY + dcy},${cellZ + dcz}`;
-              const atomIndices = spatialGrid.get(key);
+        for (let dcx = -1; dcx <= 1; dcx++) {
+          const gx = cellX + dcx;
+          if (gx < 0 || gx >= dimX) continue;
+          for (let dcy = -1; dcy <= 1; dcy++) {
+            const gy = cellY + dcy;
+            if (gy < 0 || gy >= dimY) continue;
+            for (let dcz = -1; dcz <= 1; dcz++) {
+              const gz = cellZ + dcz;
+              if (gz < 0 || gz >= dimZ) continue;
+              const cellIdx = gz * dimXY + gy * dimX + gx;
+              const atomIndices = cells[cellIdx];
               if (atomIndices) {
                 for (const i of atomIndices) {
                   if (visited[i] !== visitGen) {
@@ -367,49 +393,12 @@ function computeSignedDistanceField(
             signedDist = minDist;
           }
         } else {
-          // Fallback: no nearby atoms (shouldn't happen with proper grid)
+          // No nearby atoms within ±1 cells (~2×cellSize ≈ 9-10Å).
+          // This voxel is far outside the molecular surface — set large positive SDF.
+          // Atom radii are at most ~2Å, so anything >9Å away is definitely outside.
           fallbackCount++;
-
-          if (useGaussianDensity) {
-            // Full scan fallback - accumulate density from all atoms
-            let density = 0;
-            let minDist = Infinity;
-            nearestAtom = 0;
-
-            for (let i = 0; i < atoms.length; i++) {
-              const atom = atoms[i];
-              const dx = vx - atom.x;
-              const dy = vy - atom.y;
-              const dz = vz - atom.z;
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const normalizedDist = dist / atomRadii[i];
-              density += Math.exp(-GAUSSIAN_BETA * normalizedDist * normalizedDist);
-
-              if (dist < minDist) {
-                minDist = dist;
-                nearestAtom = i;
-              }
-            }
-
-            signedDist = DENSITY_ISOVALUE - density;
-          } else {
-            // Hard sphere fallback
-            let minDist = Infinity;
-            nearestAtom = 0;
-            for (let i = 0; i < atoms.length; i++) {
-              const atom = atoms[i];
-              const dx = vx - atom.x;
-              const dy = vy - atom.y;
-              const dz = vz - atom.z;
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const sd = dist - atomRadii[i];
-              if (Math.abs(sd) < Math.abs(minDist)) {
-                minDist = sd;
-                nearestAtom = i;
-              }
-            }
-            signedDist = minDist;
-          }
+          signedDist = 100;
+          nearestAtom = 0;
         }
 
         sdf[idx] = signedDist;
