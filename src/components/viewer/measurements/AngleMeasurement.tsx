@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { Line, Text } from '@react-three/drei';
+import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Atom } from '../../../types';
+import { getLabelStyle, labelWrapperStyle } from './labelStyles';
 
 export interface AngleMeasurementProps {
   atom1: Atom;
@@ -10,7 +11,6 @@ export interface AngleMeasurementProps {
   atom3: Atom;
   label: string;
   color: string;
-  outlineColor: string;
   isHighlighted?: boolean;
 }
 
@@ -20,7 +20,6 @@ export function AngleMeasurement({
   atom3,
   label,
   color,
-  outlineColor,
   isHighlighted = false,
 }: AngleMeasurementProps) {
   const radius = 1.0; // same radius for lines and arc
@@ -102,16 +101,11 @@ export function AngleMeasurement({
       <Line points={arcPoints} color={color} lineWidth={lineWidth} />
       {/* Label - position updated dynamically via useFrame */}
       <group ref={labelRef}>
-        <Text
-          fontSize={isHighlighted ? 0.9 : 0.7}
-          color={color}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.05}
-          outlineColor={outlineColor}
-        >
-          {label}
-        </Text>
+        <Html center style={labelWrapperStyle}>
+          <span style={getLabelStyle(color, isHighlighted)}>
+            {label}
+          </span>
+        </Html>
         {isHighlighted && (
           <mesh ref={pulseRef}>
             <ringGeometry args={[0.7, 1.0, 32]} />

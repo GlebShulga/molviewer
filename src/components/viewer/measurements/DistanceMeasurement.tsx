@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { Line, Text } from '@react-three/drei';
+import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Atom } from '../../../types';
+import { getLabelStyle, labelWrapperStyle } from './labelStyles';
 
 // Constants for measurement visualization
 const LABEL_CAMERA_OFFSET = 0.8;
@@ -12,9 +13,6 @@ const LINE_WIDTH_NORMAL = 2;
 const LINE_WIDTH_HIGHLIGHTED = 4;
 const DASH_SIZE = 0.3;
 const GAP_SIZE = 0.15;
-const FONT_SIZE_NORMAL = 0.8;
-const FONT_SIZE_HIGHLIGHTED = 1.0;
-const OUTLINE_WIDTH = 0.05;
 const RING_INNER_RADIUS = 0.8;
 const RING_OUTER_RADIUS = 1.2;
 const RING_SEGMENTS = 32;
@@ -29,7 +27,6 @@ export interface DistanceMeasurementProps {
   atom2: Atom;
   label: string;
   color: string;
-  outlineColor: string;
   isHighlighted?: boolean;
 }
 
@@ -38,7 +35,6 @@ export function DistanceMeasurement({
   atom2,
   label,
   color,
-  outlineColor,
   isHighlighted = false,
 }: DistanceMeasurementProps) {
   const { camera } = useThree();
@@ -88,16 +84,11 @@ export function DistanceMeasurement({
         gapSize={GAP_SIZE}
       />
       <group ref={labelRef}>
-        <Text
-          fontSize={isHighlighted ? FONT_SIZE_HIGHLIGHTED : FONT_SIZE_NORMAL}
-          color={color}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={OUTLINE_WIDTH}
-          outlineColor={outlineColor}
-        >
-          {label}
-        </Text>
+        <Html center style={labelWrapperStyle}>
+          <span style={getLabelStyle(color, isHighlighted)}>
+            {label}
+          </span>
+        </Html>
         {isHighlighted && (
           <mesh ref={pulseRef}>
             <ringGeometry args={[RING_INNER_RADIUS, RING_OUTER_RADIUS, RING_SEGMENTS]} />

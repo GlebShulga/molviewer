@@ -1,0 +1,33 @@
+name: Update E2E Snapshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-snapshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Generate Linux snapshots
+        run: pnpm test:e2e --project=chromium-visual --project=webkit --update-snapshots
+        env:
+          BASE_URL: https://molviewer.bio/
+          CI: true
+
+      - name: Create PR with updated snapshots
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'chore: update Linux e2e snapshots'
+          title: 'chore: update Linux e2e snapshots'
+          body: Auto-generated Linux baselines from `Update E2E Snapshots` workflow.
+          branch: update-e2e-snapshots
+          add-paths: e2e-snapshots/

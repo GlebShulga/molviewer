@@ -188,7 +188,6 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
                 atom2={measurementAtoms[1]}
                 label={label}
                 color={colors.distance}
-                outlineColor={colors.outline}
                 isHighlighted={isHighlighted}
               />
             );
@@ -201,7 +200,6 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
                 atom3={measurementAtoms[2]}
                 label={label}
                 color={colors.angle}
-                outlineColor={colors.outline}
                 isHighlighted={isHighlighted}
               />
             );
@@ -215,7 +213,6 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
                 atom4={measurementAtoms[3]}
                 label={label}
                 color={colors.dihedral}
-                outlineColor={colors.outline}
                 isHighlighted={isHighlighted}
               />
             );

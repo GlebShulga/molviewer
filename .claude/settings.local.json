@@ -44,7 +44,14 @@
       "Bash(cmd.exe /c \"where pnpm\")",
       "Bash(npx --yes pnpm lint)",
       "Bash(git status:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(gh run view:*)",
+      "Bash(python3:*)",
+      "Bash(head:*)",
+      "Bash(ls:*)",
+      "Read(//c/Users/olesy/OneDrive/Documents/Gleb/Apps/react-mol3d/**)",
+      "Bash(git check-ignore:*)",
+      "Bash(for dir in e2e-snapshots/visual/*-snapshots)"
     ]
   },
   "enableAllProjectMcpServers": true,

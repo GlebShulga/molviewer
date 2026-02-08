@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
-import { Line, Text } from '@react-three/drei';
+import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Atom } from '../../../types';
+import { getLabelStyle, labelWrapperStyle } from './labelStyles';
 
 export interface DihedralMeasurementProps {
   atom1: Atom;
@@ -11,7 +12,6 @@ export interface DihedralMeasurementProps {
   atom4: Atom;
   label: string;
   color: string;
-  outlineColor: string;
   isHighlighted?: boolean;
 }
 
@@ -22,7 +22,6 @@ export function DihedralMeasurement({
   atom4,
   label,
   color,
-  outlineColor,
   isHighlighted = false,
 }: DihedralMeasurementProps) {
   const { camera } = useThree();
@@ -162,16 +161,11 @@ export function DihedralMeasurement({
 
       {/* Label */}
       <group ref={labelRef}>
-        <Text
-          fontSize={isHighlighted ? 1.0 : 0.8}
-          color={color}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.05}
-          outlineColor={outlineColor}
-        >
-          {label}
-        </Text>
+        <Html center style={labelWrapperStyle}>
+          <span style={getLabelStyle(color, isHighlighted)}>
+            {label}
+          </span>
+        </Html>
         {isHighlighted && (
           <mesh ref={pulseRef}>
             <ringGeometry args={[0.8, 1.2, 32]} />

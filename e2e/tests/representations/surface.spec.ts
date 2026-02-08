@@ -59,6 +59,7 @@ test.describe('Surface Representation', () => {
   });
 
   test.describe('Large Protein (GPU Path)', () => {
+    test.setTimeout(180000); // Software renderer on CI needs more time
     test.beforeEach(async ({ }, testInfo) => {
       // Skip on WebKit - network fetch + WebGL is too slow
       test.skip(testInfo.project.name === 'webkit', 'WebGL + network fetch too slow on WebKit');
