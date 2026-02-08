@@ -5,11 +5,29 @@
   overflow: hidden;
 }
 
+.skipLink {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 8px 16px;
+  background-color: var(--accent-color);
+  color: white;
+  border-radius: 0 0 6px 6px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.skipLink:focus {
+  top: 0;
+}
+
 .appHeader {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 12px 24px;
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
 }
@@ -291,6 +309,7 @@
     transform: translateX(-100%);
     transition: transform 0.3s ease;
     padding-top: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .sidebar.open {
@@ -313,6 +332,12 @@
   .viewerContainer {
     width: 100%;
     height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
   }
 }
 

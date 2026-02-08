@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Molecule } from '../../types';
 import type { ColorScheme } from '../../store/moleculeStore';
@@ -119,19 +119,9 @@ export function Cartoon({
     colorScheme === 'residueType' ||
     colorScheme === 'bfactor';
 
-  // DEBUG: Log outside useMemo to see if component re-renders
-  console.log('DEBUG Cartoon render:', { colorScheme, needsVertexColors });
-
   // Generate geometry meshes for each segment
   const segmentMeshes = useMemo<SegmentMesh[]>(() => {
     const meshes: SegmentMesh[] = [];
-
-    // DEBUG: Log inside useMemo
-    console.log('DEBUG segmentMeshes useMemo:', {
-      colorScheme,
-      needsVertexColors,
-      chainSegmentsLength: chainSegments.length,
-    });
 
     for (const { chain, segments } of chainSegments) {
       for (let i = 0; i < segments.length; i++) {
@@ -142,24 +132,6 @@ export function Cartoon({
         let splineColors: THREE.Color[] | undefined;
 
         if (needsVertexColors) {
-          // DEBUG: Log first point of first segment to trace lookup
-          if (i === 0 && meshes.length === 0) {
-            const firstPoint = segment.points[0];
-            console.log('DEBUG Cartoon colors:', {
-              colorScheme,
-              needsVertexColors,
-              chainResiduesLength: chain.residues.length,
-              pointResidueIndex: firstPoint.residueIndex,
-              residue: chain.residues[firstPoint.residueIndex],
-              atomIndex: chain.residues[firstPoint.residueIndex]?.atomIndex,
-              atom:
-                chain.residues[firstPoint.residueIndex]?.atomIndex !== undefined
-                  ? moleculeWithSS.atoms[chain.residues[firstPoint.residueIndex].atomIndex]
-                  : 'no atomIndex',
-              totalAtoms: moleculeWithSS.atoms.length,
-            });
-          }
-
           splineColors = segment.points.map((point) => {
             // Find the residue for this spline point
             const residue = chain.residues[point.residueIndex];
@@ -232,6 +204,26 @@ export function Cartoon({
 
     return meshes;
   }, [chainSegments, colorScheme, colorContext, moleculeWithSS, needsVertexColors]);
+
+  // Dispose previous segment geometries when they change or on unmount
+  const prevMeshesRef = useRef<SegmentMesh[]>([]);
+  useEffect(() => {
+    const prev = prevMeshesRef.current;
+    if (prev.length > 0) {
+      const currentSet = new Set(segmentMeshes.map((m) => m.geometry));
+      for (const mesh of prev) {
+        if (!currentSet.has(mesh.geometry)) {
+          mesh.geometry.dispose();
+        }
+      }
+    }
+    prevMeshesRef.current = segmentMeshes;
+    return () => {
+      for (const mesh of prevMeshesRef.current) {
+        mesh.geometry.dispose();
+      }
+    };
+  }, [segmentMeshes]);
 
   // If no backbone data, show nothing
   if (backbone.length === 0) {

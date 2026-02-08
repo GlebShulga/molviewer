@@ -6,8 +6,10 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="canonical" href="https://molviewer.bio/" />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://files.rcsb.org" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d1117" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://files.rcsb.org https://log-api.eu.newrelic.com; img-src 'self' data: blob:; worker-src blob:; font-src 'self';" />
 
     <!-- Primary Meta Tags -->
     <meta name="description" content="Interactive 3D molecule viewer built with React and Three.js. View PDB, SDF, and XYZ molecular structures." />

@@ -7,6 +7,7 @@ import { SAMPLE_MOLECULES } from '../../config';
 import { validateFile, getFileExtension, decompressGzip } from '../../utils';
 import type { Molecule } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
+import { logError } from '../../utils/errorReporter';
 import styles from './FileUpload.module.css';
 
 /** Timeout for fetching sample molecules in ms */
@@ -105,6 +106,7 @@ export function FileUpload() {
       loadMolecule(molecule, name);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to parse file'));
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.handleFile' });
     } finally {
       setLoading(false);
     }
@@ -138,6 +140,11 @@ export function FileUpload() {
   }, [handleFile]);
 
   const loadSample = useCallback(async (sampleFile: string, sampleName: string) => {
+    if (!navigator.onLine) {
+      setError('You appear to be offline. Please check your internet connection.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -154,6 +161,7 @@ export function FileUpload() {
       loadMolecule(molecule, sampleName);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load sample', 'Request timed out. Please try again.'));
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.loadSample' });
     } finally {
       clearTimeout(timeout);
       setLoading(false);
@@ -170,6 +178,11 @@ export function FileUpload() {
     // Validate PDB ID format (4 characters, alphanumeric)
     if (!/^[A-Z0-9]{4}$/i.test(trimmedId)) {
       setError('Invalid PDB ID format. Must be 4 alphanumeric characters (e.g., 1CRN)');
+      return;
+    }
+
+    if (!navigator.onLine) {
+      setError('You appear to be offline. Please check your internet connection.');
       return;
     }
 
@@ -201,6 +214,7 @@ export function FileUpload() {
         'Failed to fetch PDB',
         'Request timed out. The PDB file may be too large or the server is slow.'
       ));
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchPDB' });
     } finally {
       clearTimeout(timeout);
       setLoading(false);
@@ -244,6 +258,12 @@ export function FileUpload() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            document.getElementById('file-input')?.click();
+          }
+        }}
         role="button"
         aria-label="Drop zone for molecule files"
         tabIndex={0}
@@ -263,14 +283,16 @@ export function FileUpload() {
       </div>
 
       <form className={styles.pdbFetch} onSubmit={handlePdbSubmit}>
-        <span className={styles.pdbLabel}>Fetch from RCSB:</span>
+        <label htmlFor="pdb-input" className={styles.pdbLabel}>Fetch from RCSB:</label>
         <div className={styles.pdbInputRow}>
           <input
             type="text"
+            id="pdb-input"
             value={pdbId}
             onChange={(e) => setPdbId(e.target.value)}
             placeholder="e.g., 1CRN"
             className={styles.pdbInput}
+            aria-label="PDB ID"
             maxLength={4}
             disabled={isLoading}
           />

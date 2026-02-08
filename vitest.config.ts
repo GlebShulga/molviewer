@@ -11,6 +11,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: ['node_modules/', 'src/**/*.d.ts'],
+      thresholds: {
+        lines: 30,
+        functions: 30,
+      },
     },
   },
 });

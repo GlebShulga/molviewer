@@ -319,6 +319,24 @@ export const selectVisibleStructureIds = (state: MoleculeStateShape): string[] =
   return cachedVisibleStructureIds;
 };
 
+/**
+ * Reset all module-level selector caches.
+ * Call this when the store is reset to prevent stale data.
+ */
+export function clearSelectorCaches(): void {
+  cachedSelectedAtomIndices = [];
+  cachedSelectedAtomsRef = [];
+  cachedActiveStructureIdForSelection = null;
+  cachedBoundingBox = null;
+  cachedBboxVersion = '';
+  cachedVisibleStructureIds = [];
+  cachedVisibleVersion = '';
+  cachedStructureNames = [];
+  cachedNamesVersion = '';
+  structureRenderDataCache.clear();
+  cachedSelectedAtomsPerStructure.clear();
+}
+
 // Per-structure cache for render data
 const structureRenderDataCache = new Map<string, {
   version: string;

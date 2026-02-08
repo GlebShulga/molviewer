@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { createInstances } from "@react-three/drei";
 import * as THREE from "three";
 import type { Molecule, Atom } from "../../types";
@@ -173,6 +173,16 @@ export function Stick({
   const bondGeometry = useMemo(() => {
     return new THREE.CylinderGeometry(bondRadius, bondRadius, 1, 8);
   }, [bondRadius]);
+
+  // Dispose previous geometry when it changes or on unmount
+  const prevBondGeomRef = useRef<THREE.BufferGeometry | null>(null);
+  useEffect(() => {
+    if (prevBondGeomRef.current && prevBondGeomRef.current !== bondGeometry) {
+      prevBondGeomRef.current.dispose();
+    }
+    prevBondGeomRef.current = bondGeometry;
+    return () => { prevBondGeomRef.current?.dispose(); };
+  }, [bondGeometry]);
 
   return (
     <group>

@@ -21,9 +21,11 @@ import {
   StructureList,
 } from './components/ui';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { WebGLFallback } from './components/ui/WebGLFallback';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { THEME_COLORS } from './config';
+import { isWebGL2Supported } from './utils/webglDetection';
 import { Sun, Moon, Menu, X } from 'lucide-react';
 import styles from './App.module.css';
 import './styles/globals.css';
@@ -44,6 +46,10 @@ function ThemeToggle() {
 
 function AppContent() {
   const { theme } = useTheme();
+
+  if (!isWebGL2Supported()) {
+    return <WebGLFallback />;
+  }
 
   // Use selectors for stable references
   const activeStructure = useMoleculeStore(selectActiveStructure);
@@ -201,8 +207,19 @@ function AppContent() {
     }
   }, [molecule, activeStructureId, setHoveredAtom]);
 
+  // ARIA live status message
+  const statusMessage = isLoading
+    ? 'Loading molecule...'
+    : error
+      ? error
+      : molecule
+        ? `${molecule.name} loaded with ${molecule.atoms.length} atoms`
+        : '';
+
   return (
     <div className={styles.app}>
+      <a href="#viewer-main" className={styles.skipLink}>Skip to main content</a>
+      <div aria-live="polite" className="srOnly">{statusMessage}</div>
       <header className={styles.appHeader}>
         <button
           className={styles.menuButton}
@@ -258,7 +275,7 @@ function AppContent() {
           <ExportPanel onExport={handleExport} />
         </aside>
 
-        <main className={styles.viewerContainer}>
+        <main id="viewer-main" className={styles.viewerContainer}>
           {isLoading && (
             <div className={styles.loadingOverlay}>
               <div className={styles.spinner}></div>
@@ -267,7 +284,7 @@ function AppContent() {
           )}
 
           {error && (
-            <div className={styles.errorMessage}>
+            <div className={styles.errorMessage} role="alert">
               <span className={styles.errorIcon}>!</span>
               <span>{error}</span>
             </div>

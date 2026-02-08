@@ -39,7 +39,11 @@
       "mcp__playwright__browser_type",
       "mcp__playwright__browser_click",
       "mcp__playwright__browser_close",
-      "Bash(ls -la \"c:\\\\Users\\\\olesy\\\\OneDrive\\\\Documents\\\\Gleb\\\\Apps\\\\react-mol3d\\\\public\"\" 2>/dev/null || echo \"No public directory found \")"
+      "Bash(ls -la \"c:\\\\Users\\\\olesy\\\\OneDrive\\\\Documents\\\\Gleb\\\\Apps\\\\react-mol3d\\\\public\"\" 2>/dev/null || echo \"No public directory found \")",
+      "Bash(npx --yes pnpm test -- --run)",
+      "Bash(cmd.exe /c \"where pnpm\")",
+      "Bash(npx --yes pnpm lint)",
+      "Bash(git status:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

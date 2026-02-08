@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { KEYBOARD_SHORTCUTS } from '../../hooks/useKeyboardShortcuts';
 import styles from './ShortcutsHelp.module.css';
@@ -9,7 +9,30 @@ export interface ShortcutsHelpProps {
 }
 
 export function ShortcutsHelp({ isOpen, onClose }: ShortcutsHelpProps) {
-  // Handle ESC key to close modal
+  const previousFocusRef = useRef<Element | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Save previous focus and focus close button on open
+  useEffect(() => {
+    if (isOpen) {
+      previousFocusRef.current = document.activeElement;
+      // Small delay to ensure the modal is rendered
+      requestAnimationFrame(() => {
+        closeButtonRef.current?.focus();
+      });
+    }
+  }, [isOpen]);
+
+  // Restore focus on close
+  const handleClose = useCallback(() => {
+    onClose();
+    if (previousFocusRef.current instanceof HTMLElement) {
+      previousFocusRef.current.focus();
+    }
+  }, [onClose]);
+
+  // Handle ESC key and focus trap
   useEffect(() => {
     if (!isOpen) return;
 
@@ -17,23 +40,59 @@ export function ShortcutsHelp({ isOpen, onClose }: ShortcutsHelpProps) {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        handleClose();
+        return;
+      }
+
+      // Focus trap: intercept Tab
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
 
     // Use capture phase to intercept ESC before other handlers
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose]);
+  }, [isOpen, handleClose]);
 
   if (!isOpen) return null;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.modalOverlay} onClick={handleClose}>
+      <div
+        ref={modalRef}
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Keyboard shortcuts"
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Keyboard Shortcuts</h2>
-          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+          <button
+            ref={closeButtonRef}
+            className={styles.modalClose}
+            onClick={handleClose}
+            aria-label="Close"
+          >
             <X size={20} />
           </button>
         </div>

@@ -1,10 +1,11 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import type { Molecule } from '../../types';
 import type { ColorScheme } from '../../store/moleculeStore';
 import { generateSurface, type SurfaceOptions, type SurfaceData } from '../../utils/surfaceGeneration';
 import { getAtomColor, calculateColorSchemeContext } from '../../utils/atomColor';
 import { DEFAULT_SURFACE_COLOR } from '../../colors';
+import { logError } from '../../utils/errorReporter';
 
 export interface SurfaceProps {
   molecule: Molecule;
@@ -118,11 +119,8 @@ export function Surface({
     const MAX_CACHE_SIZE = 10; // Keep max 10 surfaces
 
     if (cached) {
-      console.log('[Surface Cache] Cache hit:', cacheKey);
-      console.log('[Surface Cache] Current cache size:', cacheRef.current.size);
       surfaceData = cached;
     } else {
-      console.log('[Surface Cache] Cache miss, generating new surface:', cacheKey);
 
       const options: SurfaceOptions = {
         type,
@@ -135,17 +133,15 @@ export function Surface({
 
         // Store in cache
         cacheRef.current.set(cacheKey, surfaceData);
-        console.log('[Surface Cache] Cached surface, cache size:', cacheRef.current.size);
 
         // Enforce cache size limit (LRU eviction)
         if (cacheRef.current.size >= MAX_CACHE_SIZE) {
-          // Remove oldest entry (first key)
           const firstKey = Array.from(cacheRef.current.keys())[0];
           cacheRef.current.delete(firstKey);
-          console.log('[Surface Cache] Evicted oldest entry:', firstKey);
         }
       } catch (error) {
         console.error('Failed to generate surface:', error);
+        logError(error instanceof Error ? error : new Error(String(error)), { source: 'Surface.generate' });
         return { geometry: null, useVertexColors: false };
       }
     }
@@ -188,9 +184,20 @@ export function Surface({
       return { geometry: geom, useVertexColors: false };
     } catch (error) {
       console.error('Failed to create Three.js geometry from surface data:', error);
+      logError(error instanceof Error ? error : new Error(String(error)), { source: 'Surface.geometry' });
       return { geometry: null, useVertexColors: false };
     }
   }, [molecule, type, probeRadius, resolution, colorScheme, colorContext, cacheKey]);
+
+  // Dispose previous geometry when it changes or on unmount
+  const prevGeomRef = useRef<THREE.BufferGeometry | null>(null);
+  useEffect(() => {
+    if (prevGeomRef.current && prevGeomRef.current !== geometry) {
+      prevGeomRef.current.dispose();
+    }
+    prevGeomRef.current = geometry;
+    return () => { prevGeomRef.current?.dispose(); };
+  }, [geometry]);
 
   if (!geometry || !visible) return null;
 

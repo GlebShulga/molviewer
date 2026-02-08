@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { createInstances } from "@react-three/drei";
 import * as THREE from "three";
 import type { Molecule, Atom } from "../../types";
@@ -157,6 +157,24 @@ export function BallAndStick({
   const bondMaterial = useMemo(() => {
     return new THREE.MeshStandardMaterial({ color: bondColor });
   }, [bondColor]);
+
+  // Dispose previous geometry/material when they change or on unmount
+  const prevBondGeomRef = useRef<THREE.BufferGeometry | null>(null);
+  const prevBondMatRef = useRef<THREE.Material | null>(null);
+  useEffect(() => {
+    if (prevBondGeomRef.current && prevBondGeomRef.current !== bondGeometry) {
+      prevBondGeomRef.current.dispose();
+    }
+    prevBondGeomRef.current = bondGeometry;
+    return () => { prevBondGeomRef.current?.dispose(); };
+  }, [bondGeometry]);
+  useEffect(() => {
+    if (prevBondMatRef.current && prevBondMatRef.current !== bondMaterial) {
+      prevBondMatRef.current.dispose();
+    }
+    prevBondMatRef.current = bondMaterial;
+    return () => { prevBondMatRef.current?.dispose(); };
+  }, [bondMaterial]);
 
   return (
     <group>

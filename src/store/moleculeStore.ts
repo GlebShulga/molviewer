@@ -18,6 +18,7 @@ const UNDO_HISTORY_LIMIT = 50;
 import { createMeasurementFromAtomRefs, type Measurement, type MeasurementType } from '../utils/measurements';
 import { detectAromaticRings } from '../utils';
 import { hasBackboneData } from '../utils/backboneExtraction';
+import { clearSelectorCaches } from './selectors';
 import { AROMATIC_DETECTION_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
@@ -913,10 +914,13 @@ export const useMoleculeStore = create<MoleculeState>()(
   // Viewer state actions
   setControlsReady: (ready) => set({ controlsReady: ready }),
 
-  reset: () => set({
-    ...initialState,
-    structures: new Map(),
-  }),
+  reset: () => {
+    clearSelectorCaches();
+    set({
+      ...initialState,
+      structures: new Map(),
+    });
+  },
     }),
     {
       // Only track these fields for undo/redo (partialize)

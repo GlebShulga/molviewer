@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { logError } from '../utils/errorReporter';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -22,6 +23,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error('MolViewer Error:', error, errorInfo);
+    logError(error, {
+      componentStack: errorInfo.componentStack ?? 'unknown',
+      source: 'ErrorBoundary',
+    });
   }
 
   render(): ReactNode {
@@ -30,7 +35,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         this.props.fallback || (
           <div className="error-boundary-fallback">
             <h2>Something went wrong</h2>
-            <p>{this.state.error?.message}</p>
+            <p>An unexpected error occurred. Please try refreshing the page.</p>
             <button onClick={() => this.setState({ hasError: false, error: null })}>
               Try again
             </button>

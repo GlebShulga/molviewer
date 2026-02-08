@@ -3,14 +3,33 @@
    ============================================ */
 
 /* Focus Indicators for Accessibility */
-.control-button:focus-visible,
-.sample-button:focus-visible {
+*:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
 .drop-zone:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
   border-color: var(--accent-color);
+}
+
+/* Screen-reader only content */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

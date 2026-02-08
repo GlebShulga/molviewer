@@ -6,6 +6,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, getQualityPreset } from "../../config";
 import { useMoleculeStore } from "../../store/moleculeStore";
+import { viewerRefs } from "../../utils/viewerRefs";
 
 export interface MoleculeViewerHandle {
   homeView: () => void;
@@ -37,13 +38,32 @@ interface SceneControllerProps {
 function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneControllerProps) {
   const { camera, gl, scene } = useThree();
   const setControlsReady = useMoleculeStore(state => state.setControlsReady);
+  const setError = useMoleculeStore(state => state.setError);
 
   useEffect(() => {
-    // Store refs in a global store for export functionality
-    (window as unknown as { __mol3d_gl?: THREE.WebGLRenderer }).__mol3d_gl = gl;
-    (window as unknown as { __mol3d_scene?: THREE.Scene }).__mol3d_scene = scene;
-    (window as unknown as { __mol3d_camera?: THREE.Camera }).__mol3d_camera = camera;
+    // Store refs for export functionality
+    viewerRefs.gl = gl;
+    viewerRefs.scene = scene;
+    viewerRefs.camera = camera;
   }, [gl, scene, camera]);
+
+  // Handle WebGL context loss/restore
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      setError('WebGL context lost. Attempting to restore...');
+    };
+    const handleContextRestored = () => {
+      setError(null);
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+    };
+  }, [gl, setError]);
 
   // Set Three.js scene background color
   useEffect(() => {
@@ -128,9 +148,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         controls.update();
       },
       exportImage: (options = {}) => {
-        const gl = (window as unknown as { __mol3d_gl?: THREE.WebGLRenderer }).__mol3d_gl;
-        const scene = (window as unknown as { __mol3d_scene?: THREE.Scene }).__mol3d_scene;
-        const camera = (window as unknown as { __mol3d_camera?: THREE.Camera }).__mol3d_camera;
+        const { gl, scene, camera } = viewerRefs;
 
         if (!gl || !scene || !camera) {
           console.error("WebGL context not available for export");
@@ -175,12 +193,12 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         className={className}
         gl={{ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }}
         onCreated={(state: RootState) => {
-          // Set globals immediately when Canvas context is created
+          // Set refs immediately when Canvas context is created
           // This fires synchronously and is more reliable than useEffect for initial setup
-          (window as unknown as { __mol3d_gl?: typeof state.gl }).__mol3d_gl = state.gl;
-          (window as unknown as { __mol3d_scene?: typeof state.scene }).__mol3d_scene = state.scene;
-          (window as unknown as { __mol3d_camera?: typeof state.camera }).__mol3d_camera = state.camera;
-          (window as unknown as { __mol3d_ready?: boolean }).__mol3d_ready = true;
+          viewerRefs.gl = state.gl;
+          viewerRefs.scene = state.scene;
+          viewerRefs.camera = state.camera;
+          viewerRefs.ready = true;
         }}
       >
         <PerspectiveCamera makeDefault position={[...cameraPosition]} fov={cameraFov} />
