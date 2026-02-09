@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('Theme Toggle', () => {
-  // Theme toggle tests need longer timeout for slow browsers
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {

@@ -54,7 +54,6 @@ test.describe('Color Schemes', () => {
 
   test.describe('Protein Color Schemes', () => {
     test.beforeEach(async ({ page }) => {
-      test.setTimeout(60000);
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
     });
 
@@ -153,8 +152,6 @@ test.describe('Color Schemes', () => {
 
   test.describe('Color Scheme with Cartoon Representation', () => {
     test('[CS-09] should disable CPK for Cartoon representation', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       // Skip if representation section not visible (smart defaults active)
@@ -180,6 +177,7 @@ test.describe('Color Schemes', () => {
   });
 
   test.describe('Color Scheme Persistence', () => {
+    test.slow();
     test('[CS-10] should maintain color scheme through representation changes', async () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 

@@ -27,8 +27,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     test('[CO-02] should show smart defaults indicator for protein-ligand complexes', async () => {
       // Fetch a protein-ligand complex from RCSB
       // Using 3HTB (HIV protease with inhibitor) as it has protein + ligand
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       // Look for Smart Defaults indicator in structure list
@@ -42,8 +40,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-03] should keep representation controls visible even with smart defaults', async () => {
-      test.setTimeout(60000);
-
       // Fetch a multi-component structure
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
       await moleculeViewer.page.waitForTimeout(500);
@@ -62,8 +58,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Multi-Component Rendering', () => {
     test('[CO-04] should render protein component with cartoon representation', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       // Verify molecule renders
@@ -74,8 +68,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-05] should render ligand component with ball-and-stick representation', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       // Verify molecule renders
@@ -85,8 +77,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-06] should maintain visibility when rotating view', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
       await moleculeViewer.canvas.expectMoleculeRendered();
 
@@ -101,8 +91,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Component Visibility Toggle', () => {
     test('[CO-07] should toggle individual component visibility', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       // Look for component visibility toggles in the UI
@@ -123,8 +111,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Per-Component Settings', () => {
     test('[CO-08] should allow different color schemes per component', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       // If component settings UI exists, test color scheme changes
@@ -138,7 +124,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-09] should preserve component settings through undo/redo', async ({ page }) => {
-      test.setTimeout(90000); // Extra time for network fetch
       test.slow(); // This test involves network fetch and multiple operations
 
       // Use local caffeine sample instead of RCSB (avoid network flakiness)
@@ -165,8 +150,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Structure List Item Display', () => {
     test('[CO-10] should show correct molecule name in structure list', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       const structureNames = await moleculeViewer.structureList.getStructureNames();
@@ -177,8 +160,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-11] should show atom count in structure list', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       const structureItem = moleculeViewer.page.locator('[class*="structureItem"], [class*="item"]').first();
@@ -189,8 +170,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-12] should show "Smart Defaults" instead of representation name for complex molecules', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
       const structureItem = moleculeViewer.page.locator('[class*="structureItem"], [class*="item"]').first();
@@ -204,6 +183,7 @@ test.describe('Component Settings / Smart Defaults', () => {
   });
 
   test.describe('Fallback for Simple Molecules', () => {
+    test.slow();
     test('[CO-13] should use standard representation controls for simple molecules', async () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
@@ -241,8 +221,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Multi-Structure with Smart Defaults', () => {
     test('[CO-16] should handle multiple structures with different component types', async () => {
-      test.setTimeout(90000);
-
       // Load a complex structure
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 
@@ -258,8 +236,6 @@ test.describe('Component Settings / Smart Defaults', () => {
     });
 
     test('[CO-17] should maintain smart defaults when switching active structure', async () => {
-      test.setTimeout(90000);
-
       // Use local files to avoid network flakiness
       // Load first structure (crambin as complex protein)
       await moleculeViewer.uploadFile(molecules.crambin);
@@ -291,8 +267,6 @@ test.describe('Component Settings / Smart Defaults', () => {
 
   test.describe('Component Type Classification', () => {
     test('[CO-18] should classify protein structures correctly', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN'); // Crambin - pure protein
 
       // Pure protein should NOT trigger smart defaults (single type)

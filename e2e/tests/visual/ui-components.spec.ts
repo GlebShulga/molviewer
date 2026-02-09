@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('UI Components Visual Tests', () => {
-  // Increase timeout for visual tests due to WebGL rendering
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }, testInfo) => {

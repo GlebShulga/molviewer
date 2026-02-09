@@ -205,9 +205,6 @@ test.describe('Context Menu', () => {
   });
 
   test.describe('Context Menu with Multi-Structure', () => {
-    // Increase timeout for multi-structure tests (loading crambin takes longer)
-    test.setTimeout(60000);
-
     test.beforeEach(async () => {
       // Add a second structure
       await moleculeViewer.addStructure(molecules.crambin);
@@ -240,7 +237,6 @@ test.describe('Context Menu', () => {
     });
 
     test('[CM-16] should add label to correct structure', async () => {
-      test.setTimeout(90000); // This test involves multiple structure switches with crambin
       const names = await moleculeViewer.structureList.getStructureNames();
       if (names.length >= 2) {
         // Select first structure

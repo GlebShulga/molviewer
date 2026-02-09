@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('Keyboard Shortcuts', () => {
-  // Keyboard tests need longer timeout when running in parallel
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {

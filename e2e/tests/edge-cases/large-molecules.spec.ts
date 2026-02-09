@@ -19,8 +19,6 @@ test.describe('Large Molecules', () => {
 
   test.describe('Load Large Protein (1CRN - 327 atoms)', () => {
     test('[LM-01] should load crambin protein from fixture', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.uploadFile(molecules.crambin);
 
       const isLoaded = await moleculeViewer.isMoleculeLoaded();
@@ -32,7 +30,6 @@ test.describe('Large Molecules', () => {
     test('[LM-02] should fetch 1CRN from RCSB', async ({ }, testInfo) => {
       // Skip on WebKit - network fetch + WebGL is too slow
       testInfo.skip(testInfo.project.name === 'webkit', 'WebGL + network fetch too slow on WebKit');
-      test.setTimeout(90000);
 
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
@@ -43,8 +40,6 @@ test.describe('Large Molecules', () => {
     });
 
     test('[LM-03] should display correct atom count for protein', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.uploadFile(molecules.crambin);
 
       const atomCount = await moleculeViewer.controlPanel.getAtomCount();
@@ -94,7 +89,6 @@ test.describe('Large Molecules', () => {
       // Skip entire suite on webkit - representation tests with large molecules timeout consistently
       test.skip(testInfo.project.name === 'webkit', 'WebKit too slow for representation tests with proteins');
 
-      test.setTimeout(60000);
       await moleculeViewer.uploadFile(molecules.crambin);
     });
 
@@ -142,7 +136,6 @@ test.describe('Large Molecules', () => {
       // Skip entire suite on webkit - color scheme changes with large molecules timeout consistently
       test.skip(testInfo.project.name === 'webkit', 'WebKit too slow for color scheme tests with proteins');
 
-      test.setTimeout(60000);
       await moleculeViewer.uploadFile(molecules.crambin);
     });
 
@@ -190,13 +183,6 @@ test.describe('Large Molecules', () => {
   });
 
   test.describe('Sequence Viewer with Large Molecules', () => {
-    test.beforeEach(async ({}, testInfo) => {
-      // Don't override webkit's 120s timeout from outer beforeEach
-      if (testInfo.project.name !== 'webkit') {
-        test.setTimeout(60000);
-      }
-    });
-
     test('[LM-13] should display sequence for protein', async () => {
       await moleculeViewer.uploadFile(molecules.crambin);
 
@@ -243,8 +229,6 @@ test.describe('Large Molecules', () => {
     });
 
     test('[LM-16] should not freeze UI during large molecule operations', async () => {
-      test.setTimeout(60000);
-
       await moleculeViewer.uploadFile(molecules.crambin);
 
       // UI should remain responsive
@@ -261,7 +245,6 @@ test.describe('Large Molecules', () => {
     test('[LM-17] should load 1B7G without infinite loop errors', async ({}, testInfo) => {
       // Skip on WebKit - network fetch + WebGL is too slow
       testInfo.skip(testInfo.project.name === 'webkit', 'WebGL + network fetch too slow on WebKit');
-      test.setTimeout(90000);
 
       // This structure has 2 biological assemblies with 3 transforms
       // Previously caused "getSnapshot should be cached" infinite loop error

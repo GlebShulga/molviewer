@@ -75,9 +75,6 @@ test.describe('File Loading', () => {
 
   test.describe('RCSB PDB Fetch', () => {
     test('[FL-07] should fetch molecule from RCSB by PDB ID', async ({ page }) => {
-      // Increase timeout for network request
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       const isLoaded = await moleculeViewer.isMoleculeLoaded();
@@ -200,7 +197,6 @@ test.describe('File Loading', () => {
     });
 
     test('[FL-15] should handle protein with B-factor data', async () => {
-      test.setTimeout(60000);  // Increase timeout for protein file parsing
       // Load crambin which has B-factor data
       await moleculeViewer.uploadFile(molecules.crambin);
 
@@ -248,8 +244,6 @@ test.describe('File Loading', () => {
     });
 
     test('[FL-17] should handle protein with multiple chains', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Fetch insulin which has multiple chains (A and B)
       await moleculeViewer.fetchFromRCSBAndWait('2INS');
 
@@ -272,8 +266,6 @@ test.describe('File Loading', () => {
 
   test.describe('Multi-Model PDB Files', () => {
     test('[FL-18] should load multi-model structure from RCSB', async ({ page }) => {
-      test.setTimeout(60000);
-
       // NMR structures typically have multiple models
       // 1UBQ is a common example with multiple NMR models
       await moleculeViewer.fetchFromRCSBAndWait('1UBQ');
@@ -284,8 +276,6 @@ test.describe('File Loading', () => {
     });
 
     test('[FL-19] should handle first model of multi-model PDB', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Fetch a structure that may have multiple models
       await moleculeViewer.fetchFromRCSBAndWait('1UBQ');
 
@@ -300,8 +290,6 @@ test.describe('File Loading', () => {
 
   test.describe('Biological Assembly (BIOMT)', () => {
     test('[FL-20] should load structure with biological assembly data', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Many PDB structures have BIOMT records for biological assemblies
       // 1CRN is a small example
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
@@ -312,8 +300,6 @@ test.describe('File Loading', () => {
     });
 
     test('[FL-21] should render asymmetric unit by default', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Load a structure
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
@@ -330,8 +316,6 @@ test.describe('File Loading', () => {
 
   test.describe('Large File Handling', () => {
     test('[FL-22] should handle protein structure efficiently', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Crambin is a small protein - should load quickly
       await moleculeViewer.uploadFile(molecules.crambin);
 
@@ -341,8 +325,6 @@ test.describe('File Loading', () => {
     });
 
     test('[FL-23] should apply quality optimizations for larger structures', async ({ page }) => {
-      test.setTimeout(90000);
-
       // Fetch a medium-sized structure
       await moleculeViewer.fetchFromRCSBAndWait('3HTB');
 

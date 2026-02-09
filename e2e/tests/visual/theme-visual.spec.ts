@@ -8,8 +8,6 @@ test.describe('Theme Visual Tests', () => {
     // WebKit WebGL needs longer timeout due to slower rendering
     if (testInfo.project.name === 'webkit') {
       test.setTimeout(120000); // 2 minutes for WebKit WebGL
-    } else {
-      test.setTimeout(60000);
     }
     moleculeViewer = new MoleculeViewerPage(page);
     await moleculeViewer.goto();
@@ -153,7 +151,6 @@ test.describe('Theme Visual Tests', () => {
 
   test.describe('Theme Comparison', () => {
     test('[TV-11] should have visually distinct dark and light themes', async () => {
-      test.setTimeout(90000);
       await moleculeViewer.loadSampleMolecule('caffeine');
 
       // Ensure dark theme
@@ -183,7 +180,6 @@ test.describe('Theme Visual Tests', () => {
 
   test.describe('Theme with Different Representations', () => {
     test('[TV-12] should match snapshot for light theme spacefill', async () => {
-      test.setTimeout(90000);
       const theme = await moleculeViewer.getCurrentTheme();
       if (theme !== 'light') {
         await moleculeViewer.toggleTheme();
@@ -199,7 +195,6 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-13] should match snapshot for dark theme spacefill', async () => {
-      test.setTimeout(90000);
       const theme = await moleculeViewer.getCurrentTheme();
       if (theme !== 'dark') {
         await moleculeViewer.toggleTheme();

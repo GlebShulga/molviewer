@@ -12,17 +12,10 @@ test.describe('Mobile/Touch Responsiveness', () => {
       !MOBILE_PROJECTS.includes(testInfo.project.name),
       'Mobile tests only run on mobile-chrome and mobile-safari'
     );
-    // Mobile Safari needs longer timeout for page load
-    if (testInfo.project.name === 'mobile-safari') {
-      test.setTimeout(60000);
-    }
   });
   let moleculeViewer: MoleculeViewerPage;
 
   test.describe('Mobile Layout (<768px)', () => {
-    // Mobile tests need longer timeout for stability
-    test.setTimeout(60000);
-
     test.beforeEach(async ({ page }) => {
       moleculeViewer = new MoleculeViewerPage(page);
       await page.setViewportSize(viewports.mobile);
@@ -169,10 +162,6 @@ test.describe('Mobile/Touch Responsiveness', () => {
   });
 
   test.describe('Tablet Layout (768-1024px)', () => {
-    // Tablet tests have complex sidebar/molecule operations
-    // Chrome's WebGL stability checks need extra time
-    test.setTimeout(60000);
-
     test.beforeEach(async ({ page }) => {
       moleculeViewer = new MoleculeViewerPage(page);
       await page.setViewportSize(viewports.tablet);
@@ -246,10 +235,6 @@ test.describe('Mobile/Touch Responsiveness', () => {
   });
 
   test.describe('Touch Devices', () => {
-    // Touch device tests have complex beforeEach (load molecule, sidebar operations)
-    // Chrome's WebGL stability checks need extra time
-    test.setTimeout(60000);
-
     test.beforeEach(async ({ page }) => {
       moleculeViewer = new MoleculeViewerPage(page);
       await page.setViewportSize(viewports.mobile);
@@ -264,22 +249,20 @@ test.describe('Mobile/Touch Responsiveness', () => {
     });
 
     test('[MO-18] should have adequate button sizes for touch (44x44px minimum)', async () => {
-      // Check toolbar button sizes
-      const toolbarButtons = moleculeViewer.toolbar.toolbar.locator('button');
-      const buttonCount = await toolbarButtons.count();
-
-      for (let i = 0; i < Math.min(buttonCount, 5); i++) {
-        const button = toolbarButtons.nth(i);
-        // Use evaluate() to bypass Playwright stability checks that hang with WebGL
-        const box = await button.evaluate((el) => {
+      // Use single page.evaluate() to measure all buttons at once,
+      // avoiding multiple round-trips that compete with WebGL's rendering loop
+      const sizes = await moleculeViewer.page.evaluate((selector) => {
+        const buttons = document.querySelectorAll(selector);
+        return Array.from(buttons).slice(0, 5).map(el => {
           const rect = el.getBoundingClientRect();
           return { width: rect.width, height: rect.height };
         });
-        if (box) {
-          // Touch targets should be at least 44x44px
-          expect(box.width).toBeGreaterThanOrEqual(40); // Allow small tolerance
-          expect(box.height).toBeGreaterThanOrEqual(40);
-        }
+      }, '[class*="toolbar"] button');
+
+      for (const box of sizes) {
+        // Touch targets should be at least 44x44px
+        expect(box.width).toBeGreaterThanOrEqual(40); // Allow small tolerance
+        expect(box.height).toBeGreaterThanOrEqual(40);
       }
     });
 
@@ -332,10 +315,6 @@ test.describe('Mobile/Touch Responsiveness', () => {
   });
 
   test.describe('Responsive Transitions', () => {
-    // Responsive tests have viewport changes + molecule operations
-    // Chrome's WebGL stability checks need extra time
-    test.setTimeout(60000);
-
     test('[MO-23] should handle viewport resize from mobile to desktop', async ({ page }) => {
       moleculeViewer = new MoleculeViewerPage(page);
 
@@ -385,10 +364,6 @@ test.describe('Mobile/Touch Responsiveness', () => {
   });
 
   test.describe('Landscape Orientation', () => {
-    // Landscape tests have viewport changes + molecule operations
-    // Chrome's WebGL stability checks need extra time
-    test.setTimeout(60000);
-
     test('[MO-25] should work in mobile landscape', async ({ page }) => {
       moleculeViewer = new MoleculeViewerPage(page);
 

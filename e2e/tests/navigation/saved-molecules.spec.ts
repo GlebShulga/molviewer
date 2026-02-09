@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('Saved Molecules', () => {
-  // Saved molecules tests need longer timeout when running in parallel
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {
@@ -130,10 +127,7 @@ test.describe('Saved Molecules', () => {
   });
 
   test.describe('Clear All Saved Molecules', () => {
-    // Increase timeout for this test as it involves multiple molecule loads
     test('[SM-07] should clear all saved molecules with confirmation', async () => {
-      test.setTimeout(60000);
-
       // Ensure Replace mode for this test (so loading water replaces caffeine)
       const replaceButton = moleculeViewer.page.getByRole('button', { name: /Replace/i });
       if ((await replaceButton.getAttribute('aria-pressed')) !== 'true') {

@@ -78,8 +78,6 @@ test.describe('Molecule Rendering Visual Tests', () => {
 
   test.describe('Cartoon Representation', () => {
     test('[MR-06] should match snapshot for protein cartoon', async ({ page }) => {
-      test.setTimeout(90000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       // Switch to cartoon if available
@@ -126,8 +124,6 @@ test.describe('Molecule Rendering Visual Tests', () => {
     });
 
     test('[MR-09] should match snapshot for rainbow coloring on protein', async ({ page }) => {
-      test.setTimeout(90000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
       if (await moleculeViewer.controlPanel.colorSchemeSection.isVisible()) {

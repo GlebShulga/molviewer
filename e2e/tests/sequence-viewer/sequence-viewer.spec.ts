@@ -3,9 +3,6 @@ import { MoleculeViewerPage } from '../../page-objects';
 import { molecules, rcsbIds } from '../../fixtures';
 
 test.describe('Sequence Viewer', () => {
-  // Sequence viewer tests involve loading proteins which takes longer
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {

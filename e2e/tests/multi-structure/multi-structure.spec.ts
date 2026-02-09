@@ -163,9 +163,6 @@ test.describe('Multi-Structure Support', () => {
   });
 
   test.describe('Per-Structure Settings', () => {
-    // Per-structure tests involve multiple structure operations
-    test.setTimeout(60000);
-
     test('[MS-10] should apply representation to active structure only', async ({ }, testInfo) => {
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
@@ -188,8 +185,6 @@ test.describe('Multi-Structure Support', () => {
     });
 
     test('[MS-11] should apply color scheme to active structure only', async ({ }, testInfo) => {
-      test.setTimeout(60000); // Multi-structure operations need longer timeout
-
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
 
@@ -215,8 +210,6 @@ test.describe('Multi-Structure Support', () => {
     });
 
     test('[MS-12] should preserve settings when switching active structure', async ({ }, testInfo) => {
-      test.setTimeout(60000); // 1 minute - involves multiple file loads
-
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
 
@@ -278,9 +271,6 @@ test.describe('Multi-Structure Support', () => {
   });
 
   test.describe('Layout Modes', () => {
-    // Layout mode tests involve multiple structure operations
-    test.setTimeout(60000);
-
     test('[MS-13] should show layout toggle when >1 structure', async () => {
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
@@ -326,9 +316,6 @@ test.describe('Multi-Structure Support', () => {
   });
 
   test.describe('Camera Fit', () => {
-    // Camera fit tests involve multiple structure operations
-    test.setTimeout(60000);
-
     test('[MS-16] should fit camera to all visible structures on Home', async () => {
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
@@ -362,9 +349,6 @@ test.describe('Multi-Structure Support', () => {
   });
 
   test.describe('Cross-Structure Features', () => {
-    // Cross-structure tests involve multiple molecule loads
-    test.setTimeout(60000);
-
     test('[MS-18] should measure distance between atoms of different structures', async () => {
       // Add a second structure
       await moleculeViewer.addStructure(molecules.water);
@@ -462,9 +446,6 @@ test.describe('Multi-Structure Support', () => {
   });
 
   test.describe('Undo/Redo', () => {
-    // Undo/Redo with multi-structure operations need longer timeout
-    test.setTimeout(60000);
-
     test('[MS-22] should undo structure addition', async () => {
       const initialCount = await moleculeViewer.structureList.getStructureCount();
 

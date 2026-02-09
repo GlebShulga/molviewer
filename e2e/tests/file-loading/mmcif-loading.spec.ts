@@ -85,7 +85,6 @@ test.describe('mmCIF File Loading', () => {
     });
 
     test('[CIF-06] should handle B-factor data from mmCIF', async () => {
-      test.setTimeout(60000);
       await moleculeViewer.uploadFile(molecules.crambinCif);
 
       const isLoaded = await moleculeViewer.isMoleculeLoaded();
@@ -112,8 +111,6 @@ test.describe('mmCIF File Loading', () => {
 
   test.describe('RCSB Fetch with mmCIF', () => {
     test('[CIF-07] should fetch mmCIF from RCSB by PDB ID', async ({ page }) => {
-      test.setTimeout(60000);
-
       // RCSB fetch now uses mmCIF format
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
@@ -123,8 +120,6 @@ test.describe('mmCIF File Loading', () => {
     });
 
     test('[CIF-08] should parse secondary structure from RCSB mmCIF', async ({ page }) => {
-      test.setTimeout(60000);
-
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
       await moleculeViewer.canvas.expectMoleculeRendered();
 
@@ -136,8 +131,6 @@ test.describe('mmCIF File Loading', () => {
     });
 
     test('[CIF-09] should handle multi-chain structure from RCSB mmCIF', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Fetch insulin which has multiple chains (A and B)
       await moleculeViewer.fetchFromRCSBAndWait('2INS');
 
@@ -157,8 +150,6 @@ test.describe('mmCIF File Loading', () => {
     });
 
     test('[CIF-10] should handle NMR structure (first model only) from RCSB mmCIF', async ({ page }) => {
-      test.setTimeout(60000);
-
       // 1UBQ is a common NMR structure with multiple models
       await moleculeViewer.fetchFromRCSBAndWait('1UBQ');
 

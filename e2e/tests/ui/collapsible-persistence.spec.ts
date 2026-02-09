@@ -4,6 +4,7 @@ import { molecules } from '../../fixtures';
 import { waitForMoleculeAndHeaders } from '../../helpers/wait-for-render';
 
 test.describe('Collapsible Panel Persistence', () => {
+  test.slow();
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -36,9 +37,6 @@ test.describe('Collapsible Panel Persistence', () => {
   };
 
   test.describe('State Persistence', () => {
-    // Tests with page reload need longer timeout
-    test.setTimeout(60000);
-
     test('[CP-01] should persist collapsed state to localStorage', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
@@ -70,7 +68,7 @@ test.describe('Collapsible Panel Persistence', () => {
       const initialExpanded = await isSectionExpanded('Structures');
 
       // Toggle the state
-      await structuresHeader.click({ force: true });
+      await structuresHeader.evaluate((el) => (el as HTMLElement).click());
       await page.waitForTimeout(200);
 
       const newExpanded = await isSectionExpanded('Structures');
@@ -115,9 +113,6 @@ test.describe('Collapsible Panel Persistence', () => {
   });
 
   test.describe('Independent Panel States', () => {
-    // Tests with page reload need longer timeout
-    test.setTimeout(60000);
-
     test('[CP-04] should persist each panel state independently', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
@@ -133,9 +128,9 @@ test.describe('Collapsible Panel Persistence', () => {
       const savedMoleculesInitial = await isSectionExpanded('Saved Molecules');
 
       // Toggle both to opposite states
-      await structuresHeader.click({ force: true });
+      await structuresHeader.evaluate((el) => (el as HTMLElement).click());
       await page.waitForTimeout(100);
-      await savedMoleculesHeader.click({ force: true });
+      await savedMoleculesHeader.evaluate((el) => (el as HTMLElement).click());
       await page.waitForTimeout(100);
 
       // Reload
@@ -179,9 +174,6 @@ test.describe('Collapsible Panel Persistence', () => {
   });
 
   test.describe('Persistence Across Sessions', () => {
-    // Tests with page close/open need longer timeout
-    test.setTimeout(60000);
-
     test('[CP-06] should maintain state across browser sessions (simulated)', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
@@ -259,8 +251,6 @@ test.describe('Collapsible Panel Persistence', () => {
   });
 
   test.describe('All Panels', () => {
-    test.setTimeout(60000);
-
     test('[CP-09] should persist state for Structures panel', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
@@ -328,9 +318,6 @@ test.describe('Collapsible Panel Persistence', () => {
   });
 
   test.describe('Edge Cases', () => {
-    // Tests with page reload need longer timeout
-    test.setTimeout(60000);
-
     test('[CP-14] should handle corrupted localStorage gracefully', async ({ page }) => {
       // Set invalid value in localStorage
       await page.evaluate(() => {

@@ -3,9 +3,6 @@ import { MoleculeViewerPage } from '../../page-objects';
 import { molecules } from '../../fixtures';
 
 test.describe('Molecule Metadata', () => {
-  // Molecule loading on CI with software WebGL can take 20-30s
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {
@@ -342,7 +339,6 @@ test.describe('Molecule Metadata', () => {
     });
 
     test('[MM-20] should update metadata when switching molecules', async () => {
-      test.setTimeout(60000);
       // Load caffeine first
       await moleculeViewer.loadSampleMolecule('caffeine');
 

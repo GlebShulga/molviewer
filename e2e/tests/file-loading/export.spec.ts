@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('Export', () => {
-  // Export tests can be slow due to molecule loading + export panel opening
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {

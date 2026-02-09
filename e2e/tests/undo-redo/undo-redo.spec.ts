@@ -115,9 +115,6 @@ test.describe('Undo/Redo', () => {
   });
 
   test.describe('Multiple Undo/Redo', () => {
-    // Multiple undo/redo operations need longer timeout
-    test.setTimeout(60000);
-
     test('[UR-10] should undo multiple changes', async () => {
       // Make multiple changes
       await moleculeViewer.toolbar.setStick();
@@ -262,8 +259,6 @@ test.describe('Undo/Redo', () => {
       // WebKit WebGL initialization is significantly slower
       if (testInfo.project.name === 'webkit') {
         test.setTimeout(120000);
-      } else {
-        test.setTimeout(60000);
       }
     });
 
@@ -337,8 +332,8 @@ test.describe('Undo/Redo', () => {
     });
 
     test('[UR-21] should undo active structure representation change', async () => {
-      // Add a second structure
-      await moleculeViewer.addStructure(molecules.crambin);
+      // Add a second structure (use small molecule to avoid CI timeout)
+      await moleculeViewer.addStructure(molecules.aspirin);
       await moleculeViewer.page.waitForTimeout(300);
 
       const names = await moleculeViewer.structureList.getStructureNames();
@@ -364,10 +359,8 @@ test.describe('Undo/Redo', () => {
     });
 
     test('[UR-22] should handle Map serialization in equality check', async ({ }, testInfo) => {
-      test.setTimeout(90000); // Loading crambin + multi-structure operations need longer timeout
-
       // This tests that undo/redo handles per-structure settings stored in Maps
-      await moleculeViewer.addStructure(molecules.crambin);
+      await moleculeViewer.addStructure(molecules.aspirin);
       await moleculeViewer.page.waitForTimeout(500);
 
       const names = await moleculeViewer.structureList.getStructureNames();
@@ -380,7 +373,7 @@ test.describe('Undo/Redo', () => {
       await moleculeViewer.toolbar.setStick();
       await moleculeViewer.page.waitForTimeout(300);
 
-      // Change settings on second structure (1crn -> Spacefill)
+      // Change settings on second structure (ASPIRIN -> Spacefill)
       await moleculeViewer.structureList.selectStructure(names[1]);
       await moleculeViewer.page.waitForTimeout(300);
       await moleculeViewer.toolbar.setSpacefill();

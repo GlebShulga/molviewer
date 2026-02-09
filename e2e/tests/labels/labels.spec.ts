@@ -4,7 +4,6 @@ import { molecules } from '../../fixtures';
 
 // Labels tests need more time due to context menu interactions and multi-structure loading
 test.describe('3D Labels', () => {
-  test.setTimeout(60000); // 60 second timeout
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {

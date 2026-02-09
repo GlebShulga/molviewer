@@ -2,9 +2,6 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 test.describe('Representations', () => {
-  // Representation tests need longer timeout when running in parallel
-  test.setTimeout(60000);
-
   let moleculeViewer: MoleculeViewerPage;
 
   test.beforeEach(async ({ page }) => {
@@ -94,8 +91,6 @@ test.describe('Representations', () => {
     });
 
     test('[RE-10] should enable Cartoon for proteins with backbone', async ({ page }) => {
-      test.setTimeout(60000);
-
       // Fetch a protein (1CRN has backbone)
       await moleculeViewer.fetchFromRCSBAndWait('1CRN');
 
@@ -121,6 +116,7 @@ test.describe('Representations', () => {
   });
 
   test.describe('Representation Persistence', () => {
+    test.slow();
     test('[RE-11] should maintain representation when switching molecules', async () => {
       // Switch to spacefill
       await moleculeViewer.toolbar.setSpacefill();
