@@ -69,6 +69,7 @@ function AppContent() {
     selectAtom,
     setHoveredAtom,
     controlsReady,
+    setError,
   } = useMoleculeStore(useShallow(state => ({
     structureOrder: state.structureOrder,
     activeStructureId: state.activeStructureId,
@@ -86,6 +87,7 @@ function AppContent() {
     selectAtom: state.selectAtom,
     setHoveredAtom: state.setHoveredAtom,
     controlsReady: state.controlsReady,
+    setError: state.setError,
   })));
 
   // Get molecule from active structure
@@ -110,6 +112,13 @@ function AppContent() {
   useEffect(() => {
     loadSavedMoleculesIndex();
   }, [loadSavedMoleculesIndex]);
+
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error, setError]);
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -288,6 +297,13 @@ function AppContent() {
             <div className={styles.errorMessage} role="alert">
               <span className={styles.errorIcon}>!</span>
               <span>{error}</span>
+              <button
+                className={styles.errorClose}
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+              >
+                &times;
+              </button>
             </div>
           )}
 
