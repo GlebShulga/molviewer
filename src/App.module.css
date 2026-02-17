@@ -120,7 +120,7 @@
 /* Error State */
 .errorMessage {
   position: absolute;
-  top: 16px;
+  top: 64px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -317,6 +317,11 @@
 
   .themeToggle {
     margin-left: 0;
+  }
+
+  /* Toolbar moves to bottom on mobile, so error can be at top */
+  .errorMessage {
+    top: 16px;
   }
 
   /* Sidebar becomes off-canvas drawer */
