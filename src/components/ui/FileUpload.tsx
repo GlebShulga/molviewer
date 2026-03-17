@@ -14,6 +14,10 @@ import styles from './FileUpload.module.css';
 const SAMPLE_FETCH_TIMEOUT_MS = 10000;
 /** Timeout for fetching PDB files from RCSB (larger files need more time) */
 const PDB_FETCH_TIMEOUT_MS = 30000;
+/** Timeout for fetching AlphaFold structures (two-step: metadata + CIF) */
+const ALPHAFOLD_FETCH_TIMEOUT_MS = 30000;
+/** Matches classic 6-char (P69905) and new 10-char (A0A1B0GTW7) UniProt accession formats */
+const UNIPROT_ID_REGEX = /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/;
 
 /**
  * Extract a user-friendly error message from an unknown error.
@@ -23,6 +27,10 @@ function getErrorMessage(err: unknown, fallbackMessage: string, timeoutMessage?:
   if (err instanceof Error) {
     if (err.name === 'AbortError' && timeoutMessage) {
       return timeoutMessage;
+    }
+    // 'Failed to fetch' is a generic TypeError from CSP/CORS/network — use the descriptive fallback instead
+    if (err.message === 'Failed to fetch') {
+      return fallbackMessage;
     }
     return err.message;
   }
@@ -47,6 +55,7 @@ export function FileUpload() {
   })));
   const [isDragging, setIsDragging] = useState(false);
   const [pdbId, setPdbId] = useState('');
+  const [uniprotId, setUniprotId] = useState('');
   const [addMode, setAddMode] = useState(true); // true = Add, false = Replace
 
   // Check if we have existing structures
@@ -241,6 +250,77 @@ export function FileUpload() {
     fetchPDB(pdbId);
   }, [fetchPDB, pdbId]);
 
+  const fetchAlphaFold = useCallback(async (id: string) => {
+    const trimmedId = id.trim().toUpperCase();
+    if (!trimmedId) {
+      setError('Please enter a UniProt ID');
+      return;
+    }
+
+    if (!UNIPROT_ID_REGEX.test(trimmedId)) {
+      setError('Invalid UniProt ID format. Examples: P69905, A0A1B0GTW7');
+      return;
+    }
+
+    if (!navigator.onLine) {
+      setError('You appear to be offline. Please check your internet connection.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ALPHAFOLD_FETCH_TIMEOUT_MS);
+
+    try {
+      // Step 1: Fetch metadata from AlphaFold API
+      const metaResponse = await fetch(
+        `https://alphafold.ebi.ac.uk/api/prediction/${trimmedId}`,
+        { signal: controller.signal }
+      );
+      if (!metaResponse.ok) {
+        if (metaResponse.status === 404) {
+          throw new Error(`UniProt ID "${trimmedId}" not found in AlphaFold DB`);
+        }
+        throw new Error(`Failed to fetch AlphaFold metadata: ${metaResponse.statusText}`);
+      }
+      const metadata = await metaResponse.json();
+      const entry = Array.isArray(metadata) ? metadata[0] : metadata;
+      const cifUrl = entry?.cifUrl;
+      if (!cifUrl) {
+        throw new Error('No structure file available for this UniProt ID');
+      }
+
+      // Step 2: Fetch the CIF file
+      const cifResponse = await fetch(cifUrl, { signal: controller.signal });
+      if (!cifResponse.ok) {
+        throw new Error(`Failed to fetch AlphaFold structure: ${cifResponse.statusText}`);
+      }
+      const content = await cifResponse.text();
+      const molecule = parseMMCIF(content);
+      const structureName = `AF-${trimmedId}`;
+      molecule.name = structureName;
+      loadMolecule(molecule, structureName);
+      setUniprotId(''); // Clear input on success
+    } catch (err) {
+      setError(getErrorMessage(
+        err,
+        'Failed to fetch AlphaFold structure',
+        'Request timed out. Please try again.'
+      ));
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchAlphaFold' });
+    } finally {
+      clearTimeout(timeout);
+      setLoading(false);
+    }
+  }, [loadMolecule, setLoading, setError]);
+
+  const handleAlphaFoldSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    fetchAlphaFold(uniprotId);
+  }, [fetchAlphaFold, uniprotId]);
+
   return (
     <div className={styles.fileUpload} role="region" aria-label="File upload">
       {/* Add/Replace mode toggle - only show when structures exist */}
@@ -316,6 +396,32 @@ export function FileUpload() {
             className={styles.pdbFetchBtn}
             disabled={isLoading || !pdbId.trim()}
             title="Fetch structure from RCSB PDB"
+          >
+            <Download size={16} />
+            Fetch
+          </button>
+        </div>
+      </form>
+
+      <form className={styles.pdbFetch} onSubmit={handleAlphaFoldSubmit}>
+        <label htmlFor="uniprot-input" className={styles.pdbLabel}>Fetch from AlphaFold DB:</label>
+        <div className={styles.pdbInputRow}>
+          <input
+            type="text"
+            id="uniprot-input"
+            value={uniprotId}
+            onChange={(e) => setUniprotId(e.target.value)}
+            placeholder="e.g., P69905"
+            className={styles.pdbInput}
+            aria-label="UniProt ID"
+            maxLength={10}
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            className={styles.pdbFetchBtn}
+            disabled={isLoading || !uniprotId.trim()}
+            title="Fetch predicted structure from AlphaFold DB"
           >
             <Download size={16} />
             Fetch

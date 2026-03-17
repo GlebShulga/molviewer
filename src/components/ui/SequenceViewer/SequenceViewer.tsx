@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { Fragment, useMemo, useState, useRef, useEffect, type CSSProperties } from 'react';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../../store/moleculeStore';
@@ -13,6 +13,13 @@ import {
 import { getChainColor, useMolecularColors } from '../../../colors';
 import { CollapsibleSection } from '../CollapsibleSection';
 import styles from './SequenceViewer.module.css';
+
+// Pure function — no component state dependencies
+function getResidueSecondaryStructure(residue: Residue): 'helix' | 'sheet' | 'coil' {
+  if (residue.atoms.length === 0) return 'coil';
+  const ss = residue.atoms[0].secondaryStructure;
+  return ss || 'coil';
+}
 
 interface SequenceViewerProps {
   onResidueClick?: (atomIndices: number[]) => void;
@@ -97,19 +104,12 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
     );
   }, [chains]);
 
-  // Set active chain to first protein chain if none selected
+  // Reset active chain when structure changes or set to first protein chain
   useEffect(() => {
-    if (proteinChains.length > 0 && !activeChain) {
+    if (proteinChains.length > 0) {
       setActiveChain(proteinChains[0].id);
     }
-  }, [proteinChains, activeChain]);
-
-  // Get secondary structure for a residue
-  const getResidueSecondaryStructure = (residue: Residue): 'helix' | 'sheet' | 'coil' => {
-    if (residue.atoms.length === 0) return 'coil';
-    const ss = residue.atoms[0].secondaryStructure;
-    return ss || 'coil';
-  };
+  }, [selectedStructureId, proteinChains]);
 
   // Find the residue key that contains the hovered/selected atom
   const highlightedResidueKey = useMemo(() => {
@@ -146,12 +146,16 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
     }
   }, [highlightedResidueKey]);
 
+  const activeChainData = proteinChains.find(c => c.id === activeChain);
+  const activeChainResidues = useMemo(
+    () => activeChainData?.residues.filter(r => isAminoAcid(r.name)) ?? [],
+    [activeChainData]
+  );
+
   // Don't render if no protein chains
   if (proteinChains.length === 0) {
     return null;
   }
-
-  const activeChainData = proteinChains.find(c => c.id === activeChain);
 
   const handleResidueClick = (residue: Residue) => {
     if (onResidueClick) {
@@ -198,7 +202,7 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
                 onClick={() => setActiveChain(chain.id)}
                 style={{
                   '--chain-color': getChainColor(chain.id),
-                } as React.CSSProperties}
+                } as CSSProperties}
               >
                 <span className={styles.chainBadge}>{chain.id}</span>
                 <span className={styles.chainLength}>
@@ -209,57 +213,46 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
           </div>
         )}
 
-        {/* Secondary structure bar */}
-        {activeChainData && (
-          <div className={styles.ssBar}>
-            {activeChainData.residues.filter(r => isAminoAcid(r.name)).map(residue => {
-              const ss = getResidueSecondaryStructure(residue);
-              return (
-                <div
-                  key={`ss-${residue.chainId}-${residue.number}`}
-                  className={styles.ssBlock}
-                  style={{ backgroundColor: ssColors[ss] }}
-                  title={`${residue.name}${residue.number}: ${ss}`}
-                />
-              );
-            })}
-          </div>
-        )}
-
         {/* Sequence display */}
         {activeChainData && (
           <div className={styles.sequenceContainer} ref={sequenceRef}>
             <div className={styles.sequence}>
-              {activeChainData.residues.filter(r => isAminoAcid(r.name)).map((residue, index) => {
+              {activeChainResidues.map((residue, index) => {
                 const residueKey = `${residue.chainId}-${residue.number}`;
                 const isHighlighted = residueKey === highlightedResidueKey;
                 const isHovered = residueKey === hoveredResidue;
                 const ss = getResidueSecondaryStructure(residue);
 
                 return (
-                  <button
-                    key={residueKey}
-                    data-residue-key={residueKey}
-                    className={clsx(
-                      styles.residue,
-                      isHighlighted && styles.highlighted,
-                      isHovered && styles.hovered,
-                      ss === 'helix' && styles.helix,
-                      ss === 'sheet' && styles.sheet
+                  <Fragment key={residueKey}>
+                    {/* Group label before every 10-residue block */}
+                    {index % 10 === 0 && (
+                      <span className={styles.groupLabel}>{residue.number}</span>
                     )}
-                    onClick={() => handleResidueClick(residue)}
-                    onMouseEnter={() => handleResidueHover(residue)}
-                    onMouseLeave={() => handleResidueHover(null)}
-                    title={`${residue.name}${residue.number} (${ss})`}
-                  >
-                    <span className={styles.residueCode}>
-                      {getOneLetterCode(residue.name)}
-                    </span>
-                    {/* Show residue number every 10 residues */}
+                    <button
+                      data-residue-key={residueKey}
+                      className={clsx(
+                        styles.residue,
+                        isHighlighted && styles.highlighted,
+                        isHovered && styles.hovered,
+                        ss === 'helix' && styles.helix,
+                        ss === 'sheet' && styles.sheet,
+                        ss === 'coil' && styles.coil
+                      )}
+                      onClick={() => handleResidueClick(residue)}
+                      onMouseEnter={() => handleResidueHover(residue)}
+                      onMouseLeave={() => handleResidueHover(null)}
+                      title={`${residue.name} ${residue.number} (${ss})`}
+                    >
+                      <span className={styles.residueCode}>
+                        {getOneLetterCode(residue.name)}
+                      </span>
+                    </button>
+                    {/* Spacer after every 10th residue */}
                     {(index + 1) % 10 === 0 && (
-                      <span className={styles.residueNumber}>{residue.number}</span>
+                      <span className={styles.groupSpacer} />
                     )}
-                  </button>
+                  </Fragment>
                 );
               })}
             </div>

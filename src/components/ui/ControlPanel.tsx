@@ -40,6 +40,8 @@ export function ControlPanel() {
     [molecule]
   );
 
+  const isAlphaFold = activeStructure?.name?.startsWith('AF-') ?? false;
+
   if (!molecule || !activeStructure) {
     return null;
   }
@@ -151,7 +153,7 @@ export function ControlPanel() {
                 className={clsx(styles.controlButton, colorScheme === scheme.value && styles.active)}
                 onClick={() => setColorScheme(scheme.value)}
                 aria-pressed={colorScheme === scheme.value}
-                title={!visible ? 'Structure is hidden' : (available ? scheme.description : scheme.disabledDescription)}
+                title={!visible ? 'Structure is hidden' : (available ? (scheme.value === 'bfactor' && isAlphaFold ? 'pLDDT confidence: Blue (low) → Red (high)' : scheme.description) : scheme.disabledDescription)}
                 disabled={!available}
               >
                 {scheme.label}

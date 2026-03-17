@@ -34,6 +34,8 @@ export class MoleculeViewerPage {
   readonly dropZone: Locator;
   readonly pdbIdInput: Locator;
   readonly fetchButton: Locator;
+  readonly uniprotIdInput: Locator;
+  readonly alphafoldFetchButton: Locator;
 
   // Sample molecule buttons
   readonly sampleButtons: Locator;
@@ -76,7 +78,9 @@ export class MoleculeViewerPage {
     this.fileInput = page.locator('input[type="file"]');
     this.dropZone = page.locator('[class*="dropZone"]');
     this.pdbIdInput = page.getByPlaceholder(/1CRN/i);
-    this.fetchButton = page.getByRole('button', { name: /Fetch/i });
+    this.fetchButton = page.locator('#pdb-input').locator('..').getByRole('button', { name: /Fetch/i });
+    this.uniprotIdInput = page.getByPlaceholder(/P69905/i);
+    this.alphafoldFetchButton = page.locator('#uniprot-input').locator('..').getByRole('button', { name: /Fetch/i });
 
     // Sample buttons
     this.sampleButtons = page.locator('[class*="sampleButton"]');
@@ -163,6 +167,24 @@ export class MoleculeViewerPage {
   async fetchFromRCSBAndWait(pdbId: string): Promise<void> {
     await this.fetchFromRCSB(pdbId);
     await waitForMoleculeLoaded(this.page, 60000); // Longer timeout for network
+  }
+
+  /**
+   * Fetch a predicted structure from AlphaFold DB
+   * Uses force: true to bypass Playwright stability checks that hang due to WebGL canvas repainting
+   */
+  async fetchFromAlphaFold(uniprotId: string): Promise<void> {
+    await this.uniprotIdInput.fill(uniprotId);
+    await this.alphafoldFetchButton.click({ force: true });
+    await this.page.waitForTimeout(300);
+  }
+
+  /**
+   * Fetch from AlphaFold and wait for load
+   */
+  async fetchFromAlphaFoldAndWait(uniprotId: string): Promise<void> {
+    await this.fetchFromAlphaFold(uniprotId);
+    await waitForMoleculeLoaded(this.page, 60000); // Longer timeout for two-step network fetch
   }
 
   /**

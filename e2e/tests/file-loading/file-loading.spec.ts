@@ -98,6 +98,45 @@ test.describe('File Loading', () => {
     });
   });
 
+  test.describe('AlphaFold Fetch', () => {
+    test('[FL-28] should fetch structure from AlphaFold by UniProt ID', async () => {
+      test.slow(); // Network fetch (two-step: metadata + CIF)
+
+      await moleculeViewer.fetchFromAlphaFoldAndWait('P69905');
+
+      const isLoaded = await moleculeViewer.isMoleculeLoaded();
+      expect(isLoaded).toBe(true);
+      await moleculeViewer.canvas.expectMoleculeRendered();
+    });
+
+    test('[FL-29] should show error for invalid UniProt ID format', async () => {
+      await moleculeViewer.fetchFromAlphaFold('ABC');
+
+      await moleculeViewer.canvas.errorMessage.waitFor({ state: 'visible', timeout: 5000 });
+
+      const hasError = await moleculeViewer.canvas.hasError();
+      expect(hasError).toBe(true);
+
+      const errorText = await moleculeViewer.canvas.getErrorText();
+      expect(errorText).toContain('Invalid UniProt ID format');
+    });
+
+    test('[FL-30] should show error for non-existent UniProt ID', async () => {
+      test.slow(); // Network fetch
+
+      await moleculeViewer.fetchFromAlphaFold('Q00000');
+      await moleculeViewer.page.waitForTimeout(500);
+
+      await moleculeViewer.canvas.errorMessage.waitFor({ state: 'visible', timeout: 30000 });
+
+      const hasError = await moleculeViewer.canvas.hasError();
+      expect(hasError).toBe(true);
+
+      const errorText = await moleculeViewer.canvas.getErrorText();
+      expect(errorText).toContain('not found');
+    });
+  });
+
   test.describe('Empty State', () => {
     test('[FL-09] should show empty state when no molecule is loaded', async () => {
       const isEmpty = await moleculeViewer.canvas.isEmpty();

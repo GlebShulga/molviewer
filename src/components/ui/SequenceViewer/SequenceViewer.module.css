@@ -1,4 +1,8 @@
 .sequenceViewer {
+  --ss-helix: #ff69b4;
+  --ss-sheet: #ffd700;
+  --ss-coil: #808080;
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -80,34 +84,15 @@
   color: var(--text-secondary);
 }
 
-/* Secondary structure bar */
-.ssBar {
-  display: flex;
-  height: 6px;
-  border-radius: 3px;
-  overflow: hidden;
-  background-color: var(--bg-tertiary);
-}
-
-.ssBlock {
-  flex: 1;
-  min-width: 2px;
-  transition: opacity 0.15s ease;
-}
-
-.ssBlock:hover {
-  opacity: 0.8;
-}
-
 /* Sequence container */
 .sequenceContainer {
-  max-height: 120px;
+  max-height: 180px;
   overflow-y: auto;
   overflow-x: hidden;
   background-color: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 8px;
+  padding: 6px 4px;
 }
 
 .sequence {
@@ -132,60 +117,76 @@
   transition: all 0.1s ease;
 }
 
-.residue:hover,
-.hovered {
-  background-color: rgba(88, 166, 255, 0.15);
-  border-color: var(--accent-color);
-}
-
-.highlighted {
-  background-color: rgba(88, 166, 255, 0.3);
-  border-color: var(--accent-color);
-}
-
 .residue.helix {
-  border-bottom: 2px solid #ff69b4;
+  background-color: color-mix(in srgb, var(--ss-helix) 20%, transparent);
+  border-bottom: 2px solid var(--ss-helix);
 }
 
 .residue.sheet {
-  border-bottom: 2px solid #ffd700;
+  background-color: color-mix(in srgb, var(--ss-sheet) 20%, transparent);
+  border-bottom: 2px solid var(--ss-sheet);
+}
+
+.residue.coil {
+  background-color: color-mix(in srgb, var(--ss-coil) 10%, transparent);
+}
+
+/* Hover/highlight must come after SS styles and use .residue prefix to win specificity */
+.residue.hovered,
+.residue:hover {
+  background-color: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border-color: var(--accent-color);
+}
+
+.residue.highlighted {
+  background-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
+  border-color: var(--accent-color);
 }
 
 .residueCode {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1;
 }
 
-.residueNumber {
-  position: absolute;
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.55rem;
+/* Group label shown before every 10-residue block */
+.groupLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 28px;
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   color: var(--text-secondary);
-  white-space: nowrap;
+  user-select: none;
+}
+
+/* Spacer inserted after every 10th residue */
+.groupSpacer {
+  width: 6px;
+  flex-shrink: 0;
 }
 
 /* Legend */
 .legend {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.65rem;
+  gap: 3px;
+  font-size: 0.6rem;
   color: var(--text-secondary);
 }
 
 .legendColor {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 2px;
 }

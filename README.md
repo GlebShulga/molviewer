@@ -44,6 +44,7 @@ Interactive 3D molecular visualization built with React and Three.js.
 - Drag & drop or browse for files
 - **Formats:** PDB, CIF (mmCIF), SDF, MOL, XYZ
 - **PDB ID Lookup** - Fetch directly from RCSB PDB (uses mmCIF format)
+- **AlphaFold DB** - Fetch predicted structures by UniProt ID
 - **Sample Molecules** - Built-in caffeine, aspirin, and water
 
 ## Requirements

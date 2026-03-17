@@ -28,6 +28,9 @@ MolViewer is a molecular visualization application built with:
 - `pnpm build` - Production build
 - `pnpm preview` - Preview production build
 
+## CSS Rules
+- **Never use hardcoded color values** (e.g., `rgba(88, 166, 255, 0.15)`). Always use CSS custom properties from `src/index.css` (`--accent-color`, `--bg-primary`, etc.). For transparency, use `color-mix(in srgb, var(--accent-color) 15%, transparent)`.
+
 ## Performance Constraints
 This is an **open-source project** with the following constraints:
 - **No Web Workers**: Avoid suggesting Web Workers as they add complexity and bundle size for minimal benefit in this use case
