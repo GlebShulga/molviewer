@@ -29,14 +29,14 @@
   background-color: var(--bg-secondary);
 }
 
-.item:focus {
+.item:focus-visible {
   outline: none;
   border-color: var(--accent-color);
 }
 
 .item.active {
   border-color: var(--accent-color);
-  background-color: rgba(88, 166, 255, 0.1);
+  background-color: color-mix(in srgb, var(--accent-color) 10%, transparent);
 }
 
 .item.hidden {
@@ -109,7 +109,7 @@
 }
 
 .actionButton.danger:hover {
-  background-color: rgba(248, 81, 73, 0.2);
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
   border-color: var(--error-color);
   color: var(--error-color);
 }

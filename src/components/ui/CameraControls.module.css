@@ -63,3 +63,8 @@
   color: white;
   border-color: var(--accent-color);
 }
+
+@media (pointer: coarse) {
+  .cameraPresetBtn { width: 44px; height: 44px; }
+  .cameraActionBtn { width: 44px; height: 44px; }
+}

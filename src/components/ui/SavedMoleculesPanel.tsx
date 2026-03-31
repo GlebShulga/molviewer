@@ -143,6 +143,7 @@ export function SavedMoleculesPanel() {
                         <input
                           ref={inputRef}
                           type="text"
+                          aria-label="Edit molecule name"
                           className={styles.savedItemInput}
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}

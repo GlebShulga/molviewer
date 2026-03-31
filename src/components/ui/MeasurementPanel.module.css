@@ -138,6 +138,10 @@
 }
 
 .measurementDelete:hover {
-  background-color: rgba(248, 81, 73, 0.2);
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
   color: var(--error-color);
+}
+
+@media (pointer: coarse) {
+  .measurementDelete { width: 44px; height: 44px; }
 }

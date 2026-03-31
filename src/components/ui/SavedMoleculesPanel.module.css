@@ -102,7 +102,7 @@
   min-width: 0;
 }
 
-.savedItemInput:focus {
+.savedItemInput:focus-visible {
   outline: none;
 }
 
@@ -138,7 +138,7 @@
 }
 
 .danger:hover {
-  background-color: rgba(248, 81, 73, 0.2);
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
   border-color: var(--error-color);
   color: var(--error-color);
 }
@@ -149,18 +149,18 @@
 }
 
 .update:hover {
-  background-color: rgba(88, 166, 255, 0.2);
+  background-color: color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
 
 .success {
   color: var(--success-color);
   border-color: var(--success-color);
-  background-color: rgba(63, 185, 80, 0.2);
+  background-color: color-mix(in srgb, var(--success-color) 20%, transparent);
 }
 
 .storageWarning {
   padding: 8px;
-  background-color: rgba(248, 81, 73, 0.15);
+  background-color: color-mix(in srgb, var(--error-color) 15%, transparent);
   border: 1px solid var(--error-color);
   border-radius: 6px;
   font-size: 0.75rem;

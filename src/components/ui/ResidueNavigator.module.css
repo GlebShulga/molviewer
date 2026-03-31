@@ -26,7 +26,7 @@
   font-size: 0.875rem;
 }
 
-.residueSearchInput:focus {
+.residueSearchInput:focus-visible {
   outline: none;
 }
 
@@ -106,7 +106,7 @@
 .residueItem:hover,
 .hovered {
   border-color: var(--accent-color);
-  background-color: rgba(88, 166, 255, 0.1);
+  background-color: color-mix(in srgb, var(--accent-color) 10%, transparent);
 }
 
 .residueCode {

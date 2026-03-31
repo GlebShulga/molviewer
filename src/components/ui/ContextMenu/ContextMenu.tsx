@@ -181,7 +181,7 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     >
       <div className={styles.header}>
         <span className={styles.title}>{title}</span>
-        <button className={styles.closeButton} onClick={hideContextMenu}>
+        <button className={styles.closeButton} onClick={hideContextMenu} aria-label="Close menu">
           <X size={14} />
         </button>
       </div>

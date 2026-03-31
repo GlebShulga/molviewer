@@ -38,7 +38,7 @@
 }
 
 .controlButtonDanger:hover {
-  background-color: rgba(248, 81, 73, 0.2);
+  background-color: color-mix(in srgb, var(--error-color) 20%, transparent);
   border-color: var(--error-color);
   color: var(--error-color);
 }
@@ -49,13 +49,13 @@
 }
 
 .controlButtonUpdate:hover {
-  background-color: rgba(88, 166, 255, 0.2);
+  background-color: color-mix(in srgb, var(--accent-color) 20%, transparent);
 }
 
 .controlButtonUpdateSuccess {
   color: var(--success-color);
   border-color: var(--success-color);
-  background-color: rgba(63, 185, 80, 0.2);
+  background-color: color-mix(in srgb, var(--success-color) 20%, transparent);
 }
 
 /* Focus indicators for accessibility */

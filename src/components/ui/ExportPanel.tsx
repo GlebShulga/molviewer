@@ -33,8 +33,9 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
     <CollapsibleSection title="Export" defaultOpen={false} storageKey="export">
       <div className={styles.exportPanel}>
         <div className={styles.exportField}>
-          <label className={styles.exportLabel}>Filename</label>
+          <label className={styles.exportLabel} htmlFor="export-filename">Filename</label>
           <input
+            id="export-filename"
             type="text"
             className={styles.exportInput}
             value={filename}
