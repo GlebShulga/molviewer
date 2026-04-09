@@ -69,6 +69,7 @@ export default defineConfig({
         '**/ui/component-settings.spec.ts',
         '**/edge-cases/error-handling.spec.ts',
         '**/undo-redo/**/*.spec.ts',
+        '**/onboarding/**/*.spec.ts',
       ],
       use: {
         ...devices['Desktop Chrome'],

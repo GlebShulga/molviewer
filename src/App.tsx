@@ -24,9 +24,12 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { WebGLFallback } from './components/ui/WebGLFallback';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { OnboardingProvider, useOnboardingContext, WelcomeScreen, SpotlightTour } from './components/onboarding';
 import { THEME_COLORS } from './config';
 import { isWebGL2Supported } from './utils/webglDetection';
-import { Sun, Moon, Menu, X } from 'lucide-react';
+import { parseMoleculeParams, parseViewParams } from './utils/urlParams';
+import { parseMMCIF, parseByFilename } from './parsers';
+import { Sun, Moon, Menu, X, Github } from 'lucide-react';
 import styles from './App.module.css';
 import './styles/globals.css';
 
@@ -41,6 +44,36 @@ function ThemeToggle() {
     >
       {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
     </button>
+  );
+}
+
+function OnboardingSpotlight({ setSidebarOpen }: { setSidebarOpen: (open: boolean) => void }) {
+  const onboarding = useOnboardingContext();
+  if (onboarding.phase !== 'touring') return null;
+  return (
+    <SpotlightTour
+      step={onboarding.tourStep}
+      onNext={onboarding.nextStep}
+      onPrev={onboarding.prevStep}
+      onSkip={onboarding.skipTour}
+      setSidebarOpen={setSidebarOpen}
+    />
+  );
+}
+
+function EmptyOrWelcome() {
+  const onboarding = useOnboardingContext();
+
+  if (onboarding.phase === 'welcome' || onboarding.phase === 'loading') {
+    return <WelcomeScreen onStart={onboarding.startTour} isLoading={onboarding.phase === 'loading'} />;
+  }
+
+  return (
+    <div className={styles.emptyState}>
+      <div className={styles.emptyIcon}>&#x2B21;</div>
+      <p>Upload a molecule file to get started</p>
+      <p className={styles.emptyHint}>Supported formats: PDB, SDF, MOL, XYZ</p>
+    </div>
   );
 }
 
@@ -70,6 +103,10 @@ function AppContent() {
     setHoveredAtom,
     controlsReady,
     setError,
+    addStructure,
+    setStructureRepresentation,
+    setStructureColorScheme,
+    setMoleculeSource,
   } = useMoleculeStore(useShallow(state => ({
     structureOrder: state.structureOrder,
     activeStructureId: state.activeStructureId,
@@ -88,6 +125,10 @@ function AppContent() {
     setHoveredAtom: state.setHoveredAtom,
     controlsReady: state.controlsReady,
     setError: state.setError,
+    addStructure: state.addStructure,
+    setStructureRepresentation: state.setStructureRepresentation,
+    setStructureColorScheme: state.setStructureColorScheme,
+    setMoleculeSource: state.setMoleculeSource,
   })));
 
   // Get molecule from active structure
@@ -112,6 +153,87 @@ function AppContent() {
   useEffect(() => {
     loadSavedMoleculesIndex();
   }, [loadSavedMoleculesIndex]);
+
+  // Auto-load from URL params (?pdb=, ?af=, ?url=)
+  useEffect(() => {
+    if (structureOrder.length > 0) return;
+
+    const moleculeParams = parseMoleculeParams(window.location.search);
+    if (!moleculeParams) return; // No URL params — show empty state
+
+    const viewParams = parseViewParams(window.location.search);
+    const controller = new AbortController();
+    // TypeScript narrowed moleculeParams to non-null above, but the closure
+    // doesn't preserve that. Capture it in a const the closure can trust.
+    const params = moleculeParams;
+
+    async function loadFromUrl() {
+      const { setLoading } = useMoleculeStore.getState();
+      setLoading(true);
+
+      try {
+        let content: string;
+        let name: string;
+        let source: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string };
+
+        if (params.source === 'rcsb') {
+          const id = params.id!;
+          const resp = await fetch(`https://files.rcsb.org/download/${id}.cif`, { signal: controller.signal });
+          if (!resp.ok) throw new Error(`PDB ID "${id}" not found`);
+          content = await resp.text();
+          name = id;
+          source = { type: 'rcsb', id };
+        } else if (params.source === 'alphafold') {
+          const id = params.id!;
+          const metaResp = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${id}`, { signal: controller.signal });
+          if (!metaResp.ok) throw new Error(`UniProt ID "${id}" not found in AlphaFold DB`);
+          const metadata = await metaResp.json();
+          const entry = Array.isArray(metadata) ? metadata[0] : metadata;
+          const cifUrl = entry?.cifUrl;
+          if (!cifUrl) throw new Error('No structure file available');
+          const cifResp = await fetch(cifUrl, { signal: controller.signal });
+          if (!cifResp.ok) throw new Error('Failed to fetch AlphaFold structure');
+          content = await cifResp.text();
+          name = `AF-${id}`;
+          source = { type: 'alphafold', id };
+        } else {
+          const url = params.url!;
+          const resp = await fetch(url, { signal: controller.signal });
+          if (!resp.ok) throw new Error('Failed to fetch molecule from URL');
+          content = await resp.text();
+          const urlPath = new URL(url).pathname;
+          name = urlPath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'External';
+          source = { type: 'url', url };
+        }
+
+        if (controller.signal.aborted) return;
+
+        const molecule = params.source === 'url'
+          ? parseByFilename(content, new URL(params.url!).pathname)
+          : parseMMCIF(content);
+        molecule.name = name;
+        const structId = addStructure(molecule, name);
+        setMoleculeSource(source);
+        document.title = `${name} - MolViewer`;
+
+        if (structId) {
+          if (viewParams.repr) setStructureRepresentation(structId, viewParams.repr);
+          if (viewParams.color) setStructureColorScheme(structId, viewParams.color);
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Failed to load molecule');
+      } finally {
+        if (!controller.signal.aborted) {
+          useMoleculeStore.getState().setLoading(false);
+        }
+      }
+    }
+
+    loadFromUrl();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-dismiss error after 5 seconds
   useEffect(() => {
@@ -240,6 +362,16 @@ function AppContent() {
         </button>
         <h1>MolViewer</h1>
         <span className={styles.tagline}>Interactive 3D Molecule Viewer</span>
+        <a
+          href="https://github.com/GlebShulga/molviewer"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.githubLink}
+          title="View on Github"
+          aria-label="View on Github"
+        >
+          <Github size={20} />
+        </a>
         <ThemeToggle />
       </header>
 
@@ -308,11 +440,7 @@ function AppContent() {
           )}
 
           {!hasStructures && !isLoading && !error && (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>&#x2B21;</div>
-              <p>Upload a molecule file to get started</p>
-              <p className={styles.emptyHint}>Supported formats: PDB, SDF, MOL, XYZ</p>
-            </div>
+            <EmptyOrWelcome />
           )}
 
           {hasStructures && (
@@ -350,6 +478,7 @@ function AppContent() {
       <AtomTooltip />
       <ContextMenu />
       <ShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <OnboardingSpotlight setSidebarOpen={setSidebarOpen} />
     </div>
   );
 }
@@ -357,7 +486,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <OnboardingProvider>
+        <AppContent />
+      </OnboardingProvider>
     </ThemeProvider>
   );
 }

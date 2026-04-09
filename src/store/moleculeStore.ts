@@ -150,6 +150,9 @@ interface MoleculeState {
   // Viewer state (transient - not tracked for undo/redo)
   controlsReady: boolean;
 
+  // Source tracking for URL sharing (transient)
+  moleculeSource: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string } | null;
+
   // ===== Structure management actions =====
   addStructure: (molecule: Molecule, name?: string) => string;
   removeStructure: (id: string) => void;
@@ -234,6 +237,9 @@ interface MoleculeState {
   // Viewer state actions
   setControlsReady: (ready: boolean) => void;
 
+  // Source tracking
+  setMoleculeSource: (source: MoleculeState['moleculeSource']) => void;
+
   reset: () => void;
 }
 
@@ -294,6 +300,9 @@ const initialState = {
 
   // Viewer state
   controlsReady: false,
+
+  // Source tracking
+  moleculeSource: null as MoleculeState['moleculeSource'],
 };
 
 /**
@@ -913,6 +922,9 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   // Viewer state actions
   setControlsReady: (ready) => set({ controlsReady: ready }),
+
+  // Source tracking
+  setMoleculeSource: (source) => set({ moleculeSource: source }),
 
   reset: () => {
     clearSelectorCaches();

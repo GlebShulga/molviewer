@@ -43,8 +43,30 @@
   font-size: 0.875rem;
 }
 
-.themeToggle {
+.githubLink {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.githubLink:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+  text-decoration: none;
+}
+
+.themeToggle {
+  margin-left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -309,6 +331,10 @@
 
   .tagline {
     display: none;
+  }
+
+  .githubLink {
+    margin-left: auto;
   }
 
   .menuButton {

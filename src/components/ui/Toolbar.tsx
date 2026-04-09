@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import clsx from 'clsx';
 import {
   Circle,
@@ -12,11 +12,14 @@ import {
   Undo2,
   Redo2,
   RotateCw,
+  Link,
+  Check,
 } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
+import { buildShareUrl } from '../../utils/urlParams';
 import styles from './Toolbar.module.css';
 
 export type MeasurementMode = 'none' | 'distance' | 'angle' | 'dihedral';
@@ -52,11 +55,32 @@ export function Toolbar({
 }: ToolbarProps) {
   // Use new hook for active structure access
   const activeStructure = useActiveStructure();
-  const { setRepresentation, autoRotate, setAutoRotate } = useMoleculeStore(useShallow(state => ({
+  const { setRepresentation, autoRotate, setAutoRotate, moleculeSource } = useMoleculeStore(useShallow(state => ({
     setRepresentation: state.setRepresentation,
     autoRotate: state.autoRotate,
     setAutoRotate: state.setAutoRotate,
+    moleculeSource: state.moleculeSource,
   })));
+
+  // Copy link state
+  const [linkCopied, setLinkCopied] = useState(false);
+  const handleCopyLink = useCallback(() => {
+    const repr = activeStructure?.representation;
+    const color = activeStructure?.colorScheme;
+    const url = buildShareUrl({
+      pdbId: moleculeSource?.type === 'rcsb' ? moleculeSource.id : undefined,
+      uniprotId: moleculeSource?.type === 'alphafold' ? moleculeSource.id : undefined,
+      externalUrl: moleculeSource?.type === 'url' ? moleculeSource.url : undefined,
+      repr,
+      color,
+    });
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }).catch(() => {
+      // Clipboard API can fail in iframes or older browsers — ignore silently
+    });
+  }, [activeStructure, moleculeSource]);
 
   // Get undo/redo state from temporal store
   const { pastStates, futureStates, undo, redo } = useStore(temporalStore);
@@ -127,7 +151,14 @@ export function Toolbar({
       onClick: () => onExport?.(),
       disabled: !hasMolecule,
     },
-  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport]);
+    {
+      icon: linkCopied ? <Check size={18} /> : <Link size={18} />,
+      label: linkCopied ? 'Link Copied!' : 'Copy Link',
+      onClick: handleCopyLink,
+      active: linkCopied,
+      disabled: !hasMolecule || !moleculeSource,
+    },
+  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport, linkCopied, handleCopyLink, moleculeSource]);
 
   const undoRedoButtons = useMemo<ToolbarButton[]>(() => [
     {
@@ -152,8 +183,8 @@ export function Toolbar({
     },
   ], [onShowShortcuts]);
 
-  const renderButtonGroup = (buttons: ToolbarButton[]) => (
-    <div className={styles.toolbarGroup}>
+  const renderButtonGroup = (buttons: ToolbarButton[], onboardingId?: string) => (
+    <div className={styles.toolbarGroup} data-onboarding={onboardingId}>
       {buttons.map((button, index) => (
         <button
           key={index}
@@ -172,13 +203,13 @@ export function Toolbar({
 
   return (
     <div className={styles.toolbar}>
-      {renderButtonGroup(representationButtons)}
+      {renderButtonGroup(representationButtons, 'repr-buttons')}
       <div className={styles.toolbarDivider} />
-      {renderButtonGroup(measurementButtons)}
+      {renderButtonGroup(measurementButtons, 'measurement-buttons')}
       <div className={styles.toolbarDivider} />
       {renderButtonGroup(undoRedoButtons)}
       <div className={styles.toolbarDivider} />
-      {renderButtonGroup(viewButtons)}
+      {renderButtonGroup(viewButtons, 'view-buttons')}
       <div className={clsx(styles.toolbarDivider, styles.helpDivider)} />
       <div className={styles.helpGroup}>
         {helpButtons.map((button, index) => (

@@ -1,0 +1,176 @@
+.blocker {
+  position: fixed;
+  inset: 0;
+  z-index: 899;
+  pointer-events: auto;
+}
+
+.spotlightHole {
+  position: fixed;
+  z-index: 900;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.spotlightRing {
+  position: fixed;
+  z-index: 901;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent-color);
+  opacity: 0.45;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 910;
+  width: 300px;
+  padding: 18px 20px 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--bg-primary) 50%, transparent);
+  outline: none;
+  transition: opacity 0.2s ease;
+}
+
+.stepHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.stepBadge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  padding: 3px 9px;
+  border-radius: 10px;
+}
+
+.progressDots {
+  display: flex;
+  gap: 4px;
+}
+
+.dot {
+  width: 6px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+
+.dotActive {
+  width: 16px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+.tooltipTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin-bottom: 5px;
+}
+
+.tooltipDescription {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 16px;
+}
+
+.tooltipActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navButtons {
+  display: flex;
+  gap: 7px;
+}
+
+.skipButton {
+  padding: 6px 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.skipButton:hover {
+  opacity: 1;
+}
+
+.backButton {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.backButton:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+}
+
+.backButton:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.nextButton {
+  padding: 6px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  background-color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.nextButton:hover {
+  background-color: var(--accent-hover);
+}
+
+@media (max-width: 768px) {
+  .tooltip {
+    width: 260px;
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlightHole,
+  .spotlightRing {
+    transition: none;
+  }
+
+  .tooltip {
+    transition: none;
+  }
+
+  .dotActive {
+    transition: none;
+  }
+}

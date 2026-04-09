@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, MAX_STRUCTURES } from '../../store/moleculeStore';
-import { parsePDB, parseSDF, parseXYZ, parseMMCIF } from '../../parsers';
-import { SAMPLE_MOLECULES } from '../../config';
-import { validateFile, getFileExtension, decompressGzip, detectFormat } from '../../utils';
+import { parseMMCIF, parseByFilename } from '../../parsers';
+import { SAMPLE_MOLECULES, type SampleMolecule } from '../../config';
+import { validateFile, decompressGzip } from '../../utils';
 import type { Molecule } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/errorReporter';
@@ -45,6 +45,7 @@ export function FileUpload() {
     setLoading,
     setError,
     isLoading,
+    setMoleculeSource,
   } = useMoleculeStore(useShallow(state => ({
     setMolecule: state.setMolecule,
     addStructure: state.addStructure,
@@ -52,6 +53,7 @@ export function FileUpload() {
     setLoading: state.setLoading,
     setError: state.setError,
     isLoading: state.isLoading,
+    setMoleculeSource: state.setMoleculeSource,
   })));
   const [isDragging, setIsDragging] = useState(false);
   const [pdbId, setPdbId] = useState('');
@@ -62,41 +64,9 @@ export function FileUpload() {
   const hasStructures = structureOrder.length > 0;
   const canAddMore = structureOrder.length < MAX_STRUCTURES;
 
-  const parseByFormat = useCallback((content: string, format: string): Molecule => {
-    switch (format) {
-      case 'pdb':
-        return parsePDB(content);
-      case 'cif':
-      case 'mmcif':
-        return parseMMCIF(content);
-      case 'sdf':
-      case 'mol':
-        return parseSDF(content);
-      case 'xyz':
-        return parseXYZ(content);
-      default:
-        throw new Error(`Unsupported file format: .${format}`);
-    }
-  }, []);
-
   const parseFile = useCallback((content: string, filename: string) => {
-    // Handle .cif.gz by stripping .gz first
-    const normalizedFilename = filename.replace(/\.gz$/i, '');
-    const extension = getFileExtension(normalizedFilename);
-
-    try {
-      return parseByFormat(content, extension);
-    } catch {
-      // Extension-based parsing failed — try content-based format detection
-      const detected = detectFormat(content);
-      if (detected && detected !== extension) {
-        return parseByFormat(content, detected);
-      }
-      throw new Error(
-        `Could not parse file. The file may be empty, corrupted, or in a format that doesn't match its .${extension} extension. Supported formats: PDB, mmCIF, SDF, MOL, XYZ.`
-      );
-    }
-  }, [parseByFormat]);
+    return parseByFilename(content, filename);
+  }, []);
 
   const loadMolecule = useCallback((molecule: Molecule, name?: string) => {
     if (hasStructures && addMode && canAddMore) {
@@ -128,6 +98,8 @@ export function FileUpload() {
       // Extract name from filename without extension(s)
       const name = file.name.replace(/\.(cif\.gz|[^/.]+)$/i, '');
       loadMolecule(molecule, name);
+      setMoleculeSource(null); // Local files aren't shareable via URL
+      document.title = `${name} - MolViewer`;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to parse file'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.handleFile' });
@@ -163,7 +135,7 @@ export function FileUpload() {
     }
   }, [handleFile]);
 
-  const loadSample = useCallback(async (sampleFile: string, sampleName: string) => {
+  const loadSample = useCallback(async (sample: SampleMolecule) => {
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your internet connection.');
       return;
@@ -172,17 +144,42 @@ export function FileUpload() {
     setLoading(true);
     setError(null);
 
+    const isRcsb = sample.file.startsWith('rcsb:');
+    const timeoutMs = isRcsb ? PDB_FETCH_TIMEOUT_MS : SAMPLE_FETCH_TIMEOUT_MS;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SAMPLE_FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(sampleFile, { signal: controller.signal });
-      if (!response.ok) {
-        throw new Error('Failed to load sample molecule');
+      let content: string;
+      let filename: string;
+
+      if (isRcsb) {
+        const pdbId = sample.file.slice(5); // strip 'rcsb:'
+        const response = await fetch(`https://files.rcsb.org/download/${pdbId}.cif`, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(response.status === 404 ? `PDB ID "${pdbId}" not found` : 'Failed to fetch from RCSB');
+        }
+        content = await response.text();
+        filename = `${pdbId}.cif`;
+      } else {
+        const response = await fetch(sample.file, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error('Failed to load sample molecule');
+        }
+        content = await response.text();
+        filename = sample.file;
       }
-      const content = await response.text();
-      const molecule = parseFile(content, sampleFile);
-      loadMolecule(molecule, sampleName);
+
+      const molecule = parseFile(content, filename);
+      loadMolecule(molecule, sample.name);
+
+      // Track source for URL sharing
+      if (sample.pdbId) {
+        setMoleculeSource({ type: 'rcsb', id: sample.pdbId });
+      } else {
+        setMoleculeSource(null);
+      }
+      document.title = `${sample.name} - MolViewer`;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load sample', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.loadSample' });
@@ -190,7 +187,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [parseFile, loadMolecule, setLoading, setError]);
+  }, [parseFile, loadMolecule, setLoading, setError, setMoleculeSource]);
 
   const fetchPDB = useCallback(async (id: string) => {
     const trimmedId = id.trim().toUpperCase();
@@ -231,6 +228,8 @@ export function FileUpload() {
       const molecule = parseMMCIF(content);
       molecule.name = trimmedId;
       loadMolecule(molecule, trimmedId);
+      setMoleculeSource({ type: 'rcsb', id: trimmedId });
+      document.title = `${trimmedId} - MolViewer`;
       setPdbId(''); // Clear input on success
     } catch (err) {
       setError(getErrorMessage(
@@ -302,6 +301,8 @@ export function FileUpload() {
       const structureName = `AF-${trimmedId}`;
       molecule.name = structureName;
       loadMolecule(molecule, structureName);
+      setMoleculeSource({ type: 'alphafold', id: trimmedId });
+      document.title = `AF-${trimmedId} - MolViewer`;
       setUniprotId(''); // Clear input on success
     } catch (err) {
       setError(getErrorMessage(
@@ -322,7 +323,7 @@ export function FileUpload() {
   }, [fetchAlphaFold, uniprotId]);
 
   return (
-    <div className={styles.fileUpload} role="region" aria-label="File upload">
+    <div className={styles.fileUpload} role="region" aria-label="File upload" data-onboarding="file-upload">
       {/* Add/Replace mode toggle - only show when structures exist */}
       {hasStructures && (
         <div className={styles.modeToggle}>
@@ -431,17 +432,34 @@ export function FileUpload() {
 
       <div className={styles.sampleMolecules}>
         <span className={styles.sampleLabel}>Or try a sample:</span>
-        <div className={styles.sampleButtons}>
-          {SAMPLE_MOLECULES.map((sample) => (
-            <button
-              key={sample.name}
-              onClick={() => loadSample(sample.file, sample.name)}
-              className={styles.sampleButton}
-            >
-              {sample.name}
-            </button>
-          ))}
-        </div>
+        {(['small-molecule', 'protein', 'nucleic-acid', 'complex'] as const).map(category => {
+          const samples = SAMPLE_MOLECULES.filter(s => s.category === category);
+          if (samples.length === 0) return null;
+          const categoryLabels = {
+            'small-molecule': 'Small Molecules',
+            'protein': 'Proteins',
+            'nucleic-acid': 'Nucleic Acids',
+            'complex': 'Complexes',
+          } as const;
+          return (
+            <div key={category} className={styles.sampleCategory}>
+              <span className={styles.categoryLabel}>{categoryLabels[category]}</span>
+              <div className={styles.sampleButtons}>
+                {samples.map((sample) => (
+                  <button
+                    key={sample.name}
+                    onClick={() => loadSample(sample)}
+                    className={styles.sampleButton}
+                    title={sample.description}
+                    disabled={isLoading}
+                  >
+                    {sample.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

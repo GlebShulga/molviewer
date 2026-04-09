@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Interactive 3D molecular visualization tool for proteins, small molecules, and nucleic acids",
+  "keywords": ["molecular-visualization", "protein-viewer", "PDB", "chemistry", "3d-viewer", "structural-biology", "webgl"],
+  "homepage": "https://molviewer.bio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GlebShulga/molviewer"
+  },
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

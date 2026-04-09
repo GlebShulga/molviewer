@@ -1,0 +1,152 @@
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  overflow: hidden;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-primary) 85%, transparent);
+  text-align: center;
+  padding: 24px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--accent-color);
+}
+
+.badge span {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  font-size: 38px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 8px;
+}
+
+.description {
+  max-width: 380px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+
+.cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 32px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--accent-color);
+  background: transparent;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 22px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  font-family: inherit;
+}
+
+.cta:hover:not(:disabled) {
+  background-color: var(--accent-color);
+  color: var(--bg-primary);
+}
+
+.cta:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--accent-color);
+  font-size: 13px;
+}
+
+.hidden {
+  color: transparent;
+}
+
+.hidden svg {
+  opacity: 0;
+}
+
+.spinnerIcon {
+  animation: molspin 0.8s linear infinite;
+}
+
+@keyframes molspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+  .badge {
+    margin-bottom: 8px;
+  }
+
+  .badge span {
+    font-size: 11px;
+  }
+
+  .title {
+    font-size: 28px;
+  }
+
+  .description {
+    font-size: 13px;
+    max-width: 300px;
+  }
+
+  .cta {
+    height: 40px;
+    padding: 0 24px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta {
+    transition: none;
+  }
+
+  .spinnerIcon {
+    animation: none;
+  }
+}
