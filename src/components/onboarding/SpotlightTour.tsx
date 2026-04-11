@@ -148,7 +148,7 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onSkip]);
 
-  // Calculate tooltip position
+  // Calculate tooltip position with viewport clamping
   const getTooltipStyle = useCallback((): React.CSSProperties => {
     if (!rect) return { opacity: 0 };
 
@@ -157,6 +157,11 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
       : currentStep?.placement ?? 'bottom';
 
     const style: React.CSSProperties = { opacity: 1 };
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tooltipWidth = isMobile ? 260 : 300;
+    const tooltipEstHeight = 160; // approximate tooltip height
+    const margin = 12; // min distance from viewport edge
 
     switch (placement) {
       case 'bottom':
@@ -165,7 +170,7 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
         style.transform = 'translateX(-50%)';
         break;
       case 'top':
-        style.bottom = window.innerHeight - rect.top + TOOLTIP_GAP;
+        style.bottom = vh - rect.top + TOOLTIP_GAP;
         style.left = rect.left + rect.width / 2;
         style.transform = 'translateX(-50%)';
         break;
@@ -176,9 +181,35 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
         break;
       case 'left':
         style.top = rect.top + rect.height / 2;
-        style.right = window.innerWidth - rect.left + TOOLTIP_GAP;
+        style.right = vw - rect.left + TOOLTIP_GAP;
         style.transform = 'translateY(-50%)';
         break;
+    }
+
+    // Clamp tooltip within viewport
+    if (style.top !== undefined && typeof style.top === 'number') {
+      // If tooltip would overflow below viewport, pull it up
+      if (style.top + tooltipEstHeight > vh - margin) {
+        style.top = vh - tooltipEstHeight - margin;
+      }
+      // Don't let it go above viewport
+      if (style.top < margin) {
+        style.top = margin;
+      }
+    }
+
+    if (style.left !== undefined && typeof style.left === 'number') {
+      // Clamp horizontal: account for centering transform
+      const effectiveLeft = style.transform?.includes('translateX(-50%)')
+        ? style.left - tooltipWidth / 2
+        : style.left;
+      if (effectiveLeft < margin) {
+        style.left = margin;
+        style.transform = style.transform?.replace('translateX(-50%)', '') || undefined;
+      } else if (effectiveLeft + tooltipWidth > vw - margin) {
+        style.left = vw - tooltipWidth - margin;
+        style.transform = style.transform?.replace('translateX(-50%)', '') || undefined;
+      }
     }
 
     return style;

@@ -80,6 +80,8 @@ function EmptyOrWelcome() {
 function AppContent() {
   const { theme } = useTheme();
   const webgl2Supported = isWebGL2Supported();
+  const onboarding = useOnboardingContext();
+  const isTouringSidebar = onboarding.phase === 'touring' && onboarding.tourStep === 1;
 
   // Use selectors for stable references
   const activeStructure = useMoleculeStore(selectActiveStructure);
@@ -378,12 +380,12 @@ function AppContent() {
       <div className={styles.appContent}>
         {/* Mobile sidebar overlay */}
         <div
-          className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.visible : ''}`}
+          className={`${styles.sidebarOverlay} ${sidebarOpen ? styles.visible : ''} ${isTouringSidebar ? styles.tourActive : ''}`}
           onClick={closeSidebar}
           aria-hidden="true"
         />
 
-        <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''}`}>
+        <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${isTouringSidebar ? styles.tourActive : ''}`}>
           <button
             className={styles.sidebarCloseButton}
             onClick={closeSidebar}

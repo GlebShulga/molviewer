@@ -283,6 +283,10 @@
   pointer-events: auto;
 }
 
+.sidebarOverlay.tourActive {
+  display: none;
+}
+
 /* Close button for mobile sidebar */
 .sidebarCloseButton {
   display: none;
@@ -367,6 +371,10 @@
 
   .sidebar.open {
     transform: translateX(0);
+  }
+
+  .sidebar.open.tourActive {
+    z-index: 905;
   }
 
   .sidebarOverlay {
