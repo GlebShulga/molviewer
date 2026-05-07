@@ -8,9 +8,14 @@ import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, getQualityPreset } from
 import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
 
+import type { CameraSnapshot } from "../../types/session";
+export type { CameraSnapshot };
+
 export interface MoleculeViewerHandle {
   homeView: () => void;
   exportImage: (options?: { scale?: number; background?: string | null; filename?: string }) => void;
+  getCameraSnapshot: () => CameraSnapshot | null;
+  applyCameraSnapshot: (snapshot: CameraSnapshot) => void;
 }
 
 export interface MoleculeViewerProps {
@@ -145,6 +150,27 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           controls.target.set(0, 0, 0);
         }
 
+        controls.update();
+      },
+      getCameraSnapshot: (): CameraSnapshot | null => {
+        const controls = controlsRef.current;
+        if (!controls) return null;
+        const camera = controls.object as THREE.PerspectiveCamera;
+        return {
+          position: [camera.position.x, camera.position.y, camera.position.z],
+          target: [controls.target.x, controls.target.y, controls.target.z],
+          zoom: camera.zoom,
+        };
+      },
+      applyCameraSnapshot: (snapshot: CameraSnapshot) => {
+        const controls = controlsRef.current;
+        if (!controls) return;
+        const camera = controls.object as THREE.PerspectiveCamera;
+        camera.position.set(...snapshot.position);
+        controls.target.set(...snapshot.target);
+        camera.zoom = snapshot.zoom;
+        camera.updateProjectionMatrix();
+        camera.lookAt(controls.target);
         controls.update();
       },
       exportImage: (options = {}) => {

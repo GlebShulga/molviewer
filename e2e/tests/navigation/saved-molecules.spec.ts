@@ -135,14 +135,14 @@ test.describe('Saved Molecules', () => {
       }
 
       // Save caffeine first
-      await savedMoleculesPanel().getByRole('button', { name: 'Save Current Molecule' }).click({ force: true });
+      await savedMoleculesPanel().getByRole('button', { name: 'Save Session' }).click({ force: true });
       await moleculeViewer.page.waitForTimeout(200);
 
       // Load water (replaces caffeine) and save it
       await moleculeViewer.loadSampleMolecule('water');
 
       // Save water
-      await savedMoleculesPanel().getByRole('button', { name: 'Save Current Molecule' }).click({ force: true });
+      await savedMoleculesPanel().getByRole('button', { name: 'Save Session' }).click({ force: true });
       await moleculeViewer.page.waitForTimeout(200);
 
       // Click Clear All button - first click shows confirmation state

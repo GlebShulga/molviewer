@@ -6,6 +6,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
 import { getStorageUsage } from '../../utils';
+import { viewerHandle } from '../../utils/viewerHandle';
 import styles from './SavedMoleculesPanel.module.css';
 
 /** Duration in ms to show the update success indicator */
@@ -19,8 +20,9 @@ export function SavedMoleculesPanel() {
   const {
     savedMolecules,
     loadedMoleculeId,
-    saveMoleculeToStorage,
-    updateSavedMolecule,
+    saveSession,
+    updateSessionEntry,
+    loadSavedSession,
     loadSavedMolecule,
     deleteSavedMolecule,
     renameSavedMolecule,
@@ -28,8 +30,9 @@ export function SavedMoleculesPanel() {
   } = useMoleculeStore(useShallow(state => ({
     savedMolecules: state.savedMolecules,
     loadedMoleculeId: state.loadedMoleculeId,
-    saveMoleculeToStorage: state.saveMoleculeToStorage,
-    updateSavedMolecule: state.updateSavedMolecule,
+    saveSession: state.saveSession,
+    updateSessionEntry: state.updateSessionEntry,
+    loadSavedSession: state.loadSavedSession,
     loadSavedMolecule: state.loadSavedMolecule,
     deleteSavedMolecule: state.deleteSavedMolecule,
     renameSavedMolecule: state.renameSavedMolecule,
@@ -56,17 +59,48 @@ export function SavedMoleculesPanel() {
     }
   }, [updatedId]);
 
-  const handleSave = () => {
-    saveMoleculeToStorage();
+  const handleSave = async () => {
+    if (!molecule) return;
+    const camera = viewerHandle.get()?.getCameraSnapshot() ?? null;
+    const name = molecule.name || `Session ${new Date().toLocaleString()}`;
+    try {
+      await saveSession(name, camera);
+    } catch (err) {
+      console.error('[SavedMoleculesPanel] Failed to save session:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save session');
+    }
   };
 
-  const handleUpdate = (id: string) => {
-    updateSavedMolecule();
-    setUpdatedId(id);
+  const handleUpdate = async (id: string) => {
+    const entry = savedMolecules.find((e) => e.id === id);
+    if (!entry || entry.kind !== 'session') return;
+    const camera = viewerHandle.get()?.getCameraSnapshot() ?? null;
+    try {
+      await updateSessionEntry(id, camera);
+      setUpdatedId(id);
+    } catch (err) {
+      console.error('[SavedMoleculesPanel] Failed to update session:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update session');
+    }
   };
 
-  const handleLoad = (id: string) => {
-    loadSavedMolecule(id);
+  const handleLoad = async (id: string) => {
+    const entry = savedMolecules.find((e) => e.id === id);
+    if (!entry) return;
+    if (entry.kind === 'session') {
+      try {
+        // Camera is enqueued onto the store and applied by App.tsx once the
+        // scene is mounted (gated on controlsReady + boundingBoxData).
+        await loadSavedSession(id);
+      } catch (err) {
+        console.error('[SavedMoleculesPanel] Failed to load session:', err);
+        const message = err instanceof Error ? err.message : 'Failed to load session';
+        alert(message);
+      }
+    } else {
+      // Legacy single-molecule entry
+      loadSavedMolecule(id);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -120,16 +154,16 @@ export function SavedMoleculesPanel() {
   };
 
   return (
-    <CollapsibleSection title="Saved Molecules" defaultOpen={true} storageKey="saved-molecules">
+    <CollapsibleSection title="Saved Sessions" defaultOpen={true} storageKey="saved-molecules">
       <div className={styles.savedMoleculesPanel}>
         <button
           className={styles.exportButton}
           onClick={handleSave}
           disabled={!molecule}
-          title={molecule ? 'Save current molecule' : 'Load a molecule first'}
+          title={molecule ? 'Save full viewer session (structures, view, measurements)' : 'Load a molecule first'}
         >
           <Save size={16} />
-          Save Current Molecule
+          Save Session
         </button>
 
         {savedMolecules.length > 0 ? (
@@ -176,6 +210,14 @@ export function SavedMoleculesPanel() {
                       </span>
                     )}
                     <span className={styles.savedItemMeta}>
+                      {entry.kind === 'session' ? (
+                        <span className={styles.kindBadge} title="Full session (multi-structure, camera, settings)">session</span>
+                      ) : (
+                        <span className={clsx(styles.kindBadge, styles.kindLegacy)} title="Legacy single-molecule entry">legacy</span>
+                      )}
+                      {entry.kind === 'session' && entry.structureCount && entry.structureCount > 1
+                        ? `${entry.structureCount} structures, `
+                        : ''}
                       {entry.atomCount} atoms, {entry.bondCount} bonds
                       {entry.aromaticRingCount > 0 && `, ${entry.aromaticRingCount} rings`}
                       {entry.measurementCount > 0 && `, ${entry.measurementCount} measurements`}
@@ -183,11 +225,11 @@ export function SavedMoleculesPanel() {
                     <span className={styles.savedItemDate}>{formatDate(entry.savedAt)}</span>
                   </div>
                   <div className={styles.savedItemActions}>
-                    {loadedMoleculeId === entry.id && (
+                    {loadedMoleculeId === entry.id && entry.kind === 'session' && (
                       <button
                         className={clsx(styles.controlButton, styles.update, updatedId === entry.id && styles.success)}
                         onClick={() => handleUpdate(entry.id)}
-                        title="Update saved molecule with current changes"
+                        title="Update saved session with current changes"
                       >
                         {updatedId === entry.id ? <Check size={14} /> : <RefreshCw size={14} />}
                       </button>

@@ -30,8 +30,16 @@ import {
   deleteMolecule,
   clearAllMolecules,
   renameMolecule,
+  saveSession as saveSessionToStorage,
+  updateSession as updateSessionInStorage,
+  loadSessionAsync,
   type SavedMoleculeEntry,
 } from '../utils/moleculeStorage';
+import {
+  serializeSession,
+  deserializeSession,
+} from '../utils/sessionSerializer';
+import type { MolViewerSession, CameraSnapshot } from '../types/session';
 
 // Forward declaration for TemporalState type used in serializeForComparison
 interface TemporalState {
@@ -150,6 +158,10 @@ interface MoleculeState {
   // Viewer state (transient - not tracked for undo/redo)
   controlsReady: boolean;
 
+  // Pending camera to apply once the viewer is ready (e.g. after loadSession).
+  // App.tsx watches this and applies via the viewer's imperative handle.
+  pendingCameraSnapshot: CameraSnapshot | null;
+
   // Source tracking for URL sharing (transient)
   moleculeSource: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string } | null;
 
@@ -218,6 +230,13 @@ interface MoleculeState {
   renameSavedMolecule: (id: string, newName: string) => void;
   clearAllSavedMolecules: () => void;
 
+  // Session save/load (full viewer state)
+  buildSession: (name: string, camera: CameraSnapshot | null) => MolViewerSession;
+  saveSession: (name: string, camera: CameraSnapshot | null) => Promise<SavedMoleculeEntry>;
+  updateSessionEntry: (id: string, camera: CameraSnapshot | null) => Promise<void>;
+  loadSession: (session: MolViewerSession) => CameraSnapshot | null;
+  loadSavedSession: (id: string) => Promise<CameraSnapshot | null>;
+
   // Lazy aromatic ring detection (for active structure)
   detectAromaticRingsIfNeeded: (structureId?: string) => void;
 
@@ -236,6 +255,7 @@ interface MoleculeState {
 
   // Viewer state actions
   setControlsReady: (ready: boolean) => void;
+  setPendingCameraSnapshot: (snapshot: CameraSnapshot | null) => void;
 
   // Source tracking
   setMoleculeSource: (source: MoleculeState['moleculeSource']) => void;
@@ -300,6 +320,7 @@ const initialState = {
 
   // Viewer state
   controlsReady: false,
+  pendingCameraSnapshot: null as CameraSnapshot | null,
 
   // Source tracking
   moleculeSource: null as MoleculeState['moleculeSource'],
@@ -843,6 +864,89 @@ export const useMoleculeStore = create<MoleculeState>()(
     });
   },
 
+  // ===== Session actions =====
+  buildSession: (name, camera) => {
+    const state = get();
+    return serializeSession(
+      {
+        structures: state.structures,
+        structureOrder: state.structureOrder,
+        activeStructureId: state.activeStructureId,
+        layoutMode: state.layoutMode,
+        measurements: state.measurements,
+        labels: state.labels,
+        surfaceSettings: state.surfaceSettings,
+        autoRotate: state.autoRotate,
+      },
+      camera,
+      name
+    );
+  },
+
+  saveSession: async (name, camera) => {
+    const session = get().buildSession(name, camera);
+    const entry = await saveSessionToStorage(session);
+    set({
+      savedMolecules: [entry, ...get().savedMolecules],
+      loadedMoleculeId: entry.id,
+    });
+    return entry;
+  },
+
+  updateSessionEntry: async (id, camera) => {
+    const { savedMolecules } = get();
+    const existing = savedMolecules.find((e) => e.id === id);
+    if (!existing) return;
+    const session = get().buildSession(existing.name, camera);
+    const updated = await updateSessionInStorage(id, session);
+    if (updated) {
+      set({
+        savedMolecules: get().savedMolecules.map((e) => (e.id === id ? updated : e)),
+      });
+    }
+  },
+
+  loadSession: (session) => {
+    const data = deserializeSession(session);
+
+    // Pause undo/redo tracking during the swap so the load is not undoable
+    // into a half-loaded state.
+    const temporal = useMoleculeStore.temporal.getState();
+    temporal.pause();
+    try {
+      clearSelectorCaches();
+      set({
+        ...initialState,
+        structures: data.structures,
+        structureOrder: data.structureOrder,
+        activeStructureId: data.activeStructureId,
+        layoutMode: data.layoutMode,
+        measurements: data.measurements,
+        labels: data.labels,
+        surfaceSettings: data.surfaceSettings,
+        autoRotate: data.autoRotate,
+        savedMolecules: get().savedMolecules,
+        // Enqueue camera so App.tsx applies it once the scene is ready.
+        // This preempts the auto-homeView triggered by structure-order changes.
+        pendingCameraSnapshot: data.camera,
+      });
+    } finally {
+      temporal.resume();
+      // Clear any history accumulated before the load, so the loaded state
+      // becomes the new baseline.
+      temporal.clear();
+    }
+    return data.camera;
+  },
+
+  loadSavedSession: async (id) => {
+    const session = await loadSessionAsync(id);
+    if (!session) return null;
+    const camera = get().loadSession(session);
+    set({ loadedMoleculeId: id });
+    return camera;
+  },
+
   // Aromatic ring detection
   detectAromaticRingsIfNeeded: (structureId) => {
     const { structures, activeStructureId } = get();
@@ -922,6 +1026,7 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   // Viewer state actions
   setControlsReady: (ready) => set({ controlsReady: ready }),
+  setPendingCameraSnapshot: (snapshot) => set({ pendingCameraSnapshot: snapshot }),
 
   // Source tracking
   setMoleculeSource: (source) => set({ moleculeSource: source }),

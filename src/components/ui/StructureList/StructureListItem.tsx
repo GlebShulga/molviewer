@@ -49,7 +49,7 @@ export function StructureListItem({
       className={`${styles.item} ${isActive ? styles.active : ''} ${!structure.visible ? styles.hidden : ''}`}
       onClick={onSelect}
       role="button"
-      aria-label={structure.name}
+      aria-label={`${structure.name}, ${atomCount.toLocaleString()} atoms`}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

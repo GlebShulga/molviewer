@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, type MeasurementMode } from './store/moleculeStore';
 import { selectActiveStructure, selectSelectedAtomIndices, selectTotalVisibleAtomCount, selectVisibleStructuresBoundingBox } from './store/selectors';
 import { MoleculeViewer, type MoleculeViewerHandle } from './components/viewer';
+import { viewerHandle } from './utils/viewerHandle';
 import { MoleculeScene } from './components/MoleculeScene';
 import {
   FileUpload,
@@ -248,11 +249,18 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportSettings, setExportSettings] = useState({ scale: 2, background: '#0d1117' as string | null, filename: 'molecule' });
   const viewerRef = useRef<MoleculeViewerHandle>(null);
+  const setViewerRef = useCallback((handle: MoleculeViewerHandle | null) => {
+    viewerRef.current = handle;
+    viewerHandle.set(handle);
+  }, []);
 
   // Create a stable string key from structure order to detect changes
   const structureOrderKey = structureOrder.join(',');
   const prevStructureOrderKeyRef = useRef('');
   const [pendingHomeView, setPendingHomeView] = useState(false);
+
+  const pendingCameraSnapshot = useMoleculeStore(state => state.pendingCameraSnapshot);
+  const setPendingCameraSnapshot = useMoleculeStore(state => state.setPendingCameraSnapshot);
 
   // Track when structures change - set flag for pending home view
   useEffect(() => {
@@ -264,13 +272,25 @@ function AppContent() {
     }
   }, [structureOrderKey, structureOrder.length]);
 
-  // Execute home view when all conditions are met
+  // Execute home view when all conditions are met.
+  // If a session-load enqueued a camera snapshot, that takes precedence over
+  // the auto-homeView (a session restore should land on the saved view).
   useEffect(() => {
-    if (pendingHomeView && controlsReady && boundingBoxData) {
-      setPendingHomeView(false);
-      viewerRef.current?.homeView();
-    }
-  }, [pendingHomeView, controlsReady, boundingBoxData]);
+    if (!pendingHomeView || !controlsReady || !boundingBoxData) return;
+    setPendingHomeView(false);
+    if (pendingCameraSnapshot) return; // camera-apply effect below will handle it
+    viewerRef.current?.homeView();
+  }, [pendingHomeView, controlsReady, boundingBoxData, pendingCameraSnapshot]);
+
+  // Apply a session-restored camera once the scene is ready.
+  // Gates on the same readiness signals as homeView (controlsReady + boundingBoxData
+  // ensures structures have mounted and been measured).
+  useEffect(() => {
+    if (!pendingCameraSnapshot || !controlsReady || !boundingBoxData) return;
+    const snapshot = pendingCameraSnapshot;
+    setPendingCameraSnapshot(null);
+    viewerRef.current?.applyCameraSnapshot(snapshot);
+  }, [pendingCameraSnapshot, controlsReady, boundingBoxData, setPendingCameraSnapshot]);
 
   // Close sidebar when clicking overlay or pressing Escape
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -463,7 +483,7 @@ function AppContent() {
                 }
               >
                 <MoleculeViewer
-                  ref={viewerRef}
+                  ref={setViewerRef}
                   autoRotate={autoRotate}
                   backgroundColor={THEME_COLORS[theme].background}
                   atomCount={totalAtomCount}

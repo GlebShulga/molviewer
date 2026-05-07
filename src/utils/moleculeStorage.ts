@@ -1,5 +1,6 @@
 import type { Molecule, Atom, Bond, AromaticRing, BiologicalAssembly } from '../types';
 import type { Measurement } from './measurements';
+import type { MolViewerSession } from '../types/session';
 
 /**
  * Molecule storage with IndexedDB support for large molecules.
@@ -23,7 +24,9 @@ const LARGE_MOLECULE_THRESHOLD = 50000; // Atoms - use IndexedDB above this
 const CHUNK_SIZE = 100000; // Atoms per chunk for IndexedDB
 
 const DB_NAME = 'mol3d-storage';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
+const SESSION_PREFIX = `${STORAGE_PREFIX}session_`;
+const LARGE_SESSION_BYTES = 1 * 1024 * 1024; // 1MB threshold for IndexedDB
 
 export interface SavedMoleculeEntry {
   id: string;
@@ -37,6 +40,13 @@ export interface SavedMoleculeEntry {
   storage?: 'localStorage' | 'indexedDB';
   /** Number of chunks if stored in IndexedDB */
   chunkCount?: number;
+  /**
+   * Entry kind. 'session' = full viewer session (multi-structure, camera, etc.).
+   * 'molecule' or undefined = legacy single-molecule entry.
+   */
+  kind?: 'molecule' | 'session';
+  /** For 'session' entries: number of structures */
+  structureCount?: number;
 }
 
 interface StoredMoleculeData {
@@ -101,6 +111,11 @@ function openDatabase(): Promise<IDBDatabase> {
           keyPath: ['moleculeId', 'chunkIndex'],
         });
         chunkStore.createIndex('byMolecule', 'moleculeId');
+      }
+
+      // Store for full session blobs (added in DB_VERSION 2)
+      if (!db.objectStoreNames.contains('sessions')) {
+        db.createObjectStore('sessions', { keyPath: 'id' });
       }
     };
   });
@@ -448,9 +463,14 @@ export function deleteMolecule(id: string): void {
 
   // Delete from appropriate storage
   if (entry?.storage === 'indexedDB') {
-    deleteMoleculeFromIndexedDB(id).catch(console.error);
+    if (entry.kind === 'session') {
+      deleteSessionFromIndexedDB(id).catch(console.error);
+    } else {
+      deleteMoleculeFromIndexedDB(id).catch(console.error);
+    }
   }
   localStorage.removeItem(`${MOLECULE_PREFIX}${id}`);
+  localStorage.removeItem(`${SESSION_PREFIX}${id}`);
 
   // Update index
   index.entries = index.entries.filter((e) => e.id !== id);
@@ -464,9 +484,10 @@ export function clearAllMolecules(): void {
   if (isIndexedDBAvailable()) {
     openDatabase()
       .then((db) => {
-        const tx = db.transaction(['molecules', 'chunks'], 'readwrite');
+        const tx = db.transaction(['molecules', 'chunks', 'sessions'], 'readwrite');
         tx.objectStore('molecules').clear();
         tx.objectStore('chunks').clear();
+        tx.objectStore('sessions').clear();
       })
       .catch(console.error);
   }
@@ -474,6 +495,7 @@ export function clearAllMolecules(): void {
   // Clear localStorage
   index.entries.forEach((entry) => {
     localStorage.removeItem(`${MOLECULE_PREFIX}${entry.id}`);
+    localStorage.removeItem(`${SESSION_PREFIX}${entry.id}`);
   });
   localStorage.removeItem(INDEX_KEY);
 }
@@ -502,6 +524,192 @@ export function getStorageUsage(): { used: number; max: number; percentage: numb
     max: MAX_LOCALSTORAGE_BYTES,
     percentage: Math.round((localStorageUsed / MAX_LOCALSTORAGE_BYTES) * 100),
   };
+}
+
+// ===== Session save/load =====
+
+interface SessionRecord {
+  id: string;
+  session: MolViewerSession;
+}
+
+async function saveSessionToIndexedDB(id: string, session: MolViewerSession): Promise<void> {
+  const db = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('sessions', 'readwrite');
+    tx.objectStore('sessions').put({ id, session } satisfies SessionRecord);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function loadSessionFromIndexedDB(id: string): Promise<MolViewerSession | null> {
+  try {
+    const db = await openDatabase();
+    return await new Promise<MolViewerSession | null>((resolve, reject) => {
+      const tx = db.transaction('sessions', 'readonly');
+      const request = tx.objectStore('sessions').get(id);
+      request.onsuccess = () => {
+        const result = request.result as SessionRecord | undefined;
+        resolve(result?.session ?? null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.error('[MoleculeStorage] Failed to load session from IndexedDB:', error);
+    return null;
+  }
+}
+
+async function deleteSessionFromIndexedDB(id: string): Promise<void> {
+  try {
+    const db = await openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('sessions', 'readwrite');
+      tx.objectStore('sessions').delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (error) {
+    console.error('[MoleculeStorage] Failed to delete session from IndexedDB:', error);
+  }
+}
+
+function summarizeSession(session: MolViewerSession) {
+  let totalAtoms = 0;
+  let totalBonds = 0;
+  let totalAromaticRings = 0;
+  for (const s of session.state.structures) {
+    totalAtoms += s.molecule.atoms.length;
+    totalBonds += s.molecule.bonds.length;
+    totalAromaticRings += s.molecule.aromaticRings?.length ?? 0;
+  }
+  return { totalAtoms, totalBonds, totalAromaticRings };
+}
+
+/**
+ * Save a full viewer session. Awaits the IDB write before committing the index
+ * so a failed write never leaves a dangling index entry pointing at nothing.
+ */
+export async function saveSession(session: MolViewerSession): Promise<SavedMoleculeEntry> {
+  const id = generateId();
+  const { totalAtoms, totalBonds, totalAromaticRings } = summarizeSession(session);
+
+  const serialized = JSON.stringify(session);
+  const useIndexedDB =
+    isIndexedDBAvailable() &&
+    (serialized.length * 2 > LARGE_SESSION_BYTES ||
+      totalAtoms >= LARGE_MOLECULE_THRESHOLD);
+
+  // Write payload first; only commit the index entry if the write succeeds.
+  if (useIndexedDB) {
+    await saveSessionToIndexedDB(id, session);
+  } else {
+    try {
+      localStorage.setItem(`${SESSION_PREFIX}${id}`, serialized);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        throw new Error('Storage is full. Please delete some saved sessions.');
+      }
+      throw e;
+    }
+  }
+
+  const entry: SavedMoleculeEntry = {
+    id,
+    name: session.name,
+    savedAt: Date.now(),
+    atomCount: totalAtoms,
+    bondCount: totalBonds,
+    aromaticRingCount: totalAromaticRings,
+    measurementCount: session.state.measurements.length,
+    storage: useIndexedDB ? 'indexedDB' : 'localStorage',
+    kind: 'session',
+    structureCount: session.state.structures.length,
+  };
+
+  const index = getIndex();
+  index.entries.unshift(entry);
+  saveIndex(index);
+  return entry;
+}
+
+/**
+ * Update an existing session entry in place. Awaits the write before committing
+ * the index update so a failed write doesn't leave the index inconsistent.
+ */
+export async function updateSession(
+  id: string,
+  session: MolViewerSession
+): Promise<SavedMoleculeEntry | null> {
+  const index = getIndex();
+  const entry = index.entries.find((e) => e.id === id);
+  if (!entry || entry.kind !== 'session') return null;
+
+  const { totalAtoms, totalBonds, totalAromaticRings } = summarizeSession(session);
+
+  const serialized = JSON.stringify(session);
+  const useIndexedDB =
+    isIndexedDBAvailable() &&
+    (serialized.length * 2 > LARGE_SESSION_BYTES ||
+      totalAtoms >= LARGE_MOLECULE_THRESHOLD);
+  const previousStorage = entry.storage;
+
+  // Write the new payload first.
+  if (useIndexedDB) {
+    await saveSessionToIndexedDB(id, session);
+  } else {
+    try {
+      localStorage.setItem(`${SESSION_PREFIX}${id}`, serialized);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        throw new Error('Storage is full. Please delete some saved sessions.');
+      }
+      throw e;
+    }
+  }
+
+  // After the new write succeeds, clean up the previous backend if it changed.
+  if (previousStorage === 'localStorage' && useIndexedDB) {
+    localStorage.removeItem(`${SESSION_PREFIX}${id}`);
+  } else if (previousStorage === 'indexedDB' && !useIndexedDB) {
+    await deleteSessionFromIndexedDB(id);
+  }
+
+  entry.savedAt = Date.now();
+  entry.atomCount = totalAtoms;
+  entry.bondCount = totalBonds;
+  entry.aromaticRingCount = totalAromaticRings;
+  entry.measurementCount = session.state.measurements.length;
+  entry.storage = useIndexedDB ? 'indexedDB' : 'localStorage';
+  entry.structureCount = session.state.structures.length;
+  entry.name = session.name;
+
+  saveIndex(index);
+  return entry;
+}
+
+/**
+ * Load a session. Returns null if not found, or if entry isn't a session.
+ */
+export async function loadSessionAsync(id: string): Promise<MolViewerSession | null> {
+  const index = getIndex();
+  const entry = index.entries.find((e) => e.id === id);
+  if (!entry || entry.kind !== 'session') return null;
+
+  if (entry.storage === 'indexedDB' && isIndexedDBAvailable()) {
+    return loadSessionFromIndexedDB(id);
+  }
+
+  try {
+    const data = localStorage.getItem(`${SESSION_PREFIX}${id}`);
+    if (data) {
+      return JSON.parse(data) as MolViewerSession;
+    }
+  } catch (e) {
+    console.error('[MoleculeStorage] Failed to load session from localStorage:', e);
+  }
+  return null;
 }
 
 /**

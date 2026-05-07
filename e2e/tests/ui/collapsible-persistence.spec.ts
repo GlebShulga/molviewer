@@ -117,7 +117,7 @@ test.describe('Collapsible Panel Persistence', () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
       const structuresHeader = getCollapsibleHeader('Structures');
-      const savedMoleculesHeader = getCollapsibleHeader('Saved Molecules');
+      const savedMoleculesHeader = getCollapsibleHeader('Saved Sessions');
 
       // Wait for headers to be visible
       await expect(structuresHeader).toBeVisible({ timeout: 5000 });
@@ -125,7 +125,7 @@ test.describe('Collapsible Panel Persistence', () => {
 
       // Get initial states
       const structuresInitial = await isSectionExpanded('Structures');
-      const savedMoleculesInitial = await isSectionExpanded('Saved Molecules');
+      const savedMoleculesInitial = await isSectionExpanded('Saved Sessions');
 
       // Toggle both to opposite states
       await structuresHeader.evaluate((el) => (el as HTMLElement).click());
@@ -141,11 +141,11 @@ test.describe('Collapsible Panel Persistence', () => {
 
       // Wait for headers to reappear after reload
       await expect(getCollapsibleHeader('Structures')).toBeVisible({ timeout: 5000 });
-      await expect(getCollapsibleHeader('Saved Molecules')).toBeVisible({ timeout: 5000 });
+      await expect(getCollapsibleHeader('Saved Sessions')).toBeVisible({ timeout: 5000 });
 
       // Each should have its toggled state preserved
       const structuresAfter = await isSectionExpanded('Structures');
-      const savedMoleculesAfter = await isSectionExpanded('Saved Molecules');
+      const savedMoleculesAfter = await isSectionExpanded('Saved Sessions');
 
       // States should be toggled from initial
       expect(structuresAfter).toBe(!structuresInitial);
@@ -267,7 +267,7 @@ test.describe('Collapsible Panel Persistence', () => {
     test('[CP-10] should persist state for Saved Molecules panel', async ({ page }) => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
-      const header = getCollapsibleHeader('Saved Molecules');
+      const header = getCollapsibleHeader('Saved Sessions');
       if (await header.isVisible()) {
         await header.click();
         await page.waitForTimeout(200);
