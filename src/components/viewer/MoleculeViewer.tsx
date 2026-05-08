@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, getQualityPreset } from "../../config";
 import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
+import { logError } from "../../utils/errorReporter";
 
 import type { CameraSnapshot } from "../../types/session";
 export type { CameraSnapshot };
@@ -178,6 +179,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
 
         if (!gl || !scene || !camera) {
           console.error("WebGL context not available for export");
+          logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
           return;
         }
 

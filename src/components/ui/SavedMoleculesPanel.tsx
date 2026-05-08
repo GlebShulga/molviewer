@@ -7,6 +7,7 @@ import { useMoleculeStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
 import { getStorageUsage } from '../../utils';
 import { viewerHandle } from '../../utils/viewerHandle';
+import { logError } from '../../utils/errorReporter';
 import styles from './SavedMoleculesPanel.module.css';
 
 /** Duration in ms to show the update success indicator */
@@ -67,6 +68,7 @@ export function SavedMoleculesPanel() {
       await saveSession(name, camera);
     } catch (err) {
       console.error('[SavedMoleculesPanel] Failed to save session:', err);
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'save-session' });
       alert(err instanceof Error ? err.message : 'Failed to save session');
     }
   };
@@ -80,6 +82,7 @@ export function SavedMoleculesPanel() {
       setUpdatedId(id);
     } catch (err) {
       console.error('[SavedMoleculesPanel] Failed to update session:', err);
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'update-session' });
       alert(err instanceof Error ? err.message : 'Failed to update session');
     }
   };
@@ -94,6 +97,7 @@ export function SavedMoleculesPanel() {
         await loadSavedSession(id);
       } catch (err) {
         console.error('[SavedMoleculesPanel] Failed to load session:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'load-session' });
         const message = err instanceof Error ? err.message : 'Failed to load session';
         alert(message);
       }

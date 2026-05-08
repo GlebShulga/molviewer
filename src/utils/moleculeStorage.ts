@@ -1,6 +1,7 @@
 import type { Molecule, Atom, Bond, AromaticRing, BiologicalAssembly } from '../types';
 import type { Measurement } from './measurements';
 import type { MolViewerSession } from '../types/session';
+import { logError } from './errorReporter';
 
 /**
  * Molecule storage with IndexedDB support for large molecules.
@@ -90,6 +91,7 @@ function openDatabase(): Promise<IDBDatabase> {
 
     request.onerror = () => {
       console.error('[MoleculeStorage] Failed to open IndexedDB:', request.error);
+      logError(request.error ?? new Error('IndexedDB open failed'), { source: 'moleculeStorage', op: 'open-db' });
       reject(request.error);
     };
 
@@ -146,6 +148,7 @@ function getIndex(): StorageIndex {
     }
   } catch (e) {
     console.error('Failed to read molecule index:', e);
+    logError(e instanceof Error ? e : new Error(String(e)), { source: 'moleculeStorage', op: 'read-index' });
   }
   return { version: STORAGE_VERSION, entries: [] };
 }
@@ -255,6 +258,7 @@ async function loadMoleculeFromIndexedDB(
     return { molecule, measurements: metadata.measurements };
   } catch (error) {
     console.error('[MoleculeStorage] Failed to load from IndexedDB:', error);
+    logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'load-molecule' });
     return null;
   }
 }
@@ -290,6 +294,7 @@ async function deleteMoleculeFromIndexedDB(id: string): Promise<void> {
     });
   } catch (error) {
     console.error('[MoleculeStorage] Failed to delete from IndexedDB:', error);
+    logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'delete-molecule' });
   }
 }
 
@@ -329,6 +334,11 @@ export function saveMolecule(
       })
       .catch((error) => {
         console.error('[MoleculeStorage] Failed to save to IndexedDB:', error);
+        logError(error instanceof Error ? error : new Error(String(error)), {
+          source: 'moleculeStorage',
+          op: 'save-molecule',
+          atomCount: molecule.atoms.length,
+        });
       });
   } else {
     // Save to localStorage
@@ -383,11 +393,17 @@ export function updateMolecule(
         entry.chunkCount = chunkCount;
         saveIndex(index);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error('[MoleculeStorage] Background save to IndexedDB failed:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'save-molecule-bg' });
+      });
   } else {
     // If switching from IndexedDB to localStorage, delete old data
     if (entry.storage === 'indexedDB') {
-      deleteMoleculeFromIndexedDB(id).catch(console.error);
+      deleteMoleculeFromIndexedDB(id).catch((err) => {
+        console.error('[MoleculeStorage] Background delete of orphan IndexedDB molecule failed:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'delete-orphan-molecule' });
+      });
     }
 
     const moleculeKey = `${MOLECULE_PREFIX}${id}`;
@@ -430,6 +446,7 @@ export function loadMolecule(id: string): { molecule: Molecule; measurements: Me
     }
   } catch (e) {
     console.error('Failed to load molecule from localStorage:', e);
+    logError(e instanceof Error ? e : new Error(String(e)), { source: 'moleculeStorage', op: 'load-molecule-localstorage' });
   }
 
   return null;
@@ -464,9 +481,15 @@ export function deleteMolecule(id: string): void {
   // Delete from appropriate storage
   if (entry?.storage === 'indexedDB') {
     if (entry.kind === 'session') {
-      deleteSessionFromIndexedDB(id).catch(console.error);
+      deleteSessionFromIndexedDB(id).catch((err) => {
+        console.error('[MoleculeStorage] Background delete of session failed:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'delete-session-bg' });
+      });
     } else {
-      deleteMoleculeFromIndexedDB(id).catch(console.error);
+      deleteMoleculeFromIndexedDB(id).catch((err) => {
+        console.error('[MoleculeStorage] Background delete of molecule failed:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'delete-molecule-bg' });
+      });
     }
   }
   localStorage.removeItem(`${MOLECULE_PREFIX}${id}`);
@@ -489,7 +512,10 @@ export function clearAllMolecules(): void {
         tx.objectStore('chunks').clear();
         tx.objectStore('sessions').clear();
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error('[MoleculeStorage] Failed to clear IndexedDB:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'clear-all' });
+      });
   }
 
   // Clear localStorage
@@ -557,6 +583,7 @@ async function loadSessionFromIndexedDB(id: string): Promise<MolViewerSession | 
     });
   } catch (error) {
     console.error('[MoleculeStorage] Failed to load session from IndexedDB:', error);
+    logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'load-session' });
     return null;
   }
 }
@@ -572,6 +599,7 @@ async function deleteSessionFromIndexedDB(id: string): Promise<void> {
     });
   } catch (error) {
     console.error('[MoleculeStorage] Failed to delete session from IndexedDB:', error);
+    logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'delete-session' });
   }
 }
 
@@ -708,6 +736,7 @@ export async function loadSessionAsync(id: string): Promise<MolViewerSession | n
     }
   } catch (e) {
     console.error('[MoleculeStorage] Failed to load session from localStorage:', e);
+    logError(e instanceof Error ? e : new Error(String(e)), { source: 'moleculeStorage', op: 'load-session-localstorage' });
   }
   return null;
 }
@@ -748,6 +777,7 @@ export async function getStorageInfoAsync(): Promise<{
       }
     } catch (error) {
       console.error('[MoleculeStorage] Failed to get IndexedDB info:', error);
+      logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'storage-info' });
     }
   }
 

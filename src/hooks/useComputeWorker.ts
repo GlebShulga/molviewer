@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Atom, Bond } from '../types';
+import { logError } from '../utils/errorReporter';
 
 /**
  * Hook for using the compute worker to offload heavy calculations.
@@ -83,6 +84,7 @@ export function useComputeWorker(): UseComputeWorkerResult {
 
       workerRef.current.onerror = (err) => {
         console.error('[ComputeWorker] Error:', err);
+        logError(err.error instanceof Error ? err.error : new Error(err.message || 'Worker runtime error'), { source: 'computeWorker', op: 'runtime' });
         setError(err.message);
         setIsAvailable(false);
       };
@@ -90,6 +92,7 @@ export function useComputeWorker(): UseComputeWorkerResult {
       setIsAvailable(true);
     } catch (err) {
       console.warn('[ComputeWorker] Failed to create worker:', err);
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'computeWorker', op: 'create' });
       setIsAvailable(false);
     }
 
