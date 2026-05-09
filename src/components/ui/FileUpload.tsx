@@ -5,7 +5,7 @@ import { useMoleculeStore, MAX_STRUCTURES } from '../../store/moleculeStore';
 import { parseMMCIF, parseByFilename } from '../../parsers';
 import { SAMPLE_MOLECULES, type SampleMolecule } from '../../config';
 import { validateFile, decompressGzip } from '../../utils';
-import type { Molecule } from '../../types';
+import type { Molecule, StructureSource } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/errorReporter';
 import styles from './FileUpload.module.css';
@@ -18,6 +18,16 @@ const PDB_FETCH_TIMEOUT_MS = 30000;
 const ALPHAFOLD_FETCH_TIMEOUT_MS = 30000;
 /** Matches classic 6-char (P69905) and new 10-char (A0A1B0GTW7) UniProt accession formats */
 const UNIPROT_ID_REGEX = /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/;
+
+function detectInlineFormat(filename: string): 'pdb' | 'cif' | 'sdf' | 'mol' | 'xyz' | null {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.pdb') || lower.endsWith('.ent')) return 'pdb';
+  if (lower.endsWith('.cif') || lower.endsWith('.cif.gz') || lower.endsWith('.mmcif')) return 'cif';
+  if (lower.endsWith('.sdf')) return 'sdf';
+  if (lower.endsWith('.mol') || lower.endsWith('.mol2')) return 'mol';
+  if (lower.endsWith('.xyz')) return 'xyz';
+  return null;
+}
 
 /**
  * Extract a user-friendly error message from an unknown error.
@@ -68,13 +78,13 @@ export function FileUpload() {
     return parseByFilename(content, filename);
   }, []);
 
-  const loadMolecule = useCallback((molecule: Molecule, name?: string) => {
+  const loadMolecule = useCallback((molecule: Molecule, name?: string, source?: StructureSource) => {
     if (hasStructures && addMode && canAddMore) {
       // Add as new structure
-      addStructure(molecule, name);
+      addStructure(molecule, name, source);
     } else {
       // Replace all structures
-      setMolecule(molecule);
+      setMolecule(molecule, source);
     }
   }, [hasStructures, addMode, canAddMore, addStructure, setMolecule]);
 
@@ -97,8 +107,11 @@ export function FileUpload() {
       const molecule = parseFile(content, file.name);
       // Extract name from filename without extension(s)
       const name = file.name.replace(/\.(cif\.gz|[^/.]+)$/i, '');
-      loadMolecule(molecule, name);
-      setMoleculeSource(null); // Local files aren't shareable via URL
+      const inlineFormat = detectInlineFormat(file.name);
+      const inlineSource: StructureSource | undefined =
+        inlineFormat ? { type: 'inline', format: inlineFormat, data: content } : undefined;
+      loadMolecule(molecule, name, inlineSource);
+      setMoleculeSource(null); // Local files aren't shareable via global URL params
       document.title = `${name} - MolViewer`;
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to parse file'));
@@ -171,7 +184,10 @@ export function FileUpload() {
       }
 
       const molecule = parseFile(content, filename);
-      loadMolecule(molecule, sample.name);
+      const sampleSource: StructureSource | undefined = sample.pdbId
+        ? { type: 'rcsb', id: sample.pdbId }
+        : undefined;
+      loadMolecule(molecule, sample.name, sampleSource);
 
       // Track source for URL sharing
       if (sample.pdbId) {
@@ -227,7 +243,7 @@ export function FileUpload() {
       const content = await response.text();
       const molecule = parseMMCIF(content);
       molecule.name = trimmedId;
-      loadMolecule(molecule, trimmedId);
+      loadMolecule(molecule, trimmedId, { type: 'rcsb', id: trimmedId });
       setMoleculeSource({ type: 'rcsb', id: trimmedId });
       document.title = `${trimmedId} - MolViewer`;
       setPdbId(''); // Clear input on success
@@ -300,7 +316,7 @@ export function FileUpload() {
       const molecule = parseMMCIF(content);
       const structureName = `AF-${trimmedId}`;
       molecule.name = structureName;
-      loadMolecule(molecule, structureName);
+      loadMolecule(molecule, structureName, { type: 'alphafold', id: trimmedId });
       setMoleculeSource({ type: 'alphafold', id: trimmedId });
       document.title = `AF-${trimmedId} - MolViewer`;
       setUniprotId(''); // Clear input on success

@@ -75,6 +75,34 @@ pnpm format:check  # Check formatting
 pnpm test          # Run unit tests
 pnpm test:coverage # Run tests with coverage
 pnpm test:e2e      # Run Playwright e2e tests
+pnpm pages:dev     # Run Cloudflare Pages Functions locally (proxies vite at :5173)
+```
+
+## Cloudflare Pages Functions
+
+Shareable session links (`/s/:id`), per-PDB landing pages (`/pdb/:id`, `/af/:id`),
+the OG image endpoint, and the sitemap all live under [`functions/`](functions/)
+and run as Cloudflare Pages Functions.
+
+### One-time setup before deploy
+
+1. **Create the KV namespace** for shareable session storage:
+   ```bash
+   pnpm wrangler kv namespace create SHARE_KV
+   pnpm wrangler kv namespace create SHARE_KV --preview
+   ```
+2. **Paste the returned IDs** into [`wrangler.toml`](wrangler.toml), replacing
+   `REPLACE_WITH_PRODUCTION_KV_ID` and `REPLACE_WITH_PREVIEW_KV_ID`.
+3. **Submit `/sitemap.xml`** to Google Search Console after the first deploy.
+
+### Local development with Pages Functions
+
+`pnpm dev` runs Vite on `:5173` for the SPA only. To exercise the Pages Functions
+(share links, landing pages, sitemap), run both:
+
+```bash
+pnpm dev           # terminal 1 — Vite SPA on :5173
+pnpm pages:dev     # terminal 2 — Wrangler proxies :5173 + serves functions/
 ```
 
 ## Project Structure

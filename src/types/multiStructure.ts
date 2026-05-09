@@ -18,6 +18,17 @@ export interface QualifiedAtomRef {
 }
 
 /**
+ * Where a structure originated from. Required for shareable session URLs:
+ * shares store source references rather than full atom dumps. Optional so
+ * older sessions and ad-hoc programmatic structures continue to work.
+ */
+export type StructureSource =
+  | { type: 'rcsb'; id: string }
+  | { type: 'alphafold'; id: string }
+  | { type: 'url'; url: string }
+  | { type: 'inline'; format: 'pdb' | 'cif' | 'sdf' | 'mol' | 'xyz'; data: string };
+
+/**
  * A single molecular structure with its own settings
  */
 export interface Structure {
@@ -32,6 +43,8 @@ export interface Structure {
   aromaticRingsDetected: boolean;
   /** Position offset for side-by-side layout */
   offset: [number, number, number];
+  /** Origin of the molecule data — used for shareable session URLs */
+  source?: StructureSource;
 }
 
 export interface ContextMenuState {

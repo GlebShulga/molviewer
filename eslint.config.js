@@ -4,7 +4,7 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist', 'node_modules', 'coverage', 'e2e', '*.config.ts'] },
+  { ignores: ['dist', 'node_modules', 'coverage', 'e2e', 'functions', '*.config.ts'] },
   js.configs.recommended,
   ...tsPlugin.configs.recommended,
   {

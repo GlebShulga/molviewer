@@ -61,3 +61,46 @@ export function getCanvasDataUrl(
 ): string {
   return renderer.domElement.toDataURL(`image/${format}`, quality);
 }
+
+export function drawWatermark(
+  sourceCanvas: HTMLCanvasElement,
+  text: string
+): HTMLCanvasElement {
+  const out = document.createElement('canvas');
+  out.width = sourceCanvas.width;
+  out.height = sourceCanvas.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return sourceCanvas;
+
+  ctx.drawImage(sourceCanvas, 0, 0);
+
+  const fontSize = Math.max(14, Math.round(sourceCanvas.width / 100));
+  ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+  ctx.textBaseline = 'middle';
+
+  const padX = Math.round(fontSize * 0.7);
+  const padY = Math.round(fontSize * 0.4);
+  const margin = Math.round(fontSize * 0.85);
+  const metrics = ctx.measureText(text);
+  const textW = metrics.width;
+  const pillH = fontSize + padY * 2;
+  const pillW = textW + padX * 2;
+  const x = sourceCanvas.width - pillW - margin;
+  const y = sourceCanvas.height - pillH - margin;
+  const radius = pillH / 2;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + pillW - radius, y);
+  ctx.arc(x + pillW - radius, y + radius, radius, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x + radius, y + pillH);
+  ctx.arc(x + radius, y + radius, radius, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.fillText(text, x + padX, y + pillH / 2);
+
+  return out;
+}

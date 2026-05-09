@@ -4,9 +4,33 @@ import type { RepresentationType, ColorScheme } from '../types';
  * Parsed URL parameters for molecule loading and view state.
  */
 export interface UrlMoleculeParams {
-  source: 'rcsb' | 'alphafold' | 'url';
+  source: 'rcsb' | 'alphafold' | 'url' | 'share';
   id?: string;
   url?: string;
+}
+
+/** Pretty-URL pathnames: /pdb/:id, /af/:id, /s/:id. */
+export function parsePathnameParams(pathname: string): UrlMoleculeParams | null {
+  const pdbMatch = pathname.match(/^\/pdb\/([A-Za-z0-9]{4})\/?$/);
+  if (pdbMatch) {
+    return { source: 'rcsb', id: pdbMatch[1].toUpperCase() };
+  }
+
+  const afMatch = pathname.match(/^\/af\/([A-Za-z0-9]+)\/?$/);
+  if (afMatch) {
+    const id = afMatch[1].toUpperCase();
+    if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/.test(id)) {
+      return { source: 'alphafold', id };
+    }
+    return null;
+  }
+
+  const shareMatch = pathname.match(/^\/s\/([A-Za-z0-9]{8,16})\/?$/);
+  if (shareMatch) {
+    return { source: 'share', id: shareMatch[1] };
+  }
+
+  return null;
 }
 
 export interface UrlViewParams {

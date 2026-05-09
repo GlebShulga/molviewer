@@ -4,7 +4,15 @@
   "private": true,
   "type": "module",
   "description": "Interactive 3D molecular visualization tool for proteins, small molecules, and nucleic acids",
-  "keywords": ["molecular-visualization", "protein-viewer", "PDB", "chemistry", "3d-viewer", "structural-biology", "webgl"],
+  "keywords": [
+    "molecular-visualization",
+    "protein-viewer",
+    "PDB",
+    "chemistry",
+    "3d-viewer",
+    "structural-biology",
+    "webgl"
+  ],
   "homepage": "https://molviewer.bio",
   "repository": {
     "type": "git",
@@ -25,7 +33,8 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
-    "test:e2e:desktop": "playwright test --project=chromium --project=chromium-visual --project=webkit"
+    "test:e2e:desktop": "playwright test --project=chromium --project=chromium-visual --project=webkit",
+    "pages:dev": "wrangler pages dev --proxy http://localhost:5173"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",
@@ -42,6 +51,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260509.1",
     "@eslint/js": "^9.17.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/react": "^14.2.0",
@@ -62,7 +72,8 @@
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.18.1",
     "vite": "^6.0.5",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "wrangler": "^4.90.0"
   },
   "packageManager": "pnpm@9.15.1",
   "engines": {

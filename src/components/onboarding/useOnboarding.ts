@@ -71,7 +71,7 @@ export function useOnboarding(): OnboardingState {
       molecule.name = '1CRN';
 
       const { addStructure, setMoleculeSource } = useMoleculeStore.getState();
-      addStructure(molecule, '1CRN');
+      addStructure(molecule, '1CRN', { type: 'rcsb', id: '1CRN' });
       setMoleculeSource({ type: 'rcsb', id: '1CRN' });
       document.title = '1CRN - MolViewer';
 

@@ -28,7 +28,8 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { OnboardingProvider, useOnboardingContext, WelcomeScreen, SpotlightTour } from './components/onboarding';
 import { THEME_COLORS } from './config';
 import { isWebGL2Supported } from './utils/webglDetection';
-import { parseMoleculeParams, parseViewParams } from './utils/urlParams';
+import { parseMoleculeParams, parsePathnameParams, parseViewParams } from './utils/urlParams';
+import { loadSharedSession, deserializeShareableSession } from './utils/shareSession';
 import { parseMMCIF, parseByFilename } from './parsers';
 import { Sun, Moon, Menu, X, Github } from 'lucide-react';
 import styles from './App.module.css';
@@ -157,11 +158,13 @@ function AppContent() {
     loadSavedMoleculesIndex();
   }, [loadSavedMoleculesIndex]);
 
-  // Auto-load from URL params (?pdb=, ?af=, ?url=)
+  // Auto-load from URL params (?pdb=, ?af=, ?url=, /pdb/:id, /af/:id, /s/:id)
   useEffect(() => {
     if (structureOrder.length > 0) return;
 
-    const moleculeParams = parseMoleculeParams(window.location.search);
+    const moleculeParams =
+      parsePathnameParams(window.location.pathname) ??
+      parseMoleculeParams(window.location.search);
     if (!moleculeParams) return; // No URL params — show empty state
 
     const viewParams = parseViewParams(window.location.search);
@@ -169,6 +172,38 @@ function AppContent() {
     // TypeScript narrowed moleculeParams to non-null above, but the closure
     // doesn't preserve that. Capture it in a const the closure can trust.
     const params = moleculeParams;
+
+    if (params.source === 'share') {
+      const shareId = params.id!;
+      (async () => {
+        const { setLoading, applyShareableSession, setMoleculeSource: setSrc } = useMoleculeStore.getState();
+        setLoading(true);
+        try {
+          const session = await loadSharedSession(shareId, controller.signal);
+          const deserialized = await deserializeShareableSession(session, controller.signal);
+          if (controller.signal.aborted) return;
+
+          applyShareableSession({ ...deserialized, sourceStructures: session.structures });
+
+          // Restore global moleculeSource for the legacy Copy Link button
+          const first = deserialized.structures[0]?.source;
+          if (first && first.type !== 'inline') {
+            setSrc(first);
+          } else {
+            setSrc(null);
+          }
+          document.title = 'Shared session - MolViewer';
+        } catch (err) {
+          if (controller.signal.aborted) return;
+          setError(err instanceof Error ? err.message : 'Failed to load shared session');
+        } finally {
+          if (!controller.signal.aborted) {
+            useMoleculeStore.getState().setLoading(false);
+          }
+        }
+      })();
+      return () => controller.abort();
+    }
 
     async function loadFromUrl() {
       const { setLoading } = useMoleculeStore.getState();
@@ -215,7 +250,7 @@ function AppContent() {
           ? parseByFilename(content, new URL(params.url!).pathname)
           : parseMMCIF(content);
         molecule.name = name;
-        const structId = addStructure(molecule, name);
+        const structId = addStructure(molecule, name, source);
         setMoleculeSource(source);
         document.title = `${name} - MolViewer`;
 
@@ -310,10 +345,15 @@ function AppContent() {
       setExportSettings(options);
     }
     const settings = options || exportSettings;
+    const sharePath = window.location.pathname.match(/^\/s\/([A-Za-z0-9]+)/)?.[0];
+    const watermark = sharePath
+      ? `${window.location.host}${sharePath}`
+      : window.location.host;
     viewerRef.current?.exportImage({
       scale: settings.scale,
       background: settings.background,
       filename: settings.filename || molecule?.name || 'molecule',
+      watermark,
     });
   }, [exportSettings, molecule?.name]);
 

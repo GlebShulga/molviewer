@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, getQualityPreset } from "../../config";
 import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
+import { drawWatermark } from "../../utils/exportImage";
 import { logError } from "../../utils/errorReporter";
 
 import type { CameraSnapshot } from "../../types/session";
@@ -14,7 +15,7 @@ export type { CameraSnapshot };
 
 export interface MoleculeViewerHandle {
   homeView: () => void;
-  exportImage: (options?: { scale?: number; background?: string | null; filename?: string }) => void;
+  exportImage: (options?: { scale?: number; background?: string | null; filename?: string; watermark?: string }) => void;
   getCameraSnapshot: () => CameraSnapshot | null;
   applyCameraSnapshot: (snapshot: CameraSnapshot) => void;
 }
@@ -183,7 +184,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           return;
         }
 
-        const { scale = 2, background = null, filename = "molecule" } = options;
+        const { scale = 2, background = null, filename = "molecule", watermark } = options;
 
         const originalSize = gl.getSize(new THREE.Vector2());
         const originalPixelRatio = gl.getPixelRatio();
@@ -201,7 +202,10 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
 
           gl.render(scene, camera);
 
-          const dataUrl = gl.domElement.toDataURL("image/png");
+          const sourceCanvas = watermark
+            ? drawWatermark(gl.domElement, watermark)
+            : gl.domElement;
+          const dataUrl = sourceCanvas.toDataURL("image/png");
           const link = document.createElement("a");
           link.download = `${filename}.png`;
           link.href = dataUrl;

@@ -8,6 +8,7 @@ import {
   type LayoutMode,
   type QualifiedAtomRef,
   type Structure,
+  type StructureSource,
   type ContextMenuState,
   type Label3D,
   MAX_STRUCTURES,
@@ -166,7 +167,7 @@ interface MoleculeState {
   moleculeSource: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string } | null;
 
   // ===== Structure management actions =====
-  addStructure: (molecule: Molecule, name?: string) => string;
+  addStructure: (molecule: Molecule, name?: string, source?: StructureSource) => string;
   removeStructure: (id: string) => void;
   setActiveStructure: (id: string | null) => void;
   setStructureVisibility: (id: string, visible: boolean) => void;
@@ -183,7 +184,7 @@ interface MoleculeState {
 
   // ===== Legacy actions (operate on active structure) =====
   /** @deprecated Use addStructure instead. Clears all and adds single structure. */
-  setMolecule: (molecule: Molecule | null) => void;
+  setMolecule: (molecule: Molecule | null, source?: StructureSource) => void;
   /** @deprecated Use setStructureRepresentation instead */
   setRepresentation: (rep: RepresentationType) => void;
   /** @deprecated Use setStructureColorScheme instead */
@@ -236,6 +237,14 @@ interface MoleculeState {
   updateSessionEntry: (id: string, camera: CameraSnapshot | null) => Promise<void>;
   loadSession: (session: MolViewerSession) => CameraSnapshot | null;
   loadSavedSession: (id: string) => Promise<CameraSnapshot | null>;
+
+  /**
+   * Apply a deserialized share payload as the current viewer state.
+   * Generates fresh structure IDs and remaps references in measurements/labels.
+   */
+  applyShareableSession: (payload: import('../utils/shareSession').DeserializedShareableSession & {
+    sourceStructures: import('../utils/shareSession').ShareableStructure[];
+  }) => void;
 
   // Lazy aromatic ring detection (for active structure)
   detectAromaticRingsIfNeeded: (structureId?: string) => void;
@@ -385,7 +394,8 @@ function createStructure(
   name: string,
   index: number,
   totalCount: number,
-  layoutMode: LayoutMode
+  layoutMode: LayoutMode,
+  source?: StructureSource
 ): Structure {
   const classification = classifyMolecule(molecule);
   const componentSettings = generateComponentSettings(classification, molecule);
@@ -408,6 +418,7 @@ function createStructure(
     classification,
     aromaticRingsDetected: !!molecule.aromaticRings,
     offset: layoutMode === 'side-by-side' ? calculateStructureOffset(index, totalCount) : [0, 0, 0],
+    source,
   };
 }
 
@@ -451,7 +462,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   ...initialState,
 
   // ===== Structure management actions =====
-  addStructure: (molecule, name) => {
+  addStructure: (molecule, name, source) => {
     const { structures, structureOrder, layoutMode } = get();
 
     if (structures.size >= MAX_STRUCTURES) {
@@ -467,7 +478,8 @@ export const useMoleculeStore = create<MoleculeState>()(
       structureName,
       structureOrder.length,
       structureOrder.length + 1,
-      layoutMode
+      layoutMode,
+      source
     );
 
     const newStructures = new Map(structures);
@@ -616,7 +628,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   // ===== Legacy actions (backward compatibility) =====
-  setMolecule: (molecule) => {
+  setMolecule: (molecule, source) => {
     if (!molecule) {
       set({
         structures: new Map(),
@@ -635,7 +647,7 @@ export const useMoleculeStore = create<MoleculeState>()(
     // Clear all structures and add single structure
     const { layoutMode } = get();
     const structureName = molecule.name || 'Structure 1';
-    const structure = createStructure(molecule, structureName, 0, 1, layoutMode);
+    const structure = createStructure(molecule, structureName, 0, 1, layoutMode, source);
 
     const newStructures = new Map<string, Structure>();
     newStructures.set(structure.id, structure);
@@ -945,6 +957,77 @@ export const useMoleculeStore = create<MoleculeState>()(
     const camera = get().loadSession(session);
     set({ loadedMoleculeId: id });
     return camera;
+  },
+
+  applyShareableSession: (payload) => {
+    const temporal = useMoleculeStore.temporal.getState();
+    temporal.pause();
+    try {
+      clearSelectorCaches();
+
+      const newStructures = new Map<string, Structure>();
+      const newOrder: string[] = [];
+      const idRemap = new Map<string, string>();
+
+      payload.structures.forEach((fs, idx) => {
+        const shareable = fs.shareableStructure;
+        const structure = createStructure(
+          fs.molecule,
+          shareable.name,
+          idx,
+          payload.structures.length,
+          payload.layoutMode,
+          fs.source
+        );
+        // Override defaults with the shared view state
+        structure.representation = shareable.representation;
+        structure.colorScheme = shareable.colorScheme;
+        structure.visible = shareable.visible;
+        if (shareable.componentSettings.length > 0) {
+          structure.componentSettings = shareable.componentSettings.map(cs => ({
+            ...cs,
+            residueFilter: cs.residueFilter ? new Set(cs.residueFilter) : undefined,
+          }));
+        }
+
+        idRemap.set(shareable.id, structure.id);
+        newStructures.set(structure.id, structure);
+        newOrder.push(structure.id);
+      });
+
+      const remappedMeasurements = payload.measurements.map(m => ({
+        ...m,
+        atomRefs: m.atomRefs.map(ref => ({
+          structureId: idRemap.get(ref.structureId) ?? ref.structureId,
+          atomIndex: ref.atomIndex,
+        })),
+      }));
+
+      const remappedLabels = payload.labels
+        .map(l => {
+          const newId = idRemap.get(l.structureId);
+          if (!newId) return null;
+          return { ...l, structureId: newId };
+        })
+        .filter((l): l is Label3D => l !== null);
+
+      set({
+        ...initialState,
+        structures: newStructures,
+        structureOrder: newOrder,
+        activeStructureId: newOrder[0] ?? null,
+        layoutMode: payload.layoutMode,
+        measurements: remappedMeasurements,
+        labels: remappedLabels,
+        surfaceSettings: payload.surfaceSettings,
+        autoRotate: payload.autoRotate,
+        savedMolecules: get().savedMolecules,
+        pendingCameraSnapshot: payload.camera,
+      });
+    } finally {
+      temporal.resume();
+      temporal.clear();
+    }
   },
 
   // Aromatic ring detection

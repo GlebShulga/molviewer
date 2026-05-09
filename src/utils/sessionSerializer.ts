@@ -50,6 +50,7 @@ function serializeStructure(s: Structure): SerializedStructure {
     classification: s.classification,
     aromaticRingsDetected: s.aromaticRingsDetected,
     offset: s.offset,
+    source: s.source,
   };
 }
 
@@ -66,6 +67,7 @@ function deserializeStructure(s: SerializedStructure): Structure {
     // Force-skip re-detection on load; saved sessions already have rings (or were past threshold)
     aromaticRingsDetected: true,
     offset: s.offset,
+    source: s.source,
   };
 }
 

@@ -1,0 +1,23 @@
+{
+  "_comment": "Curated list of well-known PDB IDs for sitemap seeding. Update periodically based on Search Console impressions and RCSB 'most viewed' lists. Add up to ~500 entries.",
+  "pdbs": [
+    "1CRN", "1HHO", "4HHB", "1MBN", "1UBQ", "2HHB", "1A3N", "1BNA", "1D66", "1ENH",
+    "1FAT", "1GFL", "1HVR", "1IGT", "1J3H", "1JLB", "1KX5", "1L2Y", "1LMB", "1MBO",
+    "1NIP", "1OXR", "1P2P", "1QYS", "1RNT", "1SHA", "1TIM", "1U3M", "1VOL", "1WJG",
+    "1XYZ", "1YRG", "1ZAA", "2BBM", "2CAB", "2DHB", "2GLS", "2INS", "2J67", "2K9R",
+    "2LYZ", "2MBT", "2NCD", "2OMF", "2P4R", "2QBQ", "2RH1", "2SOD", "2TRX", "2UMU",
+    "2VAA", "2WAR", "2XJC", "2YHX", "2ZEP", "3CYT", "3DNI", "3EAM", "3FAA", "3HHB",
+    "3IXJ", "3J3Q", "3K0H", "3LDH", "3MHT", "3NIR", "3PGK", "3PSG", "3RGK", "3SDP",
+    "3TIM", "3UEY", "3V03", "3WPC", "3ZOW", "4AKE", "4BCL", "4CDX", "4DOL", "4ESV",
+    "4F5S", "4GBC", "4HHB", "4INS", "4JHW", "4KEY", "4LZT", "4M4R", "4N6V", "4O9W",
+    "4P2C", "4Q6Z", "4R9F", "4S0V", "4TQQ", "4U7T", "4V6X", "4W6P", "4XL5", "4Y7M",
+    "4Z2J", "5A3T", "5BNA", "5CRO", "5D8V", "5E3F", "5FBR", "5GUH", "5HMG", "5IRE",
+    "5J7V", "5K3R", "5L0N", "5MDH", "5NOG", "5O7Y", "5P21", "5Q3W", "5RSA", "5SVS",
+    "5TFW", "5U6U", "5V0Z", "5WUU", "5XCO", "5Y6V", "5ZJZ", "6AHD", "6BNV", "6COX",
+    "6DZ7", "6EDD", "6FDB", "6GTW", "6HU9", "6IGY", "6J5K", "6K3F", "6LU7", "6M0J",
+    "6N5N", "6OFV", "6PBL", "6Q3Z", "6RWW", "6SEQ", "6TFV", "6U7C", "6VXX", "6W5S",
+    "6X0L", "6Y2E", "6Z43", "7BV2", "7C2K", "7DDD", "7EJ4", "7FB1", "7K3G", "7L7K",
+    "7MKT", "7N9P", "7OY3", "7P0Z", "7QDH", "7R1Z", "7S0X", "7T9K", "7UCR", "7VOX",
+    "7WEU", "7XRI", "7YCA", "7ZBB", "8A4Q", "8B0Y", "8CGA", "8DNZ", "8EG0", "8FG7"
+  ]
+}

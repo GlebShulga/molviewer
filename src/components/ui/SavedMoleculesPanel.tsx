@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import { Save, Trash2, Download, Pencil, Check, X, RefreshCw } from 'lucide-react';
 import { CollapsibleSection } from './CollapsibleSection';
+import { ShareButton } from './ShareButton';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
 import { getStorageUsage } from '../../utils';
@@ -169,6 +170,7 @@ export function SavedMoleculesPanel() {
           <Save size={16} />
           Save Session
         </button>
+        <ShareButton />
 
         {savedMolecules.length > 0 ? (
           <>

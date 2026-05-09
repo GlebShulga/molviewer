@@ -17,6 +17,7 @@ export type {
   LayoutMode,
   QualifiedAtomRef,
   Structure,
+  StructureSource,
   ContextMenuState,
   Label3D,
 } from './multiStructure';

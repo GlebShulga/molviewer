@@ -1,0 +1,11 @@
+name = "molviewer"
+compatibility_date = "2026-05-09"
+pages_build_output_dir = "dist"
+
+# KV namespace for shareable session URLs.
+# Create with: pnpm wrangler kv namespace create SHARE_KV
+# Then paste the returned IDs below (preview_id is for `wrangler pages dev`).
+[[kv_namespaces]]
+binding = "SHARE_KV"
+id = "61fe623926c34f2da4e96981685e79f8"
+preview_id = "9df791a104974f57b7b51a6c93c1cc99"

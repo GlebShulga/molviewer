@@ -4,6 +4,7 @@ import type {
   ColorScheme,
   LayoutMode,
   Label3D,
+  StructureSource,
 } from './multiStructure';
 import type { Measurement } from '../utils/measurements';
 import type {
@@ -40,6 +41,7 @@ export interface SerializedStructure {
   classification: MoleculeClassification | null;
   aromaticRingsDetected: boolean;
   offset: [number, number, number];
+  source?: StructureSource;
 }
 
 export interface CameraSnapshot {
