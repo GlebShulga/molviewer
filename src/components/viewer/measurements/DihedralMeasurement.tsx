@@ -161,7 +161,7 @@ export function DihedralMeasurement({
 
       {/* Label */}
       <group ref={labelRef}>
-        <Html center style={labelWrapperStyle}>
+        <Html center zIndexRange={[5, 0]} style={labelWrapperStyle}>
           <span style={getLabelStyle(color, isHighlighted)}>
             {label}
           </span>

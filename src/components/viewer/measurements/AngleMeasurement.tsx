@@ -101,7 +101,7 @@ export function AngleMeasurement({
       <Line points={arcPoints} color={color} lineWidth={lineWidth} />
       {/* Label - position updated dynamically via useFrame */}
       <group ref={labelRef}>
-        <Html center style={labelWrapperStyle}>
+        <Html center zIndexRange={[5, 0]} style={labelWrapperStyle}>
           <span style={getLabelStyle(color, isHighlighted)}>
             {label}
           </span>

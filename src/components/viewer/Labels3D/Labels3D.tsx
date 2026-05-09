@@ -29,6 +29,7 @@ function Label3DComponent({ label, atom, structureOffset, onDelete }: Label3DPro
       center
       distanceFactor={10}
       occlude={false}
+      zIndexRange={[5, 0]}
       style={{ pointerEvents: 'auto' }}
     >
       <div className={styles.label3d}>
