@@ -68,6 +68,15 @@ export const onRequestGet: PagesFunction = async ({ request, params, next }) => 
     return next();
   }
 
+  // Canonicalize to uppercase via 301 so Search Console doesn't flag the
+  // lowercase variant as "Page with redirect" via canonical mismatch.
+  const upper = id.toUpperCase();
+  if (id !== upper) {
+    const url = new URL(request.url);
+    url.pathname = `/pdb/${upper}`;
+    return Response.redirect(url.toString(), 301);
+  }
+
   const meta = await fetchPdbMeta(id, request);
   const indexResponse = await next();
   return applyLandingMeta(indexResponse, meta);

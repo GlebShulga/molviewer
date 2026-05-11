@@ -61,8 +61,15 @@ async function fetchAfMeta(id: string, request: Request): Promise<LandingMeta> {
 
 export const onRequestGet: PagesFunction = async ({ request, params, next }) => {
   const id = String(params.id ?? '');
-  if (!UNIPROT_RE.test(id.toUpperCase())) {
+  const upper = id.toUpperCase();
+  if (!UNIPROT_RE.test(upper)) {
     return next();
+  }
+
+  if (id !== upper) {
+    const url = new URL(request.url);
+    url.pathname = `/af/${upper}`;
+    return Response.redirect(url.toString(), 301);
   }
 
   const meta = await fetchAfMeta(id, request);
