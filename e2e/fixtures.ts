@@ -15,6 +15,11 @@ export const test = base.extend({
         req.onerror = () => {};
         req.onblocked = () => {};
       }
+      // Skip the welcome screen by default. Onboarding tests that need the
+      // first-visit state override this via their own addInitScript before goto().
+      if (!localStorage.getItem('mol3d-onboarding-completed')) {
+        localStorage.setItem('mol3d-onboarding-completed', 'true');
+      }
     });
 
     await use(page);

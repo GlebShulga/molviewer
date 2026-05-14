@@ -1152,3 +1152,11 @@ export const useMoleculeStore = create<MoleculeState>()(
 
 // Export the temporal store for undo/redo access
 export const temporalStore = useMoleculeStore.temporal;
+
+// Expose the store on window for e2e tests (mirrors the pattern in viewerRefs.ts).
+// Keeps test setup fast for boundary checks that would otherwise require many
+// sequential UI uploads.
+if (typeof window !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__mol3d_store = useMoleculeStore;
+}

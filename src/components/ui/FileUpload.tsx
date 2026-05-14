@@ -184,9 +184,12 @@ export function FileUpload() {
       }
 
       const molecule = parseFile(content, filename);
+      const inlineFormat = detectInlineFormat(filename);
       const sampleSource: StructureSource | undefined = sample.pdbId
         ? { type: 'rcsb', id: sample.pdbId }
-        : undefined;
+        : inlineFormat
+          ? { type: 'inline', format: inlineFormat, data: content }
+          : undefined;
       loadMolecule(molecule, sample.name, sampleSource);
 
       // Track source for URL sharing

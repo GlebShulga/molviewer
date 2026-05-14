@@ -61,27 +61,60 @@ test.describe('Multi-Structure Support', () => {
       expect(newCount).toBe(1);
     });
 
-    test('[MS-04] should enforce 10 structure limit', async () => {
-      test.setTimeout(120000); // 2 minutes for loading 10 structures
-
-      // Add structures up to the limit
+    test('[MS-04] should enforce 10 structure limit', async ({ page }) => {
+      // The store's addStructure action enforces the MAX_STRUCTURES guard
+      // directly. We test that guard rather than the UI upload path, which
+      // falls through to setMolecule (replace-all) when at the limit. That
+      // fallback never grows past the limit but isn't a clean "rejection"
+      // signal — and 10 sequential UI uploads timed out under shard contention.
       const maxStructures = 10;
 
-      for (let i = 1; i < maxStructures; i++) {
-        await moleculeViewer.addStructure(molecules.water);
-        const count = await moleculeViewer.structureList.getStructureCount();
-        if (count >= maxStructures) break;
-      }
+      // Seed the store with one structure via the real upload path so we have
+      // a valid Molecule to duplicate. beforeEach loads caffeine via the
+      // legacy setMolecule path, so structures.size is already 1.
+      const seededCount = await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const store = (window as any).__mol3d_store;
+        return store ? store.getState().structures.size : -1;
+      });
+      expect(seededCount).toBeGreaterThanOrEqual(1);
 
-      const count = await moleculeViewer.structureList.getStructureCount();
+      // Fill to the limit by calling the store action directly.
+      const fillResult = await page.evaluate((max) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const store = (window as any).__mol3d_store;
+        const state = store.getState();
+        const first = state.structures.get(state.structureOrder[0]);
+        if (!first) return { reached: false, size: 0 };
+        while (store.getState().structures.size < max) {
+          state.addStructure(first.molecule, `Copy ${store.getState().structures.size + 1}`);
+        }
+        return { reached: true, size: store.getState().structures.size };
+      }, maxStructures);
 
-      // Try to add one more - should fail or show warning
-      if (count === maxStructures) {
-        await moleculeViewer.addStructure(molecules.water);
-        const newCount = await moleculeViewer.structureList.getStructureCount();
-        // Should still be at max
-        expect(newCount).toBeLessThanOrEqual(maxStructures);
-      }
+      expect(fillResult.reached).toBe(true);
+      expect(fillResult.size).toBe(maxStructures);
+
+      // Attempt one more via the store action — the guard should reject it
+      // (returns '' and sets an error, size stays at max).
+      const boundary = await page.evaluate(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const store = (window as any).__mol3d_store;
+        const state = store.getState();
+        const first = state.structures.get(state.structureOrder[0]);
+        const sizeBefore = store.getState().structures.size;
+        const newId = state.addStructure(first.molecule, 'OneTooMany');
+        return {
+          sizeBefore,
+          sizeAfter: store.getState().structures.size,
+          newId,
+          error: store.getState().error,
+        };
+      });
+
+      expect(boundary.sizeAfter).toBe(boundary.sizeBefore);
+      expect(boundary.newId).toBe('');
+      expect(boundary.error).toContain('Maximum');
     });
   });
 
