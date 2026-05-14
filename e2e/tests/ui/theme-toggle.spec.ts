@@ -177,13 +177,10 @@ test.describe('Theme Toggle', () => {
   });
 
   test.describe('System Preference', () => {
-    test('[TH-13] should respect system color scheme preference on initial load', async ({
-      page,
-      context,
-    }) => {
+    test('[TH-13] should respect system color scheme preference on initial load', async () => {
       // This test would require setting up a fresh context with emulated color scheme
       // For now, just verify the app loads with a valid theme
-      await page.goto('/');
+      await moleculeViewer.goto();
       const theme = await moleculeViewer.getCurrentTheme();
       expect(['light', 'dark']).toContain(theme);
     });

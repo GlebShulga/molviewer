@@ -6,7 +6,7 @@ import { waitForMoleculeLoaded } from '../../helpers/wait-for-render';
 const MOBILE_PROJECTS = ['mobile-chrome', 'mobile-safari'];
 
 test.describe('Mobile Onboarding', () => {
-  test.beforeEach(async ({ page }, testInfo) => {
+  test.beforeEach(async ({}, testInfo) => {
     test.skip(
       !MOBILE_PROJECTS.includes(testInfo.project.name),
       'Mobile tests only run on mobile-chrome and mobile-safari'
@@ -16,7 +16,7 @@ test.describe('Mobile Onboarding', () => {
   test('welcome screen visible on mobile', async ({ page }) => {
     await page.setViewportSize(viewports.mobile);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
 
     await expect(page.locator('[data-onboarding="welcome-screen"]')).toBeVisible();
     await expect(page.locator('[class*="emptyState"]')).not.toBeVisible();
@@ -26,7 +26,7 @@ test.describe('Mobile Onboarding', () => {
     test.slow();
     await page.setViewportSize(viewports.mobile);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
 
     await page.getByRole('button', { name: 'Get started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);
@@ -47,7 +47,7 @@ test.describe('Mobile Onboarding', () => {
     test.slow();
     await page.setViewportSize(viewports.mobile);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
 
     await page.getByRole('button', { name: 'Get started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);

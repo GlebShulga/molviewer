@@ -104,10 +104,18 @@ export class MoleculeViewerPage {
   }
 
   /**
-   * Navigate to the application with clean state for test isolation
-   * Storage clearing is handled by the page fixture in e2e/fixtures.ts
+   * Navigate to the application with clean state for test isolation.
+   * Storage clearing is handled by the page fixture in e2e/fixtures.ts.
+   * By default, the welcome screen is bypassed by pre-setting the onboarding
+   * flag. Onboarding tests pass `{ keepWelcome: true }` to see the genuine
+   * first-visit state.
    */
-  async goto(): Promise<void> {
+  async goto(options?: { keepWelcome?: boolean }): Promise<void> {
+    if (!options?.keepWelcome) {
+      await this.page.addInitScript(() => {
+        localStorage.setItem('mol3d-onboarding-completed', 'true');
+      });
+    }
     await this.page.goto('/');
     await this.title.waitFor({ state: 'visible', timeout: 15000 });
   }

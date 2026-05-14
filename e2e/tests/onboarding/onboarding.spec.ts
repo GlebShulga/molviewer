@@ -2,20 +2,10 @@ import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 import { waitForMoleculeLoaded } from '../../helpers/wait-for-render';
 
-// Tests in this file need the genuine first-visit state. The shared fixture
-// pre-sets `mol3d-onboarding-completed` so non-onboarding tests skip the
-// welcome screen; this helper undoes that for tests that need it.
-async function clearOnboardingFlag(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    localStorage.removeItem('mol3d-onboarding-completed');
-  });
-}
-
 test.describe('Onboarding Tour', () => {
   test('shows welcome screen on first visit', async ({ page }) => {
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     // Welcome screen should be visible instead of empty state
     await expect(page.locator('[data-onboarding="welcome-screen"]')).toBeVisible();
     await expect(page.getByText('Get Started')).toBeVisible();
@@ -25,9 +15,8 @@ test.describe('Onboarding Tour', () => {
 
   test('Get Started button loads molecule and starts tour', async ({ page }) => {
     test.slow(); // RCSB fetch
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
     // Wait for molecule to load
     await waitForMoleculeLoaded(page, 60000);
@@ -39,9 +28,8 @@ test.describe('Onboarding Tour', () => {
 
   test('navigates through all 4 tour steps', async ({ page }) => {
     test.slow();
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);
 
@@ -72,9 +60,8 @@ test.describe('Onboarding Tour', () => {
 
   test('Skip button dismisses tour and sets flag', async ({ page }) => {
     test.slow();
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);
 
@@ -89,9 +76,8 @@ test.describe('Onboarding Tour', () => {
 
   test('ESC key dismisses tour', async ({ page }) => {
     test.slow();
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);
 
@@ -101,10 +87,6 @@ test.describe('Onboarding Tour', () => {
   });
 
   test('returning user does not see onboarding', async ({ page }) => {
-    // Set the flag before navigating
-    await page.addInitScript(() => {
-      localStorage.setItem('mol3d-onboarding-completed', 'true');
-    });
     const viewer = new MoleculeViewerPage(page);
     await viewer.goto();
     // Should see normal empty state, not welcome screen
@@ -123,9 +105,8 @@ test.describe('Onboarding Tour', () => {
 
   test('Back button returns to previous step', async ({ page }) => {
     test.slow();
-    await clearOnboardingFlag(page);
     const viewer = new MoleculeViewerPage(page);
-    await viewer.goto();
+    await viewer.goto({ keepWelcome: true });
     await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
     await waitForMoleculeLoaded(page, 60000);
 
