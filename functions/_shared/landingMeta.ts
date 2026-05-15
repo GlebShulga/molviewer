@@ -10,6 +10,7 @@ export interface LandingMeta {
   ogImageUrl: string;
   canonicalUrl: string;
   jsonLd: object;
+  bodyHtml: string;
 }
 
 class MetaTagRewriter {
@@ -44,6 +45,24 @@ class JsonLdRewriter {
   }
 }
 
+class RootContentRewriter {
+  constructor(private html: string) {}
+
+  element(element: Element) {
+    element.setInnerContent(this.html, { html: true });
+  }
+}
+
+/** Escape a string for safe interpolation into HTML text content / innerHTML. */
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Inject landing-page metadata into a Response containing index.html.
  * Uses Cloudflare's HTMLRewriter to mutate the response stream.
@@ -64,6 +83,7 @@ export function applyLandingMeta(response: Response, meta: LandingMeta): Respons
     .on('meta[property="twitter:image"]', new MetaTagRewriter('twitter:image', meta.ogImageUrl))
     .on('meta[property="twitter:image:alt"]', new MetaTagRewriter('twitter:image:alt', meta.title))
     .on('script[type="application/ld+json"]', new JsonLdRewriter(meta.jsonLd))
+    .on('div#root', new RootContentRewriter(meta.bodyHtml))
     .transform(response);
 }
 

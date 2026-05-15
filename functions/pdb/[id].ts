@@ -4,7 +4,25 @@
  * meta tags into the SPA's index.html. The SPA then loads the structure
  * via the existing pathname routing.
  */
-import { applyLandingMeta, clean, type LandingMeta } from '../_shared/landingMeta';
+import { applyLandingMeta, clean, escapeHtml, type LandingMeta } from '../_shared/landingMeta';
+
+const BOILERPLATE = `View this PDB structure interactively in 3D with MolViewer. Rotate, zoom, measure distances and angles, and explore secondary-structure annotations directly in your browser without installing any software.`;
+
+const NOSCRIPT = `JavaScript is required to view the interactive 3D structure. Please enable JavaScript or visit the RCSB link above.`;
+
+function buildPdbBodyHtml(id: string, structTitle: string | undefined): string {
+  const heading = structTitle ? `${id}: ${escapeHtml(clean(structTitle, 120))}` : `PDB Entry ${id}`;
+  const lead = structTitle
+    ? escapeHtml(clean(structTitle, 400))
+    : `Protein Data Bank entry ${id}.`;
+  return `<article class="seo-fallback">
+  <h1>${heading}</h1>
+  <p>${lead}</p>
+  <p>${BOILERPLATE}</p>
+  <p><a href="https://www.rcsb.org/structure/${id}">Source: RCSB Protein Data Bank</a></p>
+  <noscript>${NOSCRIPT}</noscript>
+</article>`;
+}
 
 const PDB_ID_RE = /^[A-Za-z0-9]{4}$/;
 
@@ -24,6 +42,7 @@ async function fetchPdbMeta(id: string, request: Request): Promise<LandingMeta> 
 
   let title = `${upper} — MolViewer`;
   let description = `View PDB structure ${upper} in an interactive 3D viewer. Explore atoms, secondary structure, and surfaces.`;
+  let structTitle: string | undefined;
 
   try {
     const resp = await fetch(`https://data.rcsb.org/rest/v1/core/entry/${upper}`, {
@@ -31,7 +50,7 @@ async function fetchPdbMeta(id: string, request: Request): Promise<LandingMeta> 
     });
     if (resp.ok) {
       const data = (await resp.json()) as RcsbEntry;
-      const structTitle = data.struct?.title;
+      structTitle = data.struct?.title;
       if (structTitle) {
         title = `${upper}: ${clean(structTitle, 80)} — MolViewer`;
         description = `${clean(structTitle, 200)}. View this PDB structure interactively in 3D with MolViewer.`;
@@ -59,6 +78,7 @@ async function fetchPdbMeta(id: string, request: Request): Promise<LandingMeta> 
         sameAs: `https://www.rcsb.org/structure/${upper}`,
       },
     },
+    bodyHtml: buildPdbBodyHtml(upper, structTitle),
   };
 }
 
