@@ -8,6 +8,8 @@
 
 import type { Structure, QualifiedAtomRef, Molecule, RepresentationType, ColorScheme } from '../types';
 import type { MoleculeClassification, ComponentSettings } from '../utils/moleculeTypeClassifier';
+import { getVdwRadius } from '../constants';
+import { SCALES } from '../config';
 
 /**
  * Data needed to render a single structure.
@@ -226,6 +228,30 @@ export const selectTotalVisibleAtomCount = (state: MoleculeStateShape): number =
 };
 
 /**
+ * Solvent probe radius (Angstroms) used for the solvent-accessible surface.
+ * Mirrors DEFAULT_PROBE_RADIUS in utils/surfaceGeneration.ts. Kept as a local
+ * constant so the bounding-box padding does not couple to live surfaceSettings.
+ */
+const SAS_PROBE_RADIUS = 1.4;
+
+/**
+ * How far an atom's rendered geometry extends past its center for a given
+ * representation, modeled as getVdwRadius(element) * vdwFactor + probeAdd.
+ * Representations without atom spheres contribute no padding.
+ */
+function getRenderExtent(representation: RepresentationType): { vdwFactor: number; probeAdd: number } {
+  switch (representation) {
+    case 'ball-and-stick': return { vdwFactor: SCALES.atom, probeAdd: 0 };
+    case 'spacefill': return { vdwFactor: SCALES.spacefill, probeAdd: 0 };
+    case 'surface-vdw': return { vdwFactor: 1.0, probeAdd: 0 };
+    case 'surface-sas': return { vdwFactor: 1.0, probeAdd: SAS_PROBE_RADIUS };
+    case 'stick':
+    case 'cartoon':
+    default: return { vdwFactor: 0, probeAdd: 0 };
+  }
+}
+
+/**
  * Bounding box computation helper (not a selector - used internally)
  */
 function computeBoundingBox(state: MoleculeStateShape): {
@@ -235,12 +261,15 @@ function computeBoundingBox(state: MoleculeStateShape): {
 } | null {
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let maxRenderRadius = 0;
   let hasAtoms = false;
 
   for (const id of state.structureOrder) {
     const structure = state.structures.get(id);
     if (!structure?.visible) continue;
     const offset = structure.offset;
+    const { vdwFactor, probeAdd } = getRenderExtent(structure.representation);
+    const hasSpheres = vdwFactor > 0 || probeAdd > 0;
     for (const atom of structure.molecule.atoms) {
       hasAtoms = true;
       const x = atom.x + offset[0];
@@ -249,10 +278,20 @@ function computeBoundingBox(state: MoleculeStateShape): {
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+      if (hasSpheres) {
+        maxRenderRadius = Math.max(maxRenderRadius, getVdwRadius(atom.element) * vdwFactor + probeAdd);
+      }
     }
   }
 
   if (!hasAtoms) return null;
+
+  // Expand symmetrically by the largest rendered sphere radius so the camera
+  // fit accounts for atom geometry (not just centers). Center is unchanged.
+  minX -= maxRenderRadius; maxX += maxRenderRadius;
+  minY -= maxRenderRadius; maxY += maxRenderRadius;
+  minZ -= maxRenderRadius; maxZ += maxRenderRadius;
+
   return {
     minX, minY, minZ, maxX, maxY, maxZ,
     centerX: (minX + maxX) / 2,
@@ -274,7 +313,7 @@ export const selectVisibleStructuresBoundingBox = (state: MoleculeStateShape): R
   const currentVersion = state.structureOrder
     .map(id => {
       const s = state.structures.get(id);
-      return s ? `${id}:${s.visible}:${s.molecule?.atoms.length ?? 0}:${s.offset.join(',')}` : '';
+      return s ? `${id}:${s.visible}:${s.molecule?.atoms.length ?? 0}:${s.offset.join(',')}:${s.representation}` : '';
     })
     .join('|');
 

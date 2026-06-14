@@ -8,6 +8,8 @@ import {
   selectVisibleStructures,
 } from '../selectors';
 import type { Molecule } from '../../types';
+import { getVdwRadius } from '../../constants';
+import { SCALES } from '../../config';
 
 function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -75,11 +77,15 @@ describe('selectors', () => {
       useMoleculeStore.getState().addStructure(createMockMolecule('A', 3), 'A');
       const bb = selectVisibleStructuresBoundingBox(useMoleculeStore.getState());
 
+      // Box is expanded symmetrically by the max rendered sphere radius
+      // (ball-and-stick default: carbon VdW radius * SCALES.atom).
+      const pad = getVdwRadius('C') * SCALES.atom;
+
       expect(bb).not.toBeNull();
-      expect(bb!.minX).toBe(0);
-      expect(bb!.maxX).toBe(3);   // 2 * 1.5
-      expect(bb!.minY).toBe(0);
-      expect(bb!.maxY).toBe(2);
+      expect(bb!.minX).toBe(0 - pad);
+      expect(bb!.maxX).toBe(3 + pad);   // atoms span x = 0..3 (2 * 1.5)
+      expect(bb!.minY).toBe(0 - pad);
+      expect(bb!.maxY).toBe(2 + pad);
     });
   });
 
