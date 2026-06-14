@@ -9,6 +9,21 @@
     <link rel="preconnect" href="https://files.rcsb.org" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d1117" />
+    <!-- SEO fallback content lives in #root for crawlers (raw HTML). Hidden for
+         JS-capable browsers so it never flashes before React mounts; revealed
+         again when JS is disabled. -->
+    <style>
+      .seo-fallback {
+        display: none;
+      }
+    </style>
+    <noscript>
+      <style>
+        .seo-fallback {
+          display: block;
+        }
+      </style>
+    </noscript>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://files.rcsb.org https://data.rcsb.org https://alphafold.ebi.ac.uk https://log-api.eu.newrelic.com https://cloudflareinsights.com; img-src 'self' data: blob:; worker-src blob:; font-src 'self';" />
 
     <!-- Primary Meta Tags -->
@@ -76,7 +91,23 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="seo-fallback">
+        <h1>MolViewer — Interactive 3D Molecular Viewer</h1>
+        <p>View PDB and AlphaFold structures in your browser. No installation required.</p>
+        <h2>Featured structures</h2>
+        <ul>
+          <li><a href="/pdb/6VXX">SARS-CoV-2 spike glycoprotein</a></li>
+          <li><a href="/pdb/4HHB">Hemoglobin</a></li>
+          <li><a href="/pdb/1UBQ">Ubiquitin</a></li>
+          <li><a href="/pdb/1CRN">Crambin</a></li>
+          <li><a href="/af/P00533">EGFR (AlphaFold)</a></li>
+          <li><a href="/af/P53350">PLK1 (AlphaFold)</a></li>
+          <li><a href="/af/P05067">Amyloid precursor protein (AlphaFold)</a></li>
+          <li><a href="/af/P38398">BRCA1 (AlphaFold)</a></li>
+        </ul>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "a3389c7a6f424ecaaf63057532dc0e1b"}'></script>
