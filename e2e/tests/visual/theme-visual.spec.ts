@@ -16,10 +16,7 @@ test.describe('Theme Visual Tests', () => {
   test.describe('Dark Theme', () => {
     test('[TV-01] should match snapshot for dark theme empty state', async () => {
       // Ensure we're in dark theme (default)
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.page.waitForTimeout(300);
       const screenshot = await moleculeViewer.screenshot();
@@ -27,10 +24,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-02] should match snapshot for dark theme with molecule', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.homeView();
@@ -41,10 +35,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-03] should match snapshot for dark theme sidebar', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.page.waitForTimeout(300);
@@ -54,10 +45,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-04] should match snapshot for dark theme toolbar', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.page.waitForTimeout(300);
@@ -67,10 +55,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-05] should match snapshot for dark theme canvas', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.homeView();
@@ -84,10 +69,7 @@ test.describe('Theme Visual Tests', () => {
   test.describe('Light Theme', () => {
     test('[TV-06] should match snapshot for light theme empty state', async () => {
       // Switch to light theme
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.page.waitForTimeout(300);
       const screenshot = await moleculeViewer.screenshot();
@@ -95,10 +77,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-07] should match snapshot for light theme with molecule', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.homeView();
@@ -109,10 +88,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-08] should match snapshot for light theme sidebar', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.page.waitForTimeout(300);
@@ -122,10 +98,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-09] should match snapshot for light theme toolbar', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.page.waitForTimeout(300);
@@ -135,10 +108,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-10] should match snapshot for light theme canvas', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.homeView();
@@ -154,10 +124,7 @@ test.describe('Theme Visual Tests', () => {
       await moleculeViewer.loadSampleMolecule('caffeine');
 
       // Ensure dark theme
-      let theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.toolbar.homeView();
       await moleculeViewer.page.waitForTimeout(500);
@@ -166,7 +133,7 @@ test.describe('Theme Visual Tests', () => {
       const darkScreenshot = await moleculeViewer.screenshot();
 
       // Switch to light theme
-      await moleculeViewer.toggleTheme();
+      await moleculeViewer.ensureTheme('light');
       await moleculeViewer.toolbar.homeView();
       await moleculeViewer.page.waitForTimeout(500);
 
@@ -180,10 +147,7 @@ test.describe('Theme Visual Tests', () => {
 
   test.describe('Theme with Different Representations', () => {
     test('[TV-12] should match snapshot for light theme spacefill', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.setSpacefill();
@@ -195,10 +159,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-13] should match snapshot for dark theme spacefill', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.toolbar.setSpacefill();
@@ -212,10 +173,7 @@ test.describe('Theme Visual Tests', () => {
 
   test.describe('Modal Styling', () => {
     test('[TV-14] should match snapshot for shortcuts modal in dark theme', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'dark') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('dark');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.pressKey('?');
@@ -230,10 +188,7 @@ test.describe('Theme Visual Tests', () => {
     });
 
     test('[TV-15] should match snapshot for shortcuts modal in light theme', async () => {
-      const theme = await moleculeViewer.getCurrentTheme();
-      if (theme !== 'light') {
-        await moleculeViewer.toggleTheme();
-      }
+      await moleculeViewer.ensureTheme('light');
 
       await moleculeViewer.loadSampleMolecule('caffeine');
       await moleculeViewer.pressKey('?');

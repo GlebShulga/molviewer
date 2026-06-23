@@ -205,12 +205,32 @@ export class MoleculeViewerPage {
   }
 
   /**
-   * Get current theme
+   * Get current theme.
+   * Waits for ThemeContext's mount effect to set data-theme before reading, so an
+   * unset/not-yet-applied attribute is never misread as 'dark' (which would let a
+   * conditional toggle be skipped and capture the wrong theme into a baseline).
    */
   async getCurrentTheme(): Promise<'light' | 'dark'> {
-    const html = this.page.locator('html');
-    const theme = await html.getAttribute('data-theme');
+    await this.page.waitForFunction(() => {
+      const t = document.documentElement.getAttribute('data-theme');
+      return t === 'light' || t === 'dark';
+    });
+    const theme = await this.page.locator('html').getAttribute('data-theme');
     return theme === 'light' ? 'light' : 'dark';
+  }
+
+  /**
+   * Ensure the active theme is `target`, toggling if needed, then assert it took effect.
+   * A failed toggle errors loudly here instead of silently saving the wrong theme.
+   */
+  async ensureTheme(target: 'light' | 'dark'): Promise<void> {
+    if ((await this.getCurrentTheme()) !== target) {
+      await this.toggleTheme();
+    }
+    await this.page.waitForFunction(
+      (t) => document.documentElement.getAttribute('data-theme') === t,
+      target,
+    );
   }
 
   /**
