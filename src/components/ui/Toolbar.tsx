@@ -19,7 +19,7 @@ import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
-import { buildShareUrl } from '../../utils/urlParams';
+import { buildShareUrl, sourceToPath } from '../../utils/urlParams';
 import styles from './Toolbar.module.css';
 
 export type MeasurementMode = 'none' | 'distance' | 'angle' | 'dihedral';
@@ -55,32 +55,27 @@ export function Toolbar({
 }: ToolbarProps) {
   // Use new hook for active structure access
   const activeStructure = useActiveStructure();
-  const { setRepresentation, autoRotate, setAutoRotate, moleculeSource } = useMoleculeStore(useShallow(state => ({
+  const { setRepresentation, autoRotate, setAutoRotate } = useMoleculeStore(useShallow(state => ({
     setRepresentation: state.setRepresentation,
     autoRotate: state.autoRotate,
     setAutoRotate: state.setAutoRotate,
-    moleculeSource: state.moleculeSource,
   })));
+  // Copy Link shares the active structure's readable address (/pdb/ID, /af/ID, ...).
+  const linkSource = activeStructure?.source && sourceToPath(activeStructure.source) ? activeStructure.source : null;
 
   // Copy link state
   const [linkCopied, setLinkCopied] = useState(false);
   const handleCopyLink = useCallback(() => {
     const repr = activeStructure?.representation;
     const color = activeStructure?.colorScheme;
-    const url = buildShareUrl({
-      pdbId: moleculeSource?.type === 'rcsb' ? moleculeSource.id : undefined,
-      uniprotId: moleculeSource?.type === 'alphafold' ? moleculeSource.id : undefined,
-      externalUrl: moleculeSource?.type === 'url' ? moleculeSource.url : undefined,
-      repr,
-      color,
-    });
+    const url = buildShareUrl({ source: linkSource, repr, color });
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     }).catch(() => {
       // Clipboard API can fail in iframes or older browsers — ignore silently
     });
-  }, [activeStructure, moleculeSource]);
+  }, [activeStructure, linkSource]);
 
   // Get undo/redo state from temporal store
   const { pastStates, futureStates, undo, redo } = useStore(temporalStore);
@@ -156,9 +151,9 @@ export function Toolbar({
       label: linkCopied ? 'Link Copied!' : 'Copy Link',
       onClick: handleCopyLink,
       active: linkCopied,
-      disabled: !hasMolecule || !moleculeSource,
+      disabled: !hasMolecule || !linkSource,
     },
-  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport, linkCopied, handleCopyLink, moleculeSource]);
+  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport, linkCopied, handleCopyLink, linkSource]);
 
   const undoRedoButtons = useMemo<ToolbarButton[]>(() => [
     {

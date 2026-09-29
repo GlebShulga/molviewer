@@ -65,7 +65,7 @@ export class MoleculeViewerPage {
 
     // Header
     this.header = page.locator('header');
-    this.title = page.locator('h1');
+    this.title = page.getByTestId('app-title');
     this.themeToggle = page.locator('[class*="themeToggle"]');
     this.menuButton = page.locator('[class*="menuButton"]');
 
@@ -513,19 +513,20 @@ export class MoleculeViewerPage {
 
   /**
    * Close sidebar by clicking overlay
-   * Must click on the exposed overlay area (RIGHT side, outside the 300px sidebar)
-   * because the sidebar (z-index: 250) is above the overlay (z-index: 200).
-   * Math: Mobile viewport is 375px, sidebar is 300px (max-width: 85vw ≈ 319px)
-   * So x = 375 - 30 = 345, which is safely outside the sidebar area
+   * Must click on the exposed overlay area because the sidebar (z-index: 250)
+   * is above the overlay (z-index: 200):
+   * - phones (<= 600px): the sidebar is a bottom sheet (max 85dvh), so the
+   *   exposed strip is at the top of the screen;
+   * - tablets: it's a left drawer (max 85vw), so the right edge is exposed.
    */
   async closeSidebarViaOverlay(): Promise<void> {
     const viewport = this.page.viewportSize();
     if (!viewport) throw new Error('No viewport set');
 
-    // Click right side of viewport (outside 300px sidebar)
-    await this.sidebarOverlay.click({
-      position: { x: viewport.width - 30, y: viewport.height / 2 }
-    });
+    const position = viewport.width <= 600
+      ? { x: viewport.width / 2, y: 20 }
+      : { x: viewport.width - 30, y: viewport.height / 2 };
+    await this.sidebarOverlay.click({ position });
     await this.page.waitForTimeout(300); // Wait for drawer animation
   }
 }

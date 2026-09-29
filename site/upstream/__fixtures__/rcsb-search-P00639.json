@@ -1,0 +1,59 @@
+{
+ "query_id": "347db3d4-665c-48bb-ada7-d85c1a9709c9",
+ "result_type": "entry",
+ "total_count": 16,
+ "result_set": [
+  {
+   "identifier": "2A40",
+   "score": 1
+  },
+  {
+   "identifier": "3W3D",
+   "score": 1
+  },
+  {
+   "identifier": "2A42",
+   "score": 1
+  },
+  {
+   "identifier": "2DNJ",
+   "score": 1
+  },
+  {
+   "identifier": "3DNI",
+   "score": 1
+  },
+  {
+   "identifier": "2A3Z",
+   "score": 1
+  },
+  {
+   "identifier": "1DNK",
+   "score": 1
+  },
+  {
+   "identifier": "2D1K",
+   "score": 1
+  },
+  {
+   "identifier": "7NXV",
+   "score": 1
+  },
+  {
+   "identifier": "2A41",
+   "score": 1
+  },
+  {
+   "identifier": "1ATN",
+   "score": 1
+  },
+  {
+   "identifier": "9NB9",
+   "score": 1
+  },
+  {
+   "identifier": "9FJY",
+   "score": 1
+  }
+ ]
+}

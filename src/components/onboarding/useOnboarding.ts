@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { parseMMCIF } from '../../parsers';
-import { parseMoleculeParams } from '../../utils/urlParams';
+import { getInitialUrlLoad } from '../../utils/urlParams';
+import { track } from '../../utils/track';
 import { TOUR_STEPS } from './tourSteps';
 
 const STORAGE_KEY = 'mol3d-onboarding-completed';
@@ -35,7 +36,7 @@ function markOnboardingCompleted(): void {
 
 function getInitialPhase(): OnboardingPhase {
   if (isOnboardingCompleted()) return 'idle';
-  if (parseMoleculeParams(window.location.search)) return 'idle';
+  if (getInitialUrlLoad(window.location)) return 'idle';
   if (useMoleculeStore.getState().structureOrder.length > 0) return 'idle';
   return 'welcome';
 }
@@ -70,10 +71,8 @@ export function useOnboarding(): OnboardingState {
       const molecule = parseMMCIF(content);
       molecule.name = '1CRN';
 
-      const { addStructure, setMoleculeSource } = useMoleculeStore.getState();
+      const { addStructure } = useMoleculeStore.getState();
       addStructure(molecule, '1CRN', { type: 'rcsb', id: '1CRN' });
-      setMoleculeSource({ type: 'rcsb', id: '1CRN' });
-      document.title = '1CRN - MolViewer';
 
       setPhase('touring');
       setTourStep(1);
@@ -91,6 +90,7 @@ export function useOnboarding(): OnboardingState {
       if (prev >= TOUR_STEPS.length) {
         markOnboardingCompleted();
         setPhase('completed');
+        track('onboarding_completed', { value: 'finished' });
         return prev;
       }
       return prev + 1;
@@ -104,6 +104,7 @@ export function useOnboarding(): OnboardingState {
   const skipTour = useCallback(() => {
     markOnboardingCompleted();
     setPhase('completed');
+    track('onboarding_completed', { value: 'skipped' });
   }, []);
 
   return { phase, tourStep, startTour, nextStep, prevStep, skipTour };

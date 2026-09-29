@@ -73,8 +73,23 @@ export function drawWatermark(
   if (!ctx) return sourceCanvas;
 
   ctx.drawImage(sourceCanvas, 0, 0);
+  paintWatermark(ctx, out.width, out.height, text);
 
-  const fontSize = Math.max(14, Math.round(sourceCanvas.width / 100));
+  return out;
+}
+
+/**
+ * Paint the URL watermark pill into the bottom-right corner of a 2D context.
+ * Shared by PNG export (via drawWatermark) and turntable video frames.
+ */
+export function paintWatermark(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  text: string
+): void {
+  const fontSize = Math.max(14, Math.round(width / 100));
+  ctx.save();
   ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
   ctx.textBaseline = 'middle';
 
@@ -85,8 +100,8 @@ export function drawWatermark(
   const textW = metrics.width;
   const pillH = fontSize + padY * 2;
   const pillW = textW + padX * 2;
-  const x = sourceCanvas.width - pillW - margin;
-  const y = sourceCanvas.height - pillH - margin;
+  const x = width - pillW - margin;
+  const y = height - pillH - margin;
   const radius = pillH / 2;
 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -101,6 +116,35 @@ export function drawWatermark(
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
   ctx.fillText(text, x + padX, y + pillH / 2);
+  ctx.restore();
+}
 
-  return out;
+/**
+ * Build a safe download filename from the user's export filename setting.
+ * Strips characters that are invalid on common file systems and a trailing
+ * copy of the extension, then appends `.ext`.
+ */
+export function buildExportFilename(base: string | null | undefined, ext: string): string {
+  const cleanExt = ext.replace(/^\.+/, '').toLowerCase();
+  let name = (base ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+    .trim();
+  const suffix = `.${cleanExt}`;
+  if (name.toLowerCase().endsWith(suffix)) name = name.slice(0, -suffix.length);
+  name = name.replace(/^\.+/, '').trim();
+  return `${name || 'molecule'}${suffix}`;
+}
+
+/** Trigger a browser download for a Blob. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Give the browser time to start the download before releasing the URL.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

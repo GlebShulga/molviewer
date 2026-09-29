@@ -1,0 +1,399 @@
+{
+ "3dni": {
+  "molecules": [
+   {
+    "entity_id": 1,
+    "chains": [
+     {
+      "chain_id": "A",
+      "secondary_structure": {
+       "helices": [
+        {
+         "start": {
+          "residue_number": 13,
+          "author_residue_number": 13,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 16,
+          "author_residue_number": 16,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 19,
+          "author_residue_number": 19,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 29,
+          "author_residue_number": 29,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 46,
+          "author_residue_number": 46,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 55,
+          "author_residue_number": 55,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 112,
+          "author_residue_number": 112,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 113,
+          "author_residue_number": 113,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 137,
+          "author_residue_number": 137,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 139,
+          "author_residue_number": 139,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 140,
+          "author_residue_number": 140,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 158,
+          "author_residue_number": 158,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 178,
+          "author_residue_number": 178,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 183,
+          "author_residue_number": 183,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 185,
+          "author_residue_number": 185,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 188,
+          "author_residue_number": 188,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 219,
+          "author_residue_number": 219,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 224,
+          "author_residue_number": 224,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 226,
+          "author_residue_number": 226,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 226,
+          "author_residue_number": 226,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 235,
+          "author_residue_number": 235,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 239,
+          "author_residue_number": 239,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "start": {
+          "residue_number": 243,
+          "author_residue_number": 243,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 249,
+          "author_residue_number": 249,
+          "author_insertion_code": null
+         }
+        }
+       ],
+       "strands": [
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 2,
+          "author_residue_number": 2,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 11,
+          "author_residue_number": 11,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 34,
+          "author_residue_number": 34,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 40,
+          "author_residue_number": 40,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 64,
+          "author_residue_number": 64,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 67,
+          "author_residue_number": 67,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 2,
+         "start": {
+          "residue_number": 71,
+          "author_residue_number": 71,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 71,
+          "author_residue_number": 71,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 2,
+         "start": {
+          "residue_number": 78,
+          "author_residue_number": 78,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 78,
+          "author_residue_number": 78,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 79,
+          "author_residue_number": 79,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 84,
+          "author_residue_number": 84,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 89,
+          "author_residue_number": 89,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 96,
+          "author_residue_number": 96,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 114,
+          "author_residue_number": 114,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 120,
+          "author_residue_number": 120,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 127,
+          "author_residue_number": 127,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 132,
+          "author_residue_number": 132,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 163,
+          "author_residue_number": 163,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 168,
+          "author_residue_number": 168,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 193,
+          "author_residue_number": 193,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 194,
+          "author_residue_number": 194,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 4,
+         "start": {
+          "residue_number": 203,
+          "author_residue_number": 203,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 203,
+          "author_residue_number": 203,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 3,
+         "start": {
+          "residue_number": 212,
+          "author_residue_number": 212,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 217,
+          "author_residue_number": 217,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 5,
+         "start": {
+          "residue_number": 225,
+          "author_residue_number": 225,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 225,
+          "author_residue_number": 225,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 231,
+          "author_residue_number": 231,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 232,
+          "author_residue_number": 232,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 4,
+         "start": {
+          "residue_number": 252,
+          "author_residue_number": 252,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 252,
+          "author_residue_number": 252,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 1,
+         "start": {
+          "residue_number": 255,
+          "author_residue_number": 255,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 258,
+          "author_residue_number": 258,
+          "author_insertion_code": null
+         }
+        },
+        {
+         "sheet_id": 5,
+         "start": {
+          "residue_number": 259,
+          "author_residue_number": 259,
+          "author_insertion_code": null
+         },
+         "end": {
+          "residue_number": 259,
+          "author_residue_number": 259,
+          "author_insertion_code": null
+         }
+        }
+       ]
+      },
+      "struct_asym_id": "A"
+     }
+    ]
+   }
+  ]
+ }
+}

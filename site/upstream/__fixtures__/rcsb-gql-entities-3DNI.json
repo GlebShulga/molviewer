@@ -1,0 +1,59 @@
+{
+ "data": {
+  "entry": {
+   "polymer_entities": [
+    {
+     "rcsb_polymer_entity": {
+      "pdbx_description": "DEOXYRIBONUCLEASE I"
+     },
+     "rcsb_polymer_entity_container_identifiers": {
+      "entity_id": "1",
+      "auth_asym_ids": [
+       "A"
+      ],
+      "uniprot_ids": [
+       "P00639"
+      ],
+      "reference_sequence_identifiers": [
+       {
+        "database_name": "UniProt",
+        "database_accession": "P00639"
+       }
+      ]
+     },
+     "rcsb_entity_source_organism": [
+      {
+       "scientific_name": "Bos taurus"
+      }
+     ],
+     "entity_poly": {
+      "pdbx_seq_one_letter_code_can": "LKIAAFNIRTFGETKMSNATLASYIVRIVRRYDIVLIQEVRDSHLVAVGKLLDYLNQDDPNTYHYVVSEPLGRNSYKERYLFLFRPNKVSVLDTYQYDDGCESCGNDSFSREPAVVKFSSHSTKVKEFAIVALHSAPSDAVAEINSLYDVYLDVQQKWHLNDVMLMGDFNADCSYVTSSQWSSIRLRTSSTFQWLIPDSADTTATSTNCAYDRIVVAGSLLQSSVVPGSAAPFDFQAAYGLSNEMALAISDHYPVEVTLT",
+      "rcsb_sample_sequence_length": 260,
+      "rcsb_entity_polymer_type": "Protein"
+     }
+    }
+   ],
+   "nonpolymer_entities": [
+    {
+     "rcsb_nonpolymer_entity_container_identifiers": {
+      "auth_asym_ids": [
+       "A"
+      ],
+      "nonpolymer_comp_id": "CA"
+     },
+     "rcsb_nonpolymer_entity": {
+      "pdbx_number_of_molecules": 2
+     },
+     "nonpolymer_comp": {
+      "chem_comp": {
+       "id": "CA",
+       "name": "CALCIUM ION",
+       "formula": "Ca",
+       "formula_weight": 40.078
+      }
+     }
+    }
+   ]
+  }
+ }
+}

@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { parseMoleculeParams, parseViewParams, buildShareUrl } from '../urlParams';
+import {
+  parseMoleculeParams,
+  parseViewParams,
+  parsePathnameParams,
+  getInitialUrlLoad,
+  sourceToPath,
+  buildShareUrl,
+} from '../urlParams';
 
 describe('parseMoleculeParams', () => {
   it('parses valid PDB ID', () => {
@@ -38,17 +45,8 @@ describe('parseMoleculeParams', () => {
     expect(parseMoleculeParams('?af=INVALID')).toBeNull();
   });
 
-  it('parses HTTPS URL', () => {
-    const result = parseMoleculeParams('?url=https://example.com/mol.pdb');
-    expect(result).toEqual({ source: 'url', url: 'https://example.com/mol.pdb' });
-  });
-
-  it('rejects HTTP URL (non-HTTPS)', () => {
-    expect(parseMoleculeParams('?url=http://example.com/mol.pdb')).toBeNull();
-  });
-
-  it('rejects invalid URL', () => {
-    expect(parseMoleculeParams('?url=not-a-url')).toBeNull();
+  it('ignores ?url= (loading from arbitrary URLs is not supported)', () => {
+    expect(parseMoleculeParams('?url=https://example.com/mol.pdb')).toBeNull();
   });
 
   it('returns null when no params', () => {
@@ -56,12 +54,12 @@ describe('parseMoleculeParams', () => {
     expect(parseMoleculeParams('?foo=bar')).toBeNull();
   });
 
-  it('pdb takes priority over af and url', () => {
+  it('pdb takes priority over af (and ?url= is ignored)', () => {
     const result = parseMoleculeParams('?pdb=1CRN&af=P69905&url=https://x.com/y.pdb');
     expect(result).toEqual({ source: 'rcsb', id: '1CRN' });
   });
 
-  it('af takes priority over url', () => {
+  it('af is used even when ?url= is present', () => {
     const result = parseMoleculeParams('?af=P69905&url=https://x.com/y.pdb');
     expect(result).toEqual({ source: 'alphafold', id: 'P69905' });
   });
@@ -96,47 +94,96 @@ describe('parseViewParams', () => {
   });
 });
 
+describe('parsePathnameParams', () => {
+  it('parses readable structure paths', () => {
+    expect(parsePathnameParams('/pdb/3dni')).toEqual({ source: 'rcsb', id: '3DNI' });
+    expect(parsePathnameParams('/af/P69905')).toEqual({ source: 'alphafold', id: 'P69905' });
+    expect(parsePathnameParams('/compound/caffeine')).toEqual({ source: 'pubchem', slug: 'caffeine' });
+    expect(parsePathnameParams('/compound/vitamin-c')).toEqual({ source: 'pubchem', slug: 'vitamin-c' });
+    expect(parsePathnameParams('/compound/cid/2519')).toEqual({ source: 'pubchem', cid: 2519 });
+    expect(parsePathnameParams('/s/TEST12345678')).toEqual({ source: 'share', id: 'TEST12345678' });
+  });
+
+  it('marks embed paths', () => {
+    expect(parsePathnameParams('/embed/pdb/4HHB')).toEqual({ source: 'rcsb', id: '4HHB', embed: true });
+    expect(parsePathnameParams('/embed/compound/caffeine')).toEqual({ source: 'pubchem', slug: 'caffeine', embed: true });
+    expect(parsePathnameParams('/embed/s/TEST12345678')).toBeNull();
+  });
+
+  it('rejects malformed paths', () => {
+    expect(parsePathnameParams('/af/NOTANID')).toBeNull();
+    expect(parsePathnameParams('/compound/cid/0')).toBeNull();
+    expect(parsePathnameParams('/embed/compound/cid/007')).toBeNull();
+    expect(parsePathnameParams('/pdb/ZZZZZ')).toBeNull();
+    expect(parsePathnameParams('/compound/Caffeine')).toBeNull();
+    expect(parsePathnameParams('/compound/-bad-')).toBeNull();
+    expect(parsePathnameParams('/random')).toBeNull();
+  });
+});
+
+describe('getInitialUrlLoad', () => {
+  it('prefers the path over query parameters', () => {
+    expect(getInitialUrlLoad({ pathname: '/pdb/3DNI', search: '?af=P69905' })).toEqual({ source: 'rcsb', id: '3DNI' });
+  });
+
+  it('returns null for unparseable input, so nothing waits for a load', () => {
+    expect(getInitialUrlLoad({ pathname: '/', search: '?pdb=abc' })).toBeNull();
+    expect(getInitialUrlLoad({ pathname: '/af/NOTANID', search: '' })).toBeNull();
+    expect(getInitialUrlLoad({ pathname: '/', search: '?url=https://example.com/x.pdb' })).toBeNull();
+  });
+});
+
+describe('sourceToPath', () => {
+  it('maps every addressable source', () => {
+    expect(sourceToPath({ type: 'rcsb', id: '4HHB' })).toBe('/pdb/4HHB');
+    expect(sourceToPath({ type: 'alphafold', id: 'P69905' })).toBe('/af/P69905');
+    expect(sourceToPath({ type: 'pubchem', cid: 2519, slug: 'caffeine' })).toBe('/compound/caffeine');
+    expect(sourceToPath({ type: 'pubchem', cid: 2519 })).toBe('/compound/cid/2519');
+  });
+
+  it('local files have no address', () => {
+    expect(sourceToPath({ type: 'inline', format: 'pdb', data: '' })).toBeNull();
+    expect(sourceToPath(undefined)).toBeNull();
+  });
+});
+
 describe('buildShareUrl', () => {
   beforeEach(() => {
-    // Mock window.location for buildShareUrl
     Object.defineProperty(window, 'location', {
       value: { origin: 'https://molviewer.bio', pathname: '/' },
       writable: true,
     });
   });
 
-  it('builds URL with PDB ID', () => {
-    const url = buildShareUrl({ pdbId: '1CRN' });
-    expect(url).toBe('https://molviewer.bio/?pdb=1CRN');
-  });
-
-  it('builds URL with UniProt ID', () => {
-    const url = buildShareUrl({ uniprotId: 'P69905' });
-    expect(url).toBe('https://molviewer.bio/?af=P69905');
-  });
-
-  it('builds URL with external URL', () => {
-    const url = buildShareUrl({ externalUrl: 'https://example.com/mol.pdb' });
-    expect(url).toBe('https://molviewer.bio/?url=https%3A%2F%2Fexample.com%2Fmol.pdb');
+  it('builds readable URLs', () => {
+    expect(buildShareUrl({ source: { type: 'rcsb', id: '1CRN' } })).toBe('https://molviewer.bio/pdb/1CRN');
+    expect(buildShareUrl({ source: { type: 'alphafold', id: 'P69905' } })).toBe('https://molviewer.bio/af/P69905');
+    expect(buildShareUrl({ source: { type: 'pubchem', cid: 2519, slug: 'caffeine' } })).toBe(
+      'https://molviewer.bio/compound/caffeine'
+    );
   });
 
   it('includes repr and color', () => {
-    const url = buildShareUrl({ pdbId: '1CRN', repr: 'cartoon', color: 'chain' });
-    expect(url).toBe('https://molviewer.bio/?pdb=1CRN&repr=cartoon&color=chain');
+    expect(buildShareUrl({ source: { type: 'rcsb', id: '1CRN' }, repr: 'cartoon', color: 'chain' })).toBe(
+      'https://molviewer.bio/pdb/1CRN?repr=cartoon&color=chain'
+    );
   });
 
-  it('pdbId takes priority over uniprotId', () => {
-    const url = buildShareUrl({ pdbId: '1CRN', uniprotId: 'P69905' });
-    expect(url).toBe('https://molviewer.bio/?pdb=1CRN');
+  it('returns the base URL without an addressable source', () => {
+    expect(buildShareUrl({})).toBe('https://molviewer.bio/');
+    expect(buildShareUrl({ source: { type: 'inline', format: 'pdb', data: '' } })).toBe('https://molviewer.bio/');
   });
 
-  it('returns base URL when no source', () => {
-    const url = buildShareUrl({});
-    expect(url).toBe('https://molviewer.bio/');
-  });
-
-  it('includes only repr when no source', () => {
-    const url = buildShareUrl({ repr: 'cartoon' });
-    expect(url).toBe('https://molviewer.bio/?repr=cartoon');
+  // Regression: links used to be built on the current path, and the path wins
+  // over ?af= on load, so a link copied on /pdb/3DNI for an AlphaFold model
+  // (/pdb/3DNI?af=P69905) reopened 3DNI.
+  it('ignores the current path', () => {
+    Object.defineProperty(window, 'location', {
+      value: { origin: 'https://molviewer.bio', pathname: '/pdb/3DNI' },
+      writable: true,
+    });
+    const url = buildShareUrl({ source: { type: 'alphafold', id: 'P69905' } });
+    expect(url).toBe('https://molviewer.bio/af/P69905');
+    expect(getInitialUrlLoad(new URL(url))).toEqual({ source: 'alphafold', id: 'P69905' });
   });
 });

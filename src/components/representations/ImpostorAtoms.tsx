@@ -143,6 +143,9 @@ export interface ImpostorAtomsProps {
   useGPUPicking?: boolean;
 }
 
+/** Marks the impostor mesh for model export (see utils/exportModel). */
+const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
+
 /** Threshold for automatic GPU picking activation */
 const GPU_PICKING_THRESHOLD = 1000;
 
@@ -489,6 +492,9 @@ export function ImpostorAtoms({
         ref={meshRef}
         args={[geometry, undefined, atomsData.length]}
         frustumCulled={false}
+        // Model export (utils/exportModel) replaces these billboards with real
+        // spheres, read from instanceMatrix + instanceRadius + instanceColor.
+        userData={IMPOSTOR_EXPORT_USER_DATA}
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
         onClick={handleClick}

@@ -1,0 +1,198 @@
+{
+ "data": {
+  "entries": [
+   {
+    "rcsb_id": "2A40",
+    "struct": {
+     "title": "Ternary complex of the WH2 domain of WAVE with Actin-DNAse I"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      1.8
+     ]
+    }
+   },
+   {
+    "rcsb_id": "3W3D",
+    "struct": {
+     "title": "Crystal structure of smooth muscle G actin DNase I complex"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      1.8
+     ]
+    }
+   },
+   {
+    "rcsb_id": "9NB9",
+    "struct": {
+     "title": "Viral protein DP71L in complex with phosphorylated eIF2alpha (NTD) and protein phosphatase 1A (D64A), stabilized by G-actin/DNAseI"
+    },
+    "exptl": [
+     {
+      "method": "ELECTRON MICROSCOPY"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      3.03
+     ]
+    }
+   },
+   {
+    "rcsb_id": "9FJY",
+    "struct": {
+     "title": "Structure of the DNase I- and phalloidin-bound pointed end of F-actin (conformer 2)."
+    },
+    "exptl": [
+     {
+      "method": "ELECTRON MICROSCOPY"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      3.79
+     ]
+    }
+   },
+   {
+    "rcsb_id": "7NXV",
+    "struct": {
+     "title": "Crystal structure of the complex of DNase I/G-actin/PPP1R15A_582-621"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.55
+     ]
+    }
+   },
+   {
+    "rcsb_id": "2DNJ",
+    "struct": {
+     "title": "DNASE I-INDUCED DNA CONFORMATION. 2 ANGSTROMS STRUCTURE OF A DNASE I-OCTAMER COMPLEX"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2
+     ]
+    }
+   },
+   {
+    "rcsb_id": "2D1K",
+    "struct": {
+     "title": "Ternary complex of the WH2 domain of mim with actin-dnase I"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.5
+     ]
+    }
+   },
+   {
+    "rcsb_id": "2A42",
+    "struct": {
+     "title": "Actin-DNAse I Complex"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      1.85
+     ]
+    }
+   },
+   {
+    "rcsb_id": "2A41",
+    "struct": {
+     "title": "Ternary complex of the WH2 Domain of WIP with Actin-DNAse I"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.6
+     ]
+    }
+   },
+   {
+    "rcsb_id": "2A3Z",
+    "struct": {
+     "title": "Ternary complex of the WH2 domain of WASP with Actin-DNAse I"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.078
+     ]
+    }
+   },
+   {
+    "rcsb_id": "1DNK",
+    "struct": {
+     "title": "THE X-RAY STRUCTURE OF THE DNASE I-D(GGTATACC)2 COMPLEX AT 2.3 ANGSTROMS RESOLUTION"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.3
+     ]
+    }
+   },
+   {
+    "rcsb_id": "1ATN",
+    "struct": {
+     "title": "Atomic structure of the actin:DNASE I complex"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.8
+     ]
+    }
+   }
+  ]
+ }
+}

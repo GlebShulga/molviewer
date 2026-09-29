@@ -24,9 +24,20 @@ MolViewer is a molecular visualization application built with:
 - `src/hooks/` - Custom React hooks
 
 ## Build Commands
-- `pnpm dev` - Start development server
-- `pnpm build` - Production build
+- `pnpm dev` - Start development server (port 3000)
+- `pnpm build` - Production build (also generates static pages, sitemaps and social cards)
 - `pnpm preview` - Preview production build
+- `pnpm pages:dev` - Pages Functions over the dev server; `pnpm pages:preview` - Functions over `dist/`
+- `pnpm test:run` - Unit tests once (`pnpm test` is watch mode)
+
+## Site / SEO Architecture
+- **Landing pages** (`/pdb/:id`, `/af/:id`, `/s/:id`, `/embed/*`, `/compound/cid/:cid`) are Pages Functions in `functions/`. Data comes from `site/upstream/` (RCSB, PDBe, AlphaFold, UniProt), HTML and metadata from `site/render/`, injected into the SPA shell by `site/render/shell.ts`. Unknown IDs return 404.
+- **Static pages** (tool pages, `/learn/*`, `/about`, `/compare`, `/collections/*`, `/compounds`, `/compound/:slug`), sitemaps and social cards are generated at build time by `site/build/` (a Vite plugin) from `site/content/` and `data/*.json`. The build fails on broken internal links.
+- Visible page text lives in `<section id="page-info">` **outside** `#root` (React would replace anything inside `#root`), between `<!--page-info:start-->`/`<!--page-info:end-->` markers.
+- `functions/_middleware.ts` 404s unknown paths (index.html carries a `mv-spa-shell` marker that real pages remove) and sets the CSP header (`site/csp.ts`). There is no CSP `<meta>` tag.
+- The address bar follows the loaded scene (`src/hooks/useUrlSync.ts`); the startup load is `src/hooks/useInitialUrlLoad.ts`. Structures are loaded by `src/utils/structureLoader.ts`.
+- Curated data (`data/*.json`) is validated by `scripts/validate-ids.ts` and `scripts/validate-compounds.ts`.
+- Product events: `src/utils/track.ts` -> `functions/api/event.ts` (Workers Analytics Engine).
 
 ## CSS Rules
 - **Never use hardcoded color values** (e.g., `rgba(88, 166, 255, 0.15)`). Always use CSS custom properties from `src/index.css` (`--accent-color`, `--bg-primary`, etc.). For transparency, use `color-mix(in srgb, var(--accent-color) 15%, transparent)`.

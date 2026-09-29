@@ -20,6 +20,8 @@ import { createMeasurementFromAtomRefs, type Measurement, type MeasurementType }
 import { detectAromaticRings } from '../utils';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
+import { useUrlSyncStore } from './urlSyncStore';
+import { track } from '../utils/track';
 import { AROMATIC_DETECTION_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
@@ -163,8 +165,6 @@ interface MoleculeState {
   // App.tsx watches this and applies via the viewer's imperative handle.
   pendingCameraSnapshot: CameraSnapshot | null;
 
-  // Source tracking for URL sharing (transient)
-  moleculeSource: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string } | null;
 
   // ===== Structure management actions =====
   addStructure: (molecule: Molecule, name?: string, source?: StructureSource) => string;
@@ -266,8 +266,6 @@ interface MoleculeState {
   setControlsReady: (ready: boolean) => void;
   setPendingCameraSnapshot: (snapshot: CameraSnapshot | null) => void;
 
-  // Source tracking
-  setMoleculeSource: (source: MoleculeState['moleculeSource']) => void;
 
   reset: () => void;
 }
@@ -331,8 +329,6 @@ const initialState = {
   controlsReady: false,
   pendingCameraSnapshot: null as CameraSnapshot | null,
 
-  // Source tracking
-  moleculeSource: null as MoleculeState['moleculeSource'],
 };
 
 /**
@@ -500,6 +496,8 @@ export const useMoleculeStore = create<MoleculeState>()(
       error: null,
       loadedMoleculeId: null,
     });
+    // User-initiated loads switch address-bar syncing back on (src/hooks/useUrlSync.ts).
+    useUrlSyncStore.getState().enableSync();
 
     return structure.id;
   },
@@ -663,12 +661,14 @@ export const useMoleculeStore = create<MoleculeState>()(
       loadedMoleculeId: null,
       labels: [],
     });
+    useUrlSyncStore.getState().enableSync();
   },
 
   setRepresentation: (representation) => {
     const { activeStructureId } = get();
     if (activeStructureId) {
       get().setStructureRepresentation(activeStructureId, representation);
+      track('representation_changed', { value: representation });
     }
   },
 
@@ -727,6 +727,7 @@ export const useMoleculeStore = create<MoleculeState>()(
           measurements: [...get().measurements, measurement],
           selectedAtoms: [],
         });
+        track('measurement_added', { kind: measurementMode });
       }
     } else {
       set({ selectedAtoms: newSelection });
@@ -948,6 +949,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       // becomes the new baseline.
       temporal.clear();
     }
+    useUrlSyncStore.getState().enableSync();
     return data.camera;
   },
 
@@ -995,13 +997,17 @@ export const useMoleculeStore = create<MoleculeState>()(
         newOrder.push(structure.id);
       });
 
-      const remappedMeasurements = payload.measurements.map(m => ({
-        ...m,
-        atomRefs: m.atomRefs.map(ref => ({
-          structureId: idRemap.get(ref.structureId) ?? ref.structureId,
-          atomIndex: ref.atomIndex,
-        })),
-      }));
+      // Measurements on a structure that couldn't be restored are dropped,
+      // like labels below, rather than left pointing at nothing.
+      const remappedMeasurements = payload.measurements
+        .filter(m => m.atomRefs.every(ref => idRemap.has(ref.structureId)))
+        .map(m => ({
+          ...m,
+          atomRefs: m.atomRefs.map(ref => ({
+            structureId: idRemap.get(ref.structureId)!,
+            atomIndex: ref.atomIndex,
+          })),
+        }));
 
       const remappedLabels = payload.labels
         .map(l => {
@@ -1111,8 +1117,6 @@ export const useMoleculeStore = create<MoleculeState>()(
   setControlsReady: (ready) => set({ controlsReady: ready }),
   setPendingCameraSnapshot: (snapshot) => set({ pendingCameraSnapshot: snapshot }),
 
-  // Source tracking
-  setMoleculeSource: (source) => set({ moleculeSource: source }),
 
   reset: () => {
     clearSelectorCaches();

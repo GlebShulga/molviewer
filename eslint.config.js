@@ -4,13 +4,13 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist', 'node_modules', 'coverage', 'e2e', 'functions', '*.config.ts'] },
+  { ignores: ['dist', 'node_modules', 'coverage', 'e2e', 'functions', '.wrangler', '*.config.ts'] },
   js.configs.recommended,
   ...tsPlugin.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parserOptions: { project: './tsconfig.json' },
+      parserOptions: { project: ['./tsconfig.json', './site/tsconfig.json', './scripts/tsconfig.json'] },
       globals: { ...globals.browser, ...globals.node },
     },
     plugins: {
@@ -24,5 +24,15 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
+  },
+  {
+    // Classic browser scripts served as-is from public/.
+    files: ['public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
+  {
+    // Command-line scripts report progress on stdout.
+    files: ['scripts/**/*.ts', 'site/**/__fixtures__/**/*.ts'],
+    rules: { 'no-console': 'off' },
   },
 ];

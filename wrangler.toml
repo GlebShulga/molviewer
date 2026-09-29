@@ -9,3 +9,9 @@ pages_build_output_dir = "dist"
 binding = "SHARE_KV"
 id = "61fe623926c34f2da4e96981685e79f8"
 preview_id = "9df791a104974f57b7b51a6c93c1cc99"
+
+# Workers Analytics Engine dataset for anonymous product events (POST /api/event).
+# Created automatically on first write. Query it with scripts/query-events.ts.
+[[analytics_engine_datasets]]
+binding = "EVENTS"
+dataset = "molviewer_events"

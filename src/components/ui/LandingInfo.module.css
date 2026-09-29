@@ -1,0 +1,90 @@
+.landingInfo {
+  font-size: 0.8125rem;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.subtitle,
+.summary {
+  color: var(--text-secondary);
+}
+
+.summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+
+.fact dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.fact dd {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.sectionLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.ssChain {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.chain {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.helix,
+.strand {
+  font-weight: 600;
+}
+
+.helix {
+  color: var(--accent-color);
+}
+
+.strand {
+  color: var(--warning-color);
+}
+
+.links {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}

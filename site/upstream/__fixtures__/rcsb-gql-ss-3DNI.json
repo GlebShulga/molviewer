@@ -1,0 +1,172 @@
+{
+ "data": {
+  "entry": {
+   "polymer_entities": [
+    {
+     "rcsb_polymer_entity_container_identifiers": {
+      "entity_id": "1"
+     },
+     "polymer_entity_instances": [
+      {
+       "rcsb_polymer_entity_instance_container_identifiers": {
+        "auth_asym_id": "A"
+       },
+       "rcsb_polymer_instance_feature": [
+        {
+         "type": "SHEET",
+         "feature_id": "S1",
+         "feature_positions": [
+          {
+           "beg_seq_id": 231,
+           "end_seq_id": 232
+          },
+          {
+           "beg_seq_id": 255,
+           "end_seq_id": 259
+          },
+          {
+           "beg_seq_id": 2,
+           "end_seq_id": 11
+          },
+          {
+           "beg_seq_id": 34,
+           "end_seq_id": 40
+          },
+          {
+           "beg_seq_id": 79,
+           "end_seq_id": 84
+          },
+          {
+           "beg_seq_id": 64,
+           "end_seq_id": 67
+          }
+         ]
+        },
+        {
+         "type": "SHEET",
+         "feature_id": "S2",
+         "feature_positions": [
+          {
+           "beg_seq_id": 89,
+           "end_seq_id": 96
+          },
+          {
+           "beg_seq_id": 114,
+           "end_seq_id": 120
+          },
+          {
+           "beg_seq_id": 126,
+           "end_seq_id": 132
+          },
+          {
+           "beg_seq_id": 163,
+           "end_seq_id": 168
+          },
+          {
+           "beg_seq_id": 212,
+           "end_seq_id": 217
+          },
+          {
+           "beg_seq_id": 193,
+           "end_seq_id": 194
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P1",
+         "feature_positions": [
+          {
+           "beg_seq_id": 13,
+           "end_seq_id": 16
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P2",
+         "feature_positions": [
+          {
+           "beg_seq_id": 19,
+           "end_seq_id": 30
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P3",
+         "feature_positions": [
+          {
+           "beg_seq_id": 46,
+           "end_seq_id": 55
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P4",
+         "feature_positions": [
+          {
+           "beg_seq_id": 139,
+           "end_seq_id": 147
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P5",
+         "feature_positions": [
+          {
+           "beg_seq_id": 148,
+           "end_seq_id": 158
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P6",
+         "feature_positions": [
+          {
+           "beg_seq_id": 185,
+           "end_seq_id": 188
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P7",
+         "feature_positions": [
+          {
+           "beg_seq_id": 219,
+           "end_seq_id": 224
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P8",
+         "feature_positions": [
+          {
+           "beg_seq_id": 235,
+           "end_seq_id": 239
+          }
+         ]
+        },
+        {
+         "type": "HELIX_P",
+         "feature_id": "HELX_P9",
+         "feature_positions": [
+          {
+           "beg_seq_id": 243,
+           "end_seq_id": 249
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

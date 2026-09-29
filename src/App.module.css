@@ -2,6 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Mobile browsers: exclude the address bar, so the viewer isn't cut off. */
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -32,10 +34,14 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.appHeader h1 {
+.brand {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.brand:hover {
+  text-decoration: none;
 }
 
 .tagline {
@@ -329,7 +335,7 @@
     gap: 12px;
   }
 
-  .appHeader h1 {
+  .brand {
     font-size: 1.25rem;
   }
 
@@ -393,6 +399,44 @@
   .viewerContainer {
     width: 100%;
     height: 100%;
+  }
+}
+
+/* Phones: the sidebar becomes a bottom sheet (keep in sync with BOTTOM_SHEET_MAX_WIDTH in App.tsx). */
+@media (max-width: 600px) {
+  .sidebar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: 85dvh;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    padding-top: 56px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 24px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+  }
+
+  /* Drag handle */
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background-color: var(--border-color);
+    transform: translateX(-50%);
+  }
+
+  .sidebar.open {
+    transform: translateY(0);
   }
 }
 

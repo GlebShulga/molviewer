@@ -1,41 +1,28 @@
 # MolViewer
 
-> Interactive 3D molecular visualization tool built with React and Three.js
+> Free, open-source 3D molecule viewer that runs in the browser (https://molviewer.bio). View proteins, DNA and RNA from the PDB, AlphaFold predictions, and small molecules from PubChem, or open your own PDB, mmCIF, SDF, MOL or XYZ file. Nothing to install.
 
-## What This Application Does
+## What it does
 
-MolViewer is a free, open-source web application for visualizing 3D molecular structures. It allows scientists, students, and researchers to:
+- Load a structure by PDB ID (from RCSB, downloaded as mmCIF), by UniProt accession (AlphaFold DB prediction), or by compound name or CID (PubChem 3D conformer).
+- Open local files: PDB (.pdb), mmCIF (.cif, .mmcif, .cif.gz), SDF, MOL and XYZ.
+- Representations: cartoon (helices and β-sheets), ball-and-stick, stick, spacefill, molecular surfaces (van der Waals and solvent-accessible).
+- Color schemes: element (CPK), chain, residue type, secondary structure, B-factor (also shows AlphaFold pLDDT confidence), rainbow.
+- Measure distances, angles and dihedrals; label atoms; read the sequence with secondary-structure annotation.
+- Compare up to 10 structures, overlaid or side by side. Undo/redo, keyboard shortcuts, dark and light themes.
+- Share a scene with a short link (/s/...), embed an interactive viewer in any page with an iframe, and export PNG images, turntable videos (WebM/MP4) and 3D models (GLB, STL).
 
-- Load molecular structures from PDB files or fetch directly from RCSB PDB database by ID
-- View molecules in multiple representations (Ball & Stick, Stick, Cartoon, Spacefill, Surface)
-- Apply various color schemes (CPK elements, Chain, Residue Type, Secondary Structure, B-factor, Rainbow)
-- Measure distances, angles, and dihedral angles between atoms
-- Compare multiple structures side-by-side or overlaid
-- View amino acid sequences with secondary structure annotations
+## Useful URLs
 
-## Key Features
+- Any PDB entry: https://molviewer.bio/pdb/{PDB_ID}, e.g. https://molviewer.bio/pdb/4HHB. Each page lists the entry's helix and β-strand residue ranges, chains, ligands, citation and related structures.
+- Any AlphaFold prediction: https://molviewer.bio/af/{UNIPROT_ACCESSION}, e.g. https://molviewer.bio/af/P04637, with the pLDDT confidence breakdown and matching PDB structures.
+- Small molecules: https://molviewer.bio/compound/{name}, e.g. https://molviewer.bio/compound/caffeine. Index: https://molviewer.bio/compounds
+- View options as query parameters: ?repr=cartoon|ball-and-stick|stick|spacefill|surface-vdw|surface-sas and ?color=cpk|chain|residueType|secondaryStructure|bfactor|rainbow, e.g. https://molviewer.bio/pdb/1CRN?repr=cartoon&color=secondaryStructure
+- Embeddable viewer: https://molviewer.bio/embed/pdb/{PDB_ID} (also /embed/af/..., /embed/compound/...), with ?spin=1 and ?bg=light. oEmbed: https://molviewer.bio/oembed?url=...
+- Topic collections: https://molviewer.bio/collections
+- Guides: https://molviewer.bio/learn (reading PDB files, helices and β-sheets, AlphaFold models, pLDDT)
+- Format-specific viewers: /pdb-viewer, /alphafold-viewer, /mmcif-viewer, /sdf-viewer, /xyz-viewer; comparison with other tools: /compare
 
-- **File Support**: PDB, SDF, XYZ molecular formats
-- **RCSB Integration**: Enter a PDB ID (e.g., "1crn", "4hhb") to fetch structures directly
-- **Representations**: Ball & Stick, Stick, Cartoon (ribbon), Spacefill (CPK), Surface
-- **Color Schemes**: Element (CPK), Chain, Residue Type, Secondary Structure, B-factor, Rainbow
-- **Measurements**: Distance (Angstroms), Angle (degrees), Dihedral angle
-- **Multi-Structure**: Load up to 10 structures, overlay or side-by-side comparison
-- **Sequence Viewer**: Interactive amino acid sequence with secondary structure color coding
-- **3D Labels**: Add persistent labels to atoms
-- **Undo/Redo**: Full history support (Ctrl+Z / Ctrl+Y)
+## Technology
 
-## Technology Stack
-
-- React 19
-- Three.js / React Three Fiber
-- TypeScript
-- Vite
-
-## Usage Examples
-
-1. Open the application
-2. Click "Load from RCSB" and enter "1crn" (crambin protein)
-3. Select "Cartoon" representation to see secondary structure
-4. Use "Secondary Structure" color scheme
-5. Click the sequence viewer to highlight residues in 3D
+React 19, TypeScript, Three.js with React Three Fiber, Zustand, Vite; hosted on Cloudflare Pages. Source code (MIT): https://github.com/GlebShulga/molviewer

@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Marks the untouched SPA shell. Cloudflare Pages serves this file for
+         unknown paths; functions/_middleware.ts turns that into a 404. Landing
+         pages and generated pages remove it. Keep it on one line. -->
+    <meta name="mv-spa-shell" content="fallback">
+    <script src="/theme-init.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="canonical" href="https://molviewer.bio/" />
@@ -9,50 +14,32 @@
     <link rel="preconnect" href="https://files.rcsb.org" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d1117" />
-    <!-- SEO fallback content lives in #root for crawlers (raw HTML). Hidden for
-         JS-capable browsers so it never flashes before React mounts; revealed
-         again when JS is disabled. -->
-    <style>
-      .seo-fallback {
-        display: none;
-      }
-    </style>
-    <noscript>
-      <style>
-        .seo-fallback {
-          display: block;
-        }
-      </style>
-    </noscript>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://files.rcsb.org https://data.rcsb.org https://alphafold.ebi.ac.uk https://log-api.eu.newrelic.com https://cloudflareinsights.com; img-src 'self' data: blob:; worker-src blob:; font-src 'self';" />
 
     <!-- Primary Meta Tags -->
-    <meta name="description" content="Interactive 3D molecule viewer built with React and Three.js. View PDB, SDF, and XYZ molecular structures." />
-    <meta name="keywords" content="molecular visualization, protein viewer, PDB viewer, 3D structure, molecule viewer, React, Three.js, open source, chemistry, biology">
-    <meta name="author" content="MolViewer">
+    <meta name="description" content="Free 3D molecule viewer in your browser, no install. Open PDB and mmCIF files, AlphaFold models and small molecules. See helices and sheets, measure distances." />
     <meta name="robots" content="index, follow">
-    <title>MolViewer - Interactive 3D Molecule Viewer</title>
+    <title>MolViewer: Free Online 3D Molecule Viewer</title>
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://molviewer.bio/">
     <meta property="og:site_name" content="MolViewer">
     <meta property="og:locale" content="en_US">
-    <meta property="og:title" content="MolViewer - Interactive 3D Molecular Viewer">
-    <meta property="og:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules. Load PDB files, measure distances, compare structures.">
+    <meta property="og:title" content="MolViewer: Free Online 3D Molecule Viewer">
+    <meta property="og:description" content="View proteins, DNA, AlphaFold predictions and small molecules in 3D, free in your browser. Open PDB, mmCIF, SDF and XYZ files, measure and share.">
     <meta property="og:image" content="https://molviewer.bio/og-image.png">
     <meta property="og:image:secure_url" content="https://molviewer.bio/og-image.png">
     <meta property="og:image:type" content="image/png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="MolViewer — Interactive 3D Molecular Viewer">
+    <meta property="og:image:alt" content="MolViewer: Free Online 3D Molecule Viewer">
 
     <!-- Twitter Card -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:title" content="MolViewer - Interactive 3D Molecular Viewer">
-    <meta property="twitter:description" content="Free, open-source 3D molecular visualization tool for proteins and molecules.">
-    <meta property="twitter:image" content="https://molviewer.bio/og-image.png">
-    <meta property="twitter:image:alt" content="MolViewer — Interactive 3D Molecular Viewer">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MolViewer: Free Online 3D Molecule Viewer">
+    <meta name="twitter:description" content="View proteins, DNA, AlphaFold predictions and small molecules in 3D, free in your browser. Open PDB, mmCIF, SDF and XYZ files, measure and share.">
+    <meta name="twitter:image" content="https://molviewer.bio/og-image.png">
+    <meta name="twitter:image:alt" content="MolViewer: Free Online 3D Molecule Viewer">
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -60,14 +47,14 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "MolViewer",
-      "alternateName": "Mol Viewer",
-      "description": "Interactive 3D molecular visualization tool for viewing protein structures and molecules. Supports PDB files, multiple representations (cartoon, ball-and-stick, surface), distance/angle measurements, and multi-structure comparison.",
+      "alternateName": ["Mol Viewer", "MolViewer Molecule Viewer"],
+      "description": "Free, open-source 3D molecule viewer that runs in the browser. Opens PDB and mmCIF files, AlphaFold predictions and PubChem small molecules, with cartoon, ball-and-stick, spacefill and surface representations, secondary-structure coloring, distance/angle/dihedral measurements, sharing and embedding.",
       "applicationCategory": "ScienceApplication",
       "operatingSystem": "Web Browser",
-      "browserRequirements": "Requires WebGL support",
+      "browserRequirements": "Requires WebGL 2 support",
       "author": {
-        "@type": "Organization",
-        "name": "MolViewer"
+        "@type": "Person",
+        "name": "Gleb Shulga"
       },
       "offers": {
         "@type": "Offer",
@@ -75,14 +62,16 @@
         "priceCurrency": "USD"
       },
       "featureList": [
-        "Load PDB files or fetch from RCSB database",
-        "Multiple representations: Ball & Stick, Cartoon, Spacefill, Surface",
-        "Color schemes: CPK, Chain, Secondary Structure, B-factor, Rainbow",
+        "Load structures by PDB ID from RCSB or by UniProt accession from AlphaFold DB",
+        "Open PDB, mmCIF, SDF, MOL and XYZ files",
+        "Small molecules from PubChem",
+        "Representations: Ball & Stick, Stick, Cartoon, Spacefill, Surface",
+        "Color schemes: CPK, Chain, Residue type, Secondary structure, B-factor (pLDDT), Rainbow",
         "Measurement tools: Distance, Angle, Dihedral",
         "Sequence viewer with secondary structure annotation",
         "Multi-structure comparison (up to 10 structures)",
-        "Undo/Redo support",
-        "Dark/Light theme"
+        "Share links and embeddable viewer",
+        "PNG, turntable video, GLB and STL export"
       ],
       "url": "https://molviewer.bio",
       "screenshot": "https://molviewer.bio/og-image.png",
@@ -91,23 +80,13 @@
     </script>
   </head>
   <body>
-    <div id="root">
-      <div class="seo-fallback">
-        <h1>MolViewer — Interactive 3D Molecular Viewer</h1>
-        <p>View PDB and AlphaFold structures in your browser. No installation required.</p>
-        <h2>Featured structures</h2>
-        <ul>
-          <li><a href="/pdb/6VXX">SARS-CoV-2 spike glycoprotein</a></li>
-          <li><a href="/pdb/4HHB">Hemoglobin</a></li>
-          <li><a href="/pdb/1UBQ">Ubiquitin</a></li>
-          <li><a href="/pdb/1CRN">Crambin</a></li>
-          <li><a href="/af/P00533">EGFR (AlphaFold)</a></li>
-          <li><a href="/af/P53350">PLK1 (AlphaFold)</a></li>
-          <li><a href="/af/P05067">Amyloid precursor protein (AlphaFold)</a></li>
-          <li><a href="/af/P38398">BRCA1 (AlphaFold)</a></li>
-        </ul>
-      </div>
-    </div>
+    <div id="root"></div>
+    <!-- Crawlable, visible page content. Sits outside #root so React never
+         replaces it. Landing pages replace the inner HTML via HTMLRewriter;
+         for the home page the build fills in the placeholder below. -->
+    <section id="page-info" class="page-info" aria-label="About this page">
+      <!--page-info:start--><!--page-info:end-->
+    </section>
     <script type="module" src="/src/main.tsx"></script>
     <!-- Cloudflare Web Analytics -->
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "a3389c7a6f424ecaaf63057532dc0e1b"}'></script>

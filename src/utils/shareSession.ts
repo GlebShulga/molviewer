@@ -16,7 +16,7 @@ import type {
 import type { ComponentSettings } from './moleculeTypeClassifier';
 import type { CameraSnapshot, SerializedComponentSettings } from '../types/session';
 import type { Measurement } from './measurements';
-import { parseByFormat } from '../parsers';
+import { loadStructureFromSource } from './structureLoader';
 import type { Molecule } from '../types';
 
 export const SHARE_SCHEMA_VERSION = 1;
@@ -138,45 +138,6 @@ interface FetchedStructure {
   shareableStructure: ShareableStructure;
 }
 
-/**
- * Re-fetch a structure described by its source reference.
- * Mirrors the load paths in App.tsx and FileUpload.tsx.
- */
-async function fetchSource(source: StructureSource, signal?: AbortSignal): Promise<Molecule> {
-  if (source.type === 'rcsb') {
-    const resp = await fetch(`https://files.rcsb.org/download/${source.id}.cif`, { signal });
-    if (!resp.ok) throw new Error(`PDB ID "${source.id}" not found`);
-    const content = await resp.text();
-    const m = parseByFormat(content, 'cif');
-    m.name = source.id;
-    return m;
-  }
-  if (source.type === 'alphafold') {
-    const metaResp = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${source.id}`, { signal });
-    if (!metaResp.ok) throw new Error(`UniProt ID "${source.id}" not found in AlphaFold DB`);
-    const metadata = await metaResp.json();
-    const entry = Array.isArray(metadata) ? metadata[0] : metadata;
-    const cifUrl = entry?.cifUrl;
-    if (!cifUrl) throw new Error('No structure file available');
-    const cifResp = await fetch(cifUrl, { signal });
-    if (!cifResp.ok) throw new Error('Failed to fetch AlphaFold structure');
-    const content = await cifResp.text();
-    const m = parseByFormat(content, 'cif');
-    m.name = `AF-${source.id}`;
-    return m;
-  }
-  if (source.type === 'url') {
-    const resp = await fetch(source.url, { signal });
-    if (!resp.ok) throw new Error('Failed to fetch molecule from URL');
-    const content = await resp.text();
-    const ext = new URL(source.url).pathname.split('.').pop()?.toLowerCase() ?? 'pdb';
-    const m = parseByFormat(content, ext);
-    return m;
-  }
-  // inline
-  return parseByFormat(source.data, source.format);
-}
-
 export interface DeserializedShareableSession {
   structures: FetchedStructure[];
   layoutMode: LayoutMode;
@@ -185,6 +146,8 @@ export interface DeserializedShareableSession {
   labels: Label3D[];
   surfaceSettings: SerializedSurfaceSettings;
   autoRotate: boolean;
+  /** Names of structures that couldn't be restored (e.g. source types this version no longer loads). */
+  skipped: string[];
 }
 
 export async function deserializeShareableSession(
@@ -195,16 +158,32 @@ export async function deserializeShareableSession(
     throw new Error(`Unsupported share schema v${session.schemaVersion}`);
   }
 
-  const fetched = await Promise.all(
+  // One structure that can't be loaded (a removed source type, a withdrawn
+  // entry) must not lose the rest of the scene.
+  const results = await Promise.allSettled(
     session.structures.map(async (s): Promise<FetchedStructure> => ({
-      molecule: await fetchSource(s.source, signal),
+      molecule: (await loadStructureFromSource(s.source, signal)).molecule,
       source: s.source,
       shareableStructure: s,
     }))
   );
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const fetched: FetchedStructure[] = [];
+  const skipped: string[] = [];
+  let firstError: unknown;
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') fetched.push(r.value);
+    else {
+      skipped.push(session.structures[i].name || `Structure ${i + 1}`);
+      firstError ??= r.reason;
+    }
+  });
+  if (fetched.length === 0 && session.structures.length > 0) throw firstError;
 
   return {
     structures: fetched,
+    skipped,
     layoutMode: session.layoutMode,
     camera: session.camera,
     measurements: session.measurements,

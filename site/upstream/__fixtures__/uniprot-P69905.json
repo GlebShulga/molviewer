@@ -1,0 +1,933 @@
+{
+ "entryType": "UniProtKB reviewed (Swiss-Prot)",
+ "primaryAccession": "P69905",
+ "organism": {
+  "scientificName": "Homo sapiens",
+  "commonName": "Human",
+  "taxonId": 9606,
+  "lineage": [
+   "Eukaryota",
+   "Metazoa",
+   "Chordata",
+   "Craniata",
+   "Vertebrata",
+   "Euteleostomi",
+   "Mammalia",
+   "Eutheria",
+   "Euarchontoglires",
+   "Primates",
+   "Haplorrhini",
+   "Catarrhini",
+   "Hominidae",
+   "Homo"
+  ]
+ },
+ "proteinDescription": {
+  "recommendedName": {
+   "fullName": {
+    "value": "Hemoglobin subunit alpha"
+   }
+  },
+  "alternativeNames": [
+   {
+    "fullName": {
+     "value": "Alpha-globin"
+    }
+   },
+   {
+    "fullName": {
+     "value": "Hemoglobin alpha chain"
+    }
+   }
+  ],
+  "contains": [
+   {
+    "recommendedName": {
+     "fullName": {
+      "evidences": [
+       {
+        "evidenceCode": "ECO:0000303",
+        "source": "PubMed",
+        "id": "18077343"
+       }
+      ],
+      "value": "Hemopressin"
+     }
+    }
+   }
+  ]
+ },
+ "genes": [
+  {
+   "geneName": {
+    "value": "HBA1"
+   }
+  },
+  {
+   "geneName": {
+    "value": "HBA2"
+   }
+  }
+ ],
+ "comments": [
+  {
+   "texts": [
+    {
+     "value": "Involved in oxygen transport from the lung to the various peripheral tissues"
+    }
+   ],
+   "commentType": "FUNCTION"
+  },
+  {
+   "texts": [
+    {
+     "evidences": [
+      {
+       "evidenceCode": "ECO:0000269",
+       "source": "PubMed",
+       "id": "18077343"
+      }
+     ],
+     "value": "Hemopressin acts as an antagonist peptide of the cannabinoid receptor CNR1 (PubMed:18077343). Hemopressin-binding efficiently blocks cannabinoid receptor CNR1 and subsequent signaling (PubMed:18077343)"
+    }
+   ],
+   "commentType": "FUNCTION",
+   "molecule": "Hemopressin"
+  },
+  {
+   "texts": [
+    {
+     "value": "Heterotetramer of two alpha chains and two beta chains in adult hemoglobin A (HbA); two alpha chains and two delta chains in adult hemoglobin A2 (HbA2); two alpha chains and two epsilon chains in early embryonic hemoglobin Gower-2; two alpha chains and two gamma chains in fetal hemoglobin F (HbF)"
+    }
+   ],
+   "commentType": "SUBUNIT"
+  },
+  {
+   "texts": [
+    {
+     "evidences": [
+      {
+       "evidenceCode": "ECO:0000269",
+       "source": "PubMed",
+       "id": "29109153"
+      }
+     ],
+     "value": "(Microbial infection) Interacts with Staphylococcus aureus protein isdB"
+    }
+   ],
+   "commentType": "SUBUNIT"
+  },
+  {
+   "commentType": "DISEASE",
+   "disease": {
+    "diseaseId": "Heinz body anemias",
+    "diseaseAccession": "DI-01698",
+    "acronym": "HEIBAN",
+    "description": "Form of non-spherocytic hemolytic anemia of Dacie type 1. After splenectomy, which has little benefit, basophilic inclusions called Heinz bodies are demonstrable in the erythrocytes. Before splenectomy, diffuse or punctate basophilia may be evident. Most of these cases are probably instances of hemoglobinopathy. The hemoglobin demonstrates heat lability. Heinz bodies are observed also with the Ivemark syndrome (asplenia with cardiovascular anomalies) and with glutathione peroxidase deficiency.",
+    "diseaseCrossReference": {
+     "database": "MIM",
+     "id": "140700"
+    },
+    "evidences": [
+     {
+      "evidenceCode": "ECO:0000269",
+      "source": "PubMed",
+      "id": "2833478"
+     }
+    ]
+   },
+   "note": {
+    "texts": [
+     {
+      "value": "The disease may be caused by variants affecting the gene represented in this entry"
+     }
+    ]
+   }
+  },
+  {
+   "commentType": "DISEASE",
+   "disease": {
+    "diseaseId": "Alpha-thalassemia",
+    "diseaseAccession": "DI-01181",
+    "acronym": "A-THAL",
+    "description": "A form of thalassemia. Thalassemias are common monogenic diseases occurring mostly in Mediterranean and Southeast Asian populations. The hallmark of alpha-thalassemia is an imbalance in globin-chain production in the adult HbA molecule. The level of alpha chain production can range from none to very nearly normal levels. Deletion of both copies of each of the two alpha-globin genes causes alpha(0)-thalassemia, also known as homozygous alpha thalassemia. Due to the complete absence of alpha chains, the predominant fetal hemoglobin is a tetramer of gamma-chains (Bart hemoglobin) that has essentially no oxygen carrying capacity. This causes oxygen starvation in the fetal tissues leading to prenatal lethality or early neonatal death. The loss of two alpha genes results in mild alpha-thalassemia, also known as heterozygous alpha-thalassemia. Affected individuals have small red cells and a mild anemia (microcytosis). If three of the four alpha-globin genes are functional, individuals are completely asymptomatic. Some rare forms of alpha-thalassemia are due to point mutations (non-deletional alpha-thalassemia).",
+    "diseaseCrossReference": {
+     "database": "MIM",
+     "id": "604131"
+    }
+   },
+   "note": {
+    "texts": [
+     {
+      "value": "The disease is caused by variants affecting the gene represented in this entry"
+     }
+    ]
+   }
+  },
+  {
+   "commentType": "DISEASE",
+   "note": {
+    "texts": [
+     {
+      "value": "Alpha(0)-thalassemia is associated with non-immune hydrops fetalis, a generalized edema of the fetus with fluid accumulation in the body cavities due to non-immune causes. Non-immune hydrops fetalis is not a diagnosis in itself but a symptom, a feature of many genetic disorders, and the end-stage of a wide variety of disorders"
+     }
+    ]
+   }
+  },
+  {
+   "commentType": "DISEASE",
+   "disease": {
+    "diseaseId": "Hemoglobin H disease",
+    "diseaseAccession": "DI-03202",
+    "acronym": "HBH",
+    "description": "A form of alpha-thalassemia due to the loss of three alpha genes. This results in high levels of a tetramer of four beta chains (hemoglobin H), causing a severe and life-threatening anemia. Untreated, most patients die in childhood or early adolescence.",
+    "diseaseCrossReference": {
+     "database": "MIM",
+     "id": "613978"
+    },
+    "evidences": [
+     {
+      "evidenceCode": "ECO:0000269",
+      "source": "PubMed",
+      "id": "10569720"
+     }
+    ]
+   },
+   "note": {
+    "texts": [
+     {
+      "value": "The disease is caused by variants affecting the gene represented in this entry"
+     }
+    ]
+   }
+  }
+ ],
+ "uniProtKBCrossReferences": [
+  {
+   "database": "PDB",
+   "id": "1A00",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A01",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A0U",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.14 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A0Z",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A3N",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A3O",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1A9W",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.90 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1ABW",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1ABY",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.60 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1AJ9",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.20 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1B86",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.50 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BAB",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.50 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=1-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BBB",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.70 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BIJ",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.30 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BUW",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.90 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BZ0",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.50 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BZ1",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.59 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=1-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1BZZ",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.59 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1C7B",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1C7C",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1C7D",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1CLS",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.90 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1CMY",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "3.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1COH",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.90 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1DKE",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.10 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1DXT",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.70 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1DXU",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.70 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1DXV",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.70 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1FDH",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.50 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/B=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1FN3",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.48 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1G9V",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.85 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1GBU",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.80 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1GBV",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1GLI",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.50 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1GZX",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.10 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1HAB",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.30 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1HAC",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.60 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1HBA",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "2.10 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1HBB",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "1.90 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C=2-142"
+    }
+   ]
+  },
+  {
+   "database": "PDB",
+   "id": "1HBS",
+   "properties": [
+    {
+     "key": "Method",
+     "value": "X-ray"
+    },
+    {
+     "key": "Resolution",
+     "value": "3.00 A"
+    },
+    {
+     "key": "Chains",
+     "value": "A/C/E/G=2-142"
+    }
+   ]
+  }
+ ],
+ "sequence": {
+  "length": 142
+ },
+ "extraAttributes": {
+  "uniParcId": "UPI0000000239"
+ }
+}

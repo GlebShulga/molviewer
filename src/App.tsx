@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, type MeasurementMode } from './store/moleculeStore';
@@ -14,26 +14,36 @@ import {
   Toolbar,
   ShortcutsHelp,
   ExportPanel,
-  MeasurementPanel,
+  SequenceViewer,
   ResidueNavigator,
   SavedMoleculesPanel,
   ContextMenu,
-  SequenceViewer,
   StructureList,
 } from './components/ui';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { WebGLFallback } from './components/ui/WebGLFallback';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { OnboardingProvider, useOnboardingContext, WelcomeScreen, SpotlightTour } from './components/onboarding';
+import { OnboardingProvider, useOnboardingContext, WelcomeScreen } from './components/onboarding';
 import { THEME_COLORS } from './config';
 import { isWebGL2Supported } from './utils/webglDetection';
-import { parseMoleculeParams, parsePathnameParams, parseViewParams } from './utils/urlParams';
-import { loadSharedSession, deserializeShareableSession } from './utils/shareSession';
-import { parseMMCIF, parseByFilename } from './parsers';
+import { useInitialUrlLoad } from './hooks/useInitialUrlLoad';
+import { useUrlSync } from './hooks/useUrlSync';
+import { getWatermarkText } from './utils/watermark';
+import { track } from './utils/track';
+import { parsePathnameParams } from './utils/urlParams';
+import { LandingInfo } from './components/ui/LandingInfo';
+import { GestureHint } from './components/ui/GestureHint';
+import { PageInfoLink } from './components/ui/PageInfoLink';
 import { Sun, Moon, Menu, X, Github } from 'lucide-react';
 import styles from './App.module.css';
 import './styles/globals.css';
+
+// Loaded on demand: not needed for the first paint (plan 1.9). The sequence
+// viewer, export panel and shortcuts modal stay eager: they must appear the
+// moment a structure loads or a key is pressed.
+const MeasurementPanel = lazy(() => import('./components/ui/MeasurementPanel').then((m) => ({ default: m.MeasurementPanel })));
+const SpotlightTour = lazy(() => import('./components/onboarding/SpotlightTour').then((m) => ({ default: m.SpotlightTour })));
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
@@ -53,13 +63,15 @@ function OnboardingSpotlight({ setSidebarOpen }: { setSidebarOpen: (open: boolea
   const onboarding = useOnboardingContext();
   if (onboarding.phase !== 'touring') return null;
   return (
-    <SpotlightTour
-      step={onboarding.tourStep}
-      onNext={onboarding.nextStep}
-      onPrev={onboarding.prevStep}
-      onSkip={onboarding.skipTour}
-      setSidebarOpen={setSidebarOpen}
-    />
+    <Suspense fallback={null}>
+      <SpotlightTour
+        step={onboarding.tourStep}
+        onNext={onboarding.nextStep}
+        onPrev={onboarding.prevStep}
+        onSkip={onboarding.skipTour}
+        setSidebarOpen={setSidebarOpen}
+      />
+    </Suspense>
   );
 }
 
@@ -107,10 +119,6 @@ function AppContent() {
     setHoveredAtom,
     controlsReady,
     setError,
-    addStructure,
-    setStructureRepresentation,
-    setStructureColorScheme,
-    setMoleculeSource,
   } = useMoleculeStore(useShallow(state => ({
     structureOrder: state.structureOrder,
     activeStructureId: state.activeStructureId,
@@ -129,10 +137,6 @@ function AppContent() {
     setHoveredAtom: state.setHoveredAtom,
     controlsReady: state.controlsReady,
     setError: state.setError,
-    addStructure: state.addStructure,
-    setStructureRepresentation: state.setStructureRepresentation,
-    setStructureColorScheme: state.setStructureColorScheme,
-    setMoleculeSource: state.setMoleculeSource,
   })));
 
   // Get molecule from active structure
@@ -158,120 +162,9 @@ function AppContent() {
     loadSavedMoleculesIndex();
   }, [loadSavedMoleculesIndex]);
 
-  // Auto-load from URL params (?pdb=, ?af=, ?url=, /pdb/:id, /af/:id, /s/:id)
-  useEffect(() => {
-    if (structureOrder.length > 0) return;
-
-    const moleculeParams =
-      parsePathnameParams(window.location.pathname) ??
-      parseMoleculeParams(window.location.search);
-    if (!moleculeParams) return; // No URL params — show empty state
-
-    const viewParams = parseViewParams(window.location.search);
-    const controller = new AbortController();
-    // TypeScript narrowed moleculeParams to non-null above, but the closure
-    // doesn't preserve that. Capture it in a const the closure can trust.
-    const params = moleculeParams;
-
-    if (params.source === 'share') {
-      const shareId = params.id!;
-      (async () => {
-        const { setLoading, applyShareableSession, setMoleculeSource: setSrc } = useMoleculeStore.getState();
-        setLoading(true);
-        try {
-          const session = await loadSharedSession(shareId, controller.signal);
-          const deserialized = await deserializeShareableSession(session, controller.signal);
-          if (controller.signal.aborted) return;
-
-          applyShareableSession({ ...deserialized, sourceStructures: session.structures });
-
-          // Restore global moleculeSource for the legacy Copy Link button
-          const first = deserialized.structures[0]?.source;
-          if (first && first.type !== 'inline') {
-            setSrc(first);
-          } else {
-            setSrc(null);
-          }
-          document.title = 'Shared session - MolViewer';
-        } catch (err) {
-          if (controller.signal.aborted) return;
-          setError(err instanceof Error ? err.message : 'Failed to load shared session');
-        } finally {
-          if (!controller.signal.aborted) {
-            useMoleculeStore.getState().setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }
-
-    async function loadFromUrl() {
-      const { setLoading } = useMoleculeStore.getState();
-      setLoading(true);
-
-      try {
-        let content: string;
-        let name: string;
-        let source: { type: 'rcsb'; id: string } | { type: 'alphafold'; id: string } | { type: 'url'; url: string };
-
-        if (params.source === 'rcsb') {
-          const id = params.id!;
-          const resp = await fetch(`https://files.rcsb.org/download/${id}.cif`, { signal: controller.signal });
-          if (!resp.ok) throw new Error(`PDB ID "${id}" not found`);
-          content = await resp.text();
-          name = id;
-          source = { type: 'rcsb', id };
-        } else if (params.source === 'alphafold') {
-          const id = params.id!;
-          const metaResp = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${id}`, { signal: controller.signal });
-          if (!metaResp.ok) throw new Error(`UniProt ID "${id}" not found in AlphaFold DB`);
-          const metadata = await metaResp.json();
-          const entry = Array.isArray(metadata) ? metadata[0] : metadata;
-          const cifUrl = entry?.cifUrl;
-          if (!cifUrl) throw new Error('No structure file available');
-          const cifResp = await fetch(cifUrl, { signal: controller.signal });
-          if (!cifResp.ok) throw new Error('Failed to fetch AlphaFold structure');
-          content = await cifResp.text();
-          name = `AF-${id}`;
-          source = { type: 'alphafold', id };
-        } else {
-          const url = params.url!;
-          const resp = await fetch(url, { signal: controller.signal });
-          if (!resp.ok) throw new Error('Failed to fetch molecule from URL');
-          content = await resp.text();
-          const urlPath = new URL(url).pathname;
-          name = urlPath.split('/').pop()?.replace(/\.[^.]+$/, '') || 'External';
-          source = { type: 'url', url };
-        }
-
-        if (controller.signal.aborted) return;
-
-        const molecule = params.source === 'url'
-          ? parseByFilename(content, new URL(params.url!).pathname)
-          : parseMMCIF(content);
-        molecule.name = name;
-        const structId = addStructure(molecule, name, source);
-        setMoleculeSource(source);
-        document.title = `${name} - MolViewer`;
-
-        if (structId) {
-          if (viewParams.repr) setStructureRepresentation(structId, viewParams.repr);
-          if (viewParams.color) setStructureColorScheme(structId, viewParams.color);
-        }
-      } catch (err) {
-        if (controller.signal.aborted) return;
-        setError(err instanceof Error ? err.message : 'Failed to load molecule');
-      } finally {
-        if (!controller.signal.aborted) {
-          useMoleculeStore.getState().setLoading(false);
-        }
-      }
-    }
-
-    loadFromUrl();
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Load what the startup URL asks for, then keep the address bar in sync.
+  useInitialUrlLoad();
+  useUrlSync();
 
   // Auto-dismiss error after 5 seconds
   useEffect(() => {
@@ -330,6 +223,31 @@ function AppContent() {
   // Close sidebar when clicking overlay or pressing Escape
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
+  // On phones the sidebar is a bottom sheet: swiping down from its top closes it.
+  const sheetTouchStartY = useRef<number | null>(null);
+  const handleSheetTouchStart = useCallback((e: React.TouchEvent<HTMLElement>) => {
+    // Only a swipe that can't be a scroll counts: the sheet and every
+    // scrollable element under the finger (sequence, lists) must be at the top.
+    let el = e.target instanceof HTMLElement ? e.target : null;
+    let atTop = true;
+    while (el) {
+      if (el.scrollTop > 0) {
+        atTop = false;
+        break;
+      }
+      if (el === e.currentTarget) break;
+      el = el.parentElement;
+    }
+    sheetTouchStartY.current = atTop ? e.touches[0].clientY : null;
+  }, []);
+  const handleSheetTouchEnd = useCallback((e: React.TouchEvent<HTMLElement>) => {
+    const start = sheetTouchStartY.current;
+    sheetTouchStartY.current = null;
+    if (start !== null && window.innerWidth <= BOTTOM_SHEET_MAX_WIDTH && e.changedTouches[0].clientY - start > 80) {
+      closeSidebar();
+    }
+  }, [closeSidebar]);
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && sidebarOpen) {
@@ -345,16 +263,13 @@ function AppContent() {
       setExportSettings(options);
     }
     const settings = options || exportSettings;
-    const sharePath = window.location.pathname.match(/^\/s\/([A-Za-z0-9]+)/)?.[0];
-    const watermark = sharePath
-      ? `${window.location.host}${sharePath}`
-      : window.location.host;
     viewerRef.current?.exportImage({
       scale: settings.scale,
       background: settings.background,
       filename: settings.filename || molecule?.name || 'molecule',
-      watermark,
+      watermark: getWatermarkText(),
     });
+    track('export_png', { scale: settings.scale });
   }, [exportSettings, molecule?.name]);
 
   const handleHomeView = useCallback(() => {
@@ -422,7 +337,7 @@ function AppContent() {
         >
           <Menu size={20} />
         </button>
-        <h1>MolViewer</h1>
+        <span className={styles.brand} data-testid="app-title">MolViewer</span>
         <span className={styles.tagline}>Interactive 3D Molecule Viewer</span>
         <a
           href="https://github.com/GlebShulga/molviewer"
@@ -445,7 +360,11 @@ function AppContent() {
           aria-hidden="true"
         />
 
-        <aside className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${isTouringSidebar ? styles.tourActive : ''}`}>
+        <aside
+          className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${isTouringSidebar ? styles.tourActive : ''}`}
+          onTouchStart={handleSheetTouchStart}
+          onTouchEnd={handleSheetTouchEnd}
+        >
           <button
             className={styles.sidebarCloseButton}
             onClick={closeSidebar}
@@ -453,6 +372,7 @@ function AppContent() {
           >
             <X size={20} />
           </button>
+          <LandingInfo />
           <FileUpload />
           <StructureList />
           <SavedMoleculesPanel />
@@ -464,17 +384,19 @@ function AppContent() {
           )}
           <ControlPanel />
           <MoleculeMetadata />
-          <MeasurementPanel
-            measurements={measurements}
-            mode={measurementMode}
-            selectedAtomIndices={selectedAtomIndices}
-            highlightedMeasurementId={highlightedMeasurementId}
-            totalAtomCount={totalAtomCount}
-            onModeChange={handleMeasurementModeChange}
-            onDeleteMeasurement={removeMeasurement}
-            onClearAll={clearMeasurements}
-            onHighlightMeasurement={setHighlightedMeasurement}
-          />
+          <Suspense fallback={null}>
+            <MeasurementPanel
+              measurements={measurements}
+              mode={measurementMode}
+              selectedAtomIndices={selectedAtomIndices}
+              highlightedMeasurementId={highlightedMeasurementId}
+              totalAtomCount={totalAtomCount}
+              onModeChange={handleMeasurementModeChange}
+              onDeleteMeasurement={removeMeasurement}
+              onClearAll={clearMeasurements}
+              onHighlightMeasurement={setHighlightedMeasurement}
+            />
+          </Suspense>
           <ResidueNavigator />
           <ExportPanel onExport={handleExport} />
         </aside>
@@ -507,6 +429,8 @@ function AppContent() {
 
           {hasStructures && (
             <>
+              <GestureHint />
+              <PageInfoLink />
               <Toolbar
                 measurementMode={measurementMode}
                 onMeasurementModeChange={handleMeasurementModeChange}
@@ -545,7 +469,24 @@ function AppContent() {
   );
 }
 
+const EmbedApp = lazy(() => import('./components/embed/EmbedApp'));
+
+/** Keep in sync with the bottom-sheet media query in App.module.css. */
+const BOTTOM_SHEET_MAX_WIDTH = 600;
+
+/** /embed/* pages render a minimal viewer for <iframe>s. */
+const IS_EMBED = typeof window !== 'undefined' && parsePathnameParams(window.location.pathname)?.embed === true;
+
 function App() {
+  if (IS_EMBED) {
+    // No ThemeProvider: the embedding page picks the theme with ?bg=, not the
+    // visitor's saved preference.
+    return (
+      <Suspense fallback={null}>
+        <EmbedApp />
+      </Suspense>
+    );
+  }
   return (
     <ThemeProvider>
       <OnboardingProvider>

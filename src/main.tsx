@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { initErrorReporter } from './utils/errorReporter';
 import App from './App';
 import './index.css';
+import './styles/site.css';
 
 initErrorReporter();
 

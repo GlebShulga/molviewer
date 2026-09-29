@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "include": [
+    "/*"
+  ],
+  "exclude": [
+    "/assets/*",
+    "/sample-molecules/*",
+    "/screenshots/*",
+    "/og/*",
+    "/favicon.svg",
+    "/apple-touch-icon.png",
+    "/og-image.png",
+    "/manifest.json",
+    "/theme-init.js",
+    "/robots.txt",
+    "/llms.txt",
+    "/sitemap.xml",
+    "/sitemap-*"
+  ]
+}

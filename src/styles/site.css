@@ -1,0 +1,397 @@
+/* ============================================
+   Site content outside the React app:
+   - #page-info below the viewer (home + landing pages)
+   - static pages generated at build time (tool pages, collections,
+     compounds, learn articles), which link this bundle's CSS too.
+   Colors come only from the tokens in src/index.css.
+   ============================================ */
+
+.page-info,
+.static-page {
+  --content-width: 960px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.page-info {
+  border-top: 1px solid var(--border-color);
+}
+
+.page-info[hidden] {
+  display: none;
+}
+
+.page-info-inner,
+.static-page main,
+.static-header-inner {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: 32px 16px 24px;
+}
+
+.page-info h1,
+.static-page h1 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+.page-info h2,
+.static-page h2 {
+  font-size: 1.25rem;
+  margin: 32px 0 12px;
+}
+
+.page-info h3,
+.static-page h3 {
+  font-size: 1rem;
+  margin: 20px 0 8px;
+}
+
+.page-info p,
+.static-page p,
+.page-info ul,
+.static-page ul,
+.page-info ol,
+.static-page ol {
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.page-info ul,
+.static-page ul,
+.page-info ol,
+.static-page ol {
+  padding-left: 24px;
+}
+
+.page-info li,
+.static-page li {
+  margin-bottom: 4px;
+}
+
+.page-info .lead,
+.static-page .lead {
+  font-size: 1.0625rem;
+  color: var(--text-secondary);
+}
+
+.page-info code,
+.static-page code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.breadcrumbs {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.breadcrumbs li + li::before {
+  content: '/';
+  margin-right: 6px;
+  color: var(--text-secondary);
+}
+
+/* Call to action links */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 16px 0 24px;
+}
+
+.cta {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background-color: var(--accent-color);
+  color: var(--bg-primary);
+  font-weight: 600;
+}
+
+.cta:hover {
+  background-color: var(--accent-hover);
+  text-decoration: none;
+}
+
+.cta-secondary {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Key facts */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 16px;
+  margin: 16px 0;
+}
+
+.facts div {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+}
+
+.facts dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Tables (secondary structure, ligands, chains, comparisons) */
+.table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.page-info table,
+.static-page table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.page-info th,
+.page-info td,
+.static-page th,
+.static-page td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+.page-info th,
+.static-page th {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.page-info tr:last-child td,
+.static-page tr:last-child td {
+  border-bottom: none;
+}
+
+.ss-helix {
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.ss-strand {
+  color: var(--warning-color);
+  font-weight: 600;
+}
+
+/* Collapsible details (FASTA, long lists) */
+.page-info details,
+.static-page details {
+  margin: 8px 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+}
+
+.page-info summary,
+.static-page summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.page-info details > :not(summary),
+.static-page details > :not(summary) {
+  padding: 0 12px 12px;
+}
+
+.sequence {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+
+/* Link grids (popular structures, related structures, collections) */
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.topic {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background-color: var(--bg-secondary);
+}
+
+.topic h3 {
+  margin-top: 0;
+}
+
+.topic ul {
+  list-style: none;
+  padding: 0;
+}
+
+.link-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+}
+
+.item-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: 6px;
+}
+
+.more {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* FAQ */
+.faq dt {
+  font-weight: 600;
+  margin-top: 16px;
+}
+
+.faq dd {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.screenshot {
+  margin: 16px 0 24px;
+}
+
+.screenshot img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.screenshot figcaption {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.note {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+/* Header used by static pages */
+.static-header {
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.static-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.static-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.static-nav {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  font-size: 0.9375rem;
+}
+
+/* Footer (static pages and below the viewer) */
+.site-footer {
+  max-width: var(--content-width, 960px);
+  margin: 24px auto 0;
+  padding: 24px 16px 40px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+
+.site-footer nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.site-footer h2 {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.site-footer ul {
+  list-style: none;
+  padding: 0;
+}
+
+.site-footer li {
+  margin-bottom: 4px;
+}
+
+.site-footer-note {
+  margin-top: 16px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .page-info h1,
+  .static-page h1 {
+    font-size: 1.375rem;
+  }
+
+  .page-info-inner,
+  .static-page main {
+    padding-top: 24px;
+  }
+}

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use MolViewer in teaching or research, please cite it as below."
+title: "MolViewer: a free, open-source 3D molecule viewer for the browser"
+type: software
+authors:
+  - family-names: Shulga
+    given-names: Gleb
+repository-code: "https://github.com/GlebShulga/molviewer"
+url: "https://molviewer.bio"
+license: MIT
+version: 0.1.0
+abstract: >-
+  MolViewer is a free, open-source web application for viewing 3D molecular
+  structures in the browser. It loads PDB entries, AlphaFold predictions and
+  PubChem small molecules, opens PDB, mmCIF, SDF, MOL and XYZ files, and
+  provides cartoon, ball-and-stick, spacefill and surface representations,
+  secondary-structure and pLDDT coloring, distance, angle and dihedral
+  measurements, multi-structure comparison, share links and embedding.
+keywords:
+  - molecular visualization
+  - protein structure
+  - PDB
+  - mmCIF
+  - AlphaFold
+  - structural biology
+  - WebGL
+  - Three.js

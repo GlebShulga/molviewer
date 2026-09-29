@@ -9,6 +9,8 @@ import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
 import { drawWatermark } from "../../utils/exportImage";
 import { logError } from "../../utils/errorReporter";
+import { recordTurntable as recordTurntableFrames, type RecordTurntableOptions } from "../../utils/exportVideo";
+import type { ModelFormat, ExportModelOptions, ExportModelResult } from "../../utils/exportModel";
 
 import type { CameraSnapshot } from "../../types/session";
 export type { CameraSnapshot };
@@ -18,7 +20,20 @@ export interface MoleculeViewerHandle {
   exportImage: (options?: { scale?: number; background?: string | null; filename?: string; watermark?: string }) => void;
   getCameraSnapshot: () => CameraSnapshot | null;
   applyCameraSnapshot: (snapshot: CameraSnapshot) => void;
+  /**
+   * Record one full camera orbit of the current view. Resolves with the video
+   * blob, or null when cancelled via `signal`. Camera, auto-rotate and control
+   * state are restored afterwards.
+   */
+  recordTurntable: (options: TurntableRecordOptions) => Promise<Blob | null>;
+  /** Export the visible scene as a GLB or binary STL model. */
+  exportModel: (format: ModelFormat, options?: ExportModelOptions) => Promise<ExportModelResult>;
 }
+
+export type TurntableRecordOptions = Pick<
+  RecordTurntableOptions,
+  'seconds' | 'mimeType' | 'watermark' | 'onProgress' | 'signal' | 'fps'
+>;
 
 export interface MoleculeViewerProps {
   children?: ReactNode;
@@ -114,6 +129,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     ref
   ) {
     const controlsRef = useRef<OrbitControlsImpl>(null);
+    const recordingRef = useRef(false);
 
     // Get quality preset based on atom count
     const qualityPreset = useMemo(() => getQualityPreset(atomCount), [atomCount]);
@@ -174,6 +190,71 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         camera.updateProjectionMatrix();
         camera.lookAt(controls.target);
         controls.update();
+      },
+      recordTurntable: async (options) => {
+        const controls = controlsRef.current;
+        const { gl, scene } = viewerRefs;
+        if (!controls || !gl || !scene) {
+          throw new Error("Viewer is not ready for video export.");
+        }
+        if (recordingRef.current) {
+          throw new Error("A recording is already in progress.");
+        }
+        recordingRef.current = true;
+
+        const camera = controls.object as THREE.PerspectiveCamera;
+        const prev = {
+          autoRotate: controls.autoRotate,
+          enabled: controls.enabled,
+          enableDamping: controls.enableDamping,
+        };
+
+        // Settle any damping momentum so the start pose is stable.
+        controls.autoRotate = false;
+        controls.enableDamping = false;
+        controls.update();
+        controls.enabled = false;
+
+        const startPosition = camera.position.clone();
+        const target = controls.target.clone();
+        const offset = startPosition.clone().sub(target);
+        const axis = camera.up.clone().normalize();
+        const q = new THREE.Quaternion();
+
+        const background = (scene.background as THREE.Color | null)?.isColor
+          ? `#${(scene.background as THREE.Color).getHexString()}`
+          : backgroundColor;
+
+        try {
+          return await recordTurntableFrames(
+            {
+              canvas: gl.domElement,
+              background,
+              setAngle: (angle) => {
+                q.setFromAxisAngle(axis, angle);
+                camera.position.copy(target).add(offset.clone().applyQuaternion(q));
+                camera.lookAt(target);
+              },
+            },
+            options
+          );
+        } finally {
+          camera.position.copy(startPosition);
+          camera.lookAt(target);
+          controls.target.copy(target);
+          controls.enabled = prev.enabled;
+          controls.enableDamping = prev.enableDamping;
+          controls.autoRotate = prev.autoRotate;
+          controls.update();
+          recordingRef.current = false;
+        }
+      },
+      exportModel: async (format, options) => {
+        const { scene } = viewerRefs;
+        if (!scene) throw new Error("Viewer is not ready for model export.");
+        // Loaded on demand so the exporters stay out of the main bundle.
+        const { exportModel } = await import("../../utils/exportModel");
+        return exportModel(scene, format, options);
       },
       exportImage: (options = {}) => {
         const { gl, scene, camera } = viewerRefs;

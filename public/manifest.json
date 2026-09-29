@@ -1,7 +1,7 @@
 {
   "name": "MolViewer",
   "short_name": "MolViewer",
-  "description": "Interactive 3D molecular visualization tool for proteins and molecules",
+  "description": "Free 3D molecule viewer for proteins, DNA, AlphaFold models and small molecules",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0d1117",
@@ -11,6 +11,11 @@
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }

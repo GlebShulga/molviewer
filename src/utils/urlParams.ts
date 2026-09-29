@@ -1,36 +1,42 @@
-import type { RepresentationType, ColorScheme } from '../types';
+import type { RepresentationType, ColorScheme, StructureSource } from '../types';
+import { UNIPROT_RE } from '../../site/identifiers';
+import { parseRoute, sourceRoute, structurePath, type StructureRoute } from '../../site/routes';
 
 /**
  * Parsed URL parameters for molecule loading and view state.
  */
 export interface UrlMoleculeParams {
-  source: 'rcsb' | 'alphafold' | 'url' | 'share';
+  source: 'rcsb' | 'alphafold' | 'share' | 'pubchem';
   id?: string;
-  url?: string;
+  /** PubChem: curated compound slug (/compound/caffeine). */
+  slug?: string;
+  /** PubChem: compound id (/compound/cid/2519). */
+  cid?: number;
+  /** True for /embed/* pages (minimal UI, no URL sync). */
+  embed?: boolean;
 }
 
-/** Pretty-URL pathnames: /pdb/:id, /af/:id, /s/:id. */
+
+function toParams(route: StructureRoute): UrlMoleculeParams {
+  switch (route.kind) {
+    case 'pdb':
+      return { source: 'rcsb', id: route.id };
+    case 'af':
+      return { source: 'alphafold', id: route.id };
+    case 'cid':
+      return { source: 'pubchem', cid: route.cid };
+    case 'compound':
+      return { source: 'pubchem', slug: route.slug };
+  }
+}
+
+/** Pretty-URL pathnames: /pdb/:id, /af/:id, /compound/:slug, /compound/cid/:cid, /s/:id, /embed/... (site/routes.ts) */
 export function parsePathnameParams(pathname: string): UrlMoleculeParams | null {
-  const pdbMatch = pathname.match(/^\/pdb\/([A-Za-z0-9]{4})\/?$/);
-  if (pdbMatch) {
-    return { source: 'rcsb', id: pdbMatch[1].toUpperCase() };
-  }
-
-  const afMatch = pathname.match(/^\/af\/([A-Za-z0-9]+)\/?$/);
-  if (afMatch) {
-    const id = afMatch[1].toUpperCase();
-    if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/.test(id)) {
-      return { source: 'alphafold', id };
-    }
-    return null;
-  }
-
-  const shareMatch = pathname.match(/^\/s\/([A-Za-z0-9]{8,16})\/?$/);
-  if (shareMatch) {
-    return { source: 'share', id: shareMatch[1] };
-  }
-
-  return null;
+  const route = parseRoute(pathname);
+  if (route.page === 'share') return { source: 'share', id: route.id };
+  if (route.page !== 'structure') return null;
+  const params = toParams(route.structure);
+  return route.embed ? { ...params, embed: true } : params;
 }
 
 export interface UrlViewParams {
@@ -48,7 +54,8 @@ const VALID_COLOR_SCHEMES: ColorScheme[] = [
 
 /**
  * Parse molecule source from URL search params.
- * Priority: pdb > af > url (first match wins).
+ * Priority: pdb > af (first match wins). Loading from arbitrary URLs is not
+ * supported: the CSP only allows fetching from the structure databases.
  */
 export function parseMoleculeParams(search: string): UrlMoleculeParams | null {
   const params = new URLSearchParams(search);
@@ -66,24 +73,22 @@ export function parseMoleculeParams(search: string): UrlMoleculeParams | null {
   if (af) {
     const trimmed = af.trim().toUpperCase();
     // Match classic 6-char and new 10-char UniProt accession formats
-    if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/.test(trimmed)) {
+    if (UNIPROT_RE.test(trimmed)) {
       return { source: 'alphafold', id: trimmed };
     }
     return null;
   }
 
-  const urlParam = params.get('url');
-  if (urlParam) {
-    try {
-      const parsed = new URL(urlParam);
-      if (parsed.protocol !== 'https:') return null; // HTTPS only
-      return { source: 'url', url: urlParam };
-    } catch {
-      return null;
-    }
-  }
-
   return null;
+}
+
+/**
+ * The structure the current URL asks to load at startup, or null.
+ * Used both by the URL-load effect and to initialise the URL-sync state,
+ * so the two can never disagree about whether a load is pending.
+ */
+export function getInitialUrlLoad(location: { pathname: string; search: string }): UrlMoleculeParams | null {
+  return parsePathnameParams(location.pathname) ?? parseMoleculeParams(location.search);
 }
 
 /**
@@ -107,24 +112,27 @@ export function parseViewParams(search: string): UrlViewParams {
 }
 
 /**
- * Build a shareable URL from the current app state.
+ * Readable address for a structure source, or null when it has none
+ * (local files).
+ */
+export function sourceToPath(source: StructureSource | undefined | null): string | null {
+  // Local files, and source types saved by older versions (e.g. external URLs), have no address.
+  const route = sourceRoute(source);
+  return route ? structurePath(route) : null;
+}
+
+/**
+ * Build a shareable URL for one structure: its readable address plus the
+ * view parameters. Always built from the origin, never from the current
+ * path, so a link copied on /pdb/3DNI for an AlphaFold model opens that model.
  */
 export function buildShareUrl(params: {
-  pdbId?: string;
-  uniprotId?: string;
-  externalUrl?: string;
+  source?: StructureSource | null;
   repr?: RepresentationType;
   color?: ColorScheme;
 }): string {
-  const url = new URL(window.location.origin + window.location.pathname);
-
-  if (params.pdbId) {
-    url.searchParams.set('pdb', params.pdbId);
-  } else if (params.uniprotId) {
-    url.searchParams.set('af', params.uniprotId);
-  } else if (params.externalUrl) {
-    url.searchParams.set('url', params.externalUrl);
-  }
+  const path = sourceToPath(params.source) ?? '/';
+  const url = new URL(path, window.location.origin);
 
   if (params.repr) {
     url.searchParams.set('repr', params.repr);

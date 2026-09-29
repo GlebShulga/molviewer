@@ -25,8 +25,9 @@ export interface QualifiedAtomRef {
 export type StructureSource =
   | { type: 'rcsb'; id: string }
   | { type: 'alphafold'; id: string }
-  | { type: 'url'; url: string }
-  | { type: 'inline'; format: 'pdb' | 'cif' | 'sdf' | 'mol' | 'xyz'; data: string };
+  | { type: 'inline'; format: 'pdb' | 'cif' | 'sdf' | 'mol' | 'xyz'; data: string }
+  /** PubChem compound. `slug` is set for curated compounds with a /compound/:slug page. */
+  | { type: 'pubchem'; cid: number; slug?: string };
 
 /**
  * A single molecular structure with its own settings

@@ -187,3 +187,42 @@ describe('moleculeStore', () => {
     });
   });
 });
+
+describe('applyShareableSession with skipped structures', () => {
+  it('drops measurements that reference a structure that was not restored', () => {
+    const kept = {
+      id: 'orig-a',
+      source: { type: 'rcsb' as const, id: '1CRN' },
+      name: '1CRN',
+      representation: 'cartoon' as const,
+      colorScheme: 'chain' as const,
+      componentSettings: [],
+      visible: true,
+    };
+    const measurement = (id: string, structureId: string) => ({
+      id,
+      type: 'distance' as const,
+      atomRefs: [
+        { structureId, atomIndex: 0 },
+        { structureId, atomIndex: 1 },
+      ],
+      atomIndices: [0, 1],
+      value: 1.5,
+      label: '1.5',
+    });
+    useMoleculeStore.getState().applyShareableSession({
+      structures: [{ molecule: createMockMolecule('1CRN'), source: kept.source, shareableStructure: kept }],
+      skipped: ['Missing'],
+      layoutMode: 'overlay',
+      camera: null,
+      measurements: [measurement('m1', 'orig-a'), measurement('m2', 'orig-missing')] as never,
+      labels: [],
+      surfaceSettings: { type: 'vdw', opacity: 0.7, probeRadius: 1.4, wireframe: false, visible: false, color: '#ffffff' },
+      autoRotate: false,
+      sourceStructures: [kept],
+    });
+    const state = useMoleculeStore.getState();
+    expect(state.measurements.map((m) => m.id)).toEqual(['m1']);
+    expect(state.structures.has(state.measurements[0].atomRefs[0].structureId)).toBe(true);
+  });
+});
