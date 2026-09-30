@@ -214,6 +214,7 @@ ${renderFooter(FEATURED_COLLECTIONS)}`;
         {
           '@context': 'https://schema.org',
           '@type': 'Dataset',
+          '@id': `${canonicalUrl}#dataset`,
           name: `AlphaFold structure prediction for ${protein} (${d.id})`,
           description: `${leadText} ${description}`,
           url: canonicalUrl,

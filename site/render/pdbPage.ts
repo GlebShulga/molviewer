@@ -274,10 +274,13 @@ function landingSecondaryStructure(d: PdbDetails): LandingData['secondaryStructu
 }
 
 function datasetJsonLd(d: PdbDetails, name: string, description: string, canonicalUrl: string): object {
-  const creators = (d.citation?.authors ?? []).slice(0, 10).map((a) => ({ '@type': 'Person', name: a }));
+  const authors = (d.citation?.authors ?? []).slice(0, 10).map((a) => ({ '@type': 'Person', name: a }));
+  // Google flags a Dataset without a creator; fall back to the archive when RCSB lists no authors.
+  const creators = authors.length ? authors : [{ '@type': 'Organization', name: 'Worldwide Protein Data Bank (wwPDB)', url: 'https://www.wwpdb.org/' }];
   return {
     '@context': 'https://schema.org',
     '@type': 'Dataset',
+    '@id': `${canonicalUrl}#dataset`,
     name: `PDB ${d.id}: ${d.title ? clean(toSentenceCase(d.title), 200) : name}`,
     description,
     url: canonicalUrl,
@@ -285,7 +288,7 @@ function datasetJsonLd(d: PdbDetails, name: string, description: string, canonic
     sameAs: `https://www.rcsb.org/structure/${d.id}`,
     isAccessibleForFree: true,
     license: 'https://creativecommons.org/publicdomain/zero/1.0/',
-    ...(creators.length ? { creator: creators } : {}),
+    creator: creators,
     ...(d.releaseDate ? { datePublished: d.releaseDate } : {}),
     ...(d.revisionDate ? { dateModified: d.revisionDate } : {}),
     ...(d.keywords ? { keywords: d.keywords.toLowerCase() } : {}),
@@ -428,7 +431,9 @@ ${renderFooter(FEATURED_COLLECTIONS)}`;
           description,
           url: canonicalUrl,
           ...(d.revisionDate ? { dateModified: d.revisionDate } : {}),
-          about: { '@type': 'Dataset', name: `PDB ${d.id}`, url: `https://www.rcsb.org/structure/${d.id}` },
+          // Reference the full Dataset below by @id. An inline stub Dataset (name + url only)
+          // is reported by Search Console as missing description, creator and license.
+          about: { '@id': `${canonicalUrl}#dataset` },
         },
         datasetJsonLd(d, name, `${leadText} ${description}`.slice(0, 4900), canonicalUrl),
       ],

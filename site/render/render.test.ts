@@ -22,6 +22,28 @@ const SHELL = readFileSync(resolve(__dirname, '../../index.html'), 'utf8').repla
   pageInfoBlock('<div><h1>Home</h1><section class="topic">A</section><section class="topic">B</section></div>')
 );
 
+/** Every schema.org Dataset anywhere in the JSON-LD, including nested ones. */
+function findDatasets(node: unknown, out: Record<string, unknown>[] = []): Record<string, unknown>[] {
+  if (Array.isArray(node)) node.forEach((n) => findDatasets(n, out));
+  else if (node && typeof node === 'object') {
+    const obj = node as Record<string, unknown>;
+    if (obj['@type'] === 'Dataset') out.push(obj);
+    Object.values(obj).forEach((v) => findDatasets(v, out));
+  }
+  return out;
+}
+
+// Search Console flags a Dataset without description (critical), creator or license.
+function expectCompleteDatasets(jsonLd: unknown) {
+  const datasets = findDatasets(jsonLd);
+  expect(datasets.length).toBeGreaterThan(0);
+  for (const ds of datasets) {
+    expect(ds.description).toBeTruthy();
+    expect(ds.creator).toBeTruthy();
+    expect(ds.license).toBeTruthy();
+  }
+}
+
 function between(html: string, start: string, end: string): string {
   const a = html.indexOf(start);
   const b = html.indexOf(end, a);
@@ -93,6 +115,7 @@ describe('renderPdbLanding (3DNI fixtures)', () => {
     expect(meta.pageInfoHtml).toContain('href="/pdb/');
     expect(meta.landingData?.secondaryStructure?.[0].helices.length).toBeGreaterThan(0);
     expect(JSON.stringify(meta.jsonLd)).toContain('"@type":"Dataset"');
+    expectCompleteDatasets(meta.jsonLd);
     expect(meta.extraHead).toContain('application/json+oembed');
   });
 
@@ -121,6 +144,7 @@ describe('renderAfLanding', () => {
     expect(meta.pageInfoHtml).toContain('id="confidence"');
     expect(meta.pageInfoHtml).toContain('href="/pdb/');
     expect(meta.ogImageUrl).toBe(`${ORIGIN}/og/af/P69905.png`);
+    expectCompleteDatasets(meta.jsonLd);
   });
 
   it('404s accessions without an AlphaFold model', async () => {
