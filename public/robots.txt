@@ -1,24 +1,46 @@
-# Allow all crawlers including AI bots
+# Pages are open to all crawlers. Machine endpoints are not: /oembed is for
+# embed platforms and /api/* for the app itself, and every hit runs a Pages
+# Function (free plan: 100k/day). A crawler that matches a named group below
+# ignores the * group, so each group repeats the Disallow lines.
 User-agent: *
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
-# Explicitly allow AI crawlers
+# GPTBot (OpenAI training crawler) is also blocked by a Cloudflare WAF rule:
+# it made ~125k requests in a week and sends no visitors. ChatGPT search
+# (OAI-SearchBot) and ChatGPT browsing (ChatGPT-User) stay allowed.
 User-agent: GPTBot
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 User-agent: ChatGPT-User
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 User-agent: Google-Extended
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 User-agent: ClaudeBot
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 User-agent: PerplexityBot
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 User-agent: Applebot-Extended
+Disallow: /oembed
+Disallow: /api/
 Allow: /
 
 # Sitemap
