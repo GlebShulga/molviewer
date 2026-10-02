@@ -17,15 +17,28 @@ export function entryKind(): 'landing' | 'share' | 'embed' | 'home' {
   return 'home';
 }
 
+/**
+ * Where events go. The chat widget runs on the host's sandbox origin, so it
+ * sets an absolute endpoint and its own page kind (src/widget/main.tsx).
+ */
+let config: { endpoint: string; page?: string } = { endpoint: '/api/event' };
+
+export function configureTracking(next: { endpoint: string; page?: string }): void {
+  config = next;
+}
+
 export function track(event: EventName, props?: EventProps): void {
   if (import.meta.env.DEV || typeof window === 'undefined') return;
   try {
-    const payload: EventPayload = { e: event, p: props, page: pageKind(window.location.pathname) };
+    const payload: EventPayload = { e: event, p: props, page: config.page ?? pageKind(window.location.pathname) };
     const body = JSON.stringify(payload);
-    if (navigator.sendBeacon?.('/api/event', new Blob([body], { type: 'application/json' }))) return;
-    void fetch('/api/event', {
+    // Same origin: JSON. Cross-origin: text/plain, a "simple" request that needs no CORS preflight.
+    const sameOrigin = config.endpoint.startsWith('/');
+    const type = sameOrigin ? 'application/json' : 'text/plain';
+    if (navigator.sendBeacon?.(config.endpoint, new Blob([body], { type }))) return;
+    void fetch(config.endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': type },
       body,
       keepalive: true,
     }).catch(() => {});

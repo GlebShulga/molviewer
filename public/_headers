@@ -1,0 +1,16 @@
+# Chat app widget (dist/widget/v1, built by vite.widget.config.ts). ChatGPT and
+# Claude load it from their sandboxed iframe origin: module scripts and fonts
+# are fetched in CORS mode, so they need Access-Control-Allow-Origin.
+# Pages merges headers from every matching rule, so Cache-Control rules don't overlap.
+/widget/*
+  Access-Control-Allow-Origin: *
+
+# Fixed names the MCP server's UI resource refers to: short lifetime so fixes ship quickly.
+/widget/v1/viewer.js
+  Cache-Control: public, max-age=300
+/widget/v1/viewer.css
+  Cache-Control: public, max-age=300
+
+# Hashed chunks never change.
+/widget/v1/assets/*
+  Cache-Control: public, max-age=31536000, immutable

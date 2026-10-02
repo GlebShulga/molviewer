@@ -6,6 +6,11 @@
  * Usage:
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts [days=7]
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --sql "SELECT ..."
+ *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --app [days=7]
+ *
+ * --app summarizes the ChatGPT/Claude app: MCP tool calls (written by
+ * workers/mcp: blob2 = tool, blob5 = kind, blob6 = client, blob7 = outcome,
+ * double2 = seconds) and the widget's widget_view / widget_open_full events.
  *
  * The token needs the "Account Analytics: Read" permission.
  * Column layout: blob1 = event, blob2..blob7 = source, entry, format, kind, ref, value,
@@ -23,10 +28,21 @@ const args = process.argv.slice(2);
 const sqlIndex = args.indexOf('--sql');
 const days = Number(args.find((a) => /^\d+$/.test(a)) ?? 7);
 
+const APP_SQL = `SELECT blob1 AS event, blob2 AS tool, blob6 AS client, blob7 AS outcome,
+       SUM(_sample_interval) AS count, AVG(double2) AS avg_seconds
+       FROM molviewer_events
+       WHERE timestamp > NOW() - INTERVAL '${days}' DAY
+         AND (blob1 = 'mcp_tool_call' OR blob1 = 'widget_view' OR blob1 = 'widget_open_full')
+       GROUP BY event, tool, client, outcome
+       ORDER BY count DESC
+       FORMAT JSON`;
+
 const sql =
   sqlIndex >= 0
     ? args[sqlIndex + 1]
-    : `SELECT blob1 AS event, blob2 AS source, blob8 AS page, SUM(_sample_interval) AS count
+    : args.includes('--app')
+      ? APP_SQL
+      : `SELECT blob1 AS event, blob2 AS source, blob8 AS page, SUM(_sample_interval) AS count
        FROM molviewer_events
        WHERE timestamp > NOW() - INTERVAL '${days}' DAY
        GROUP BY event, source, page

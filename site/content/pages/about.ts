@@ -3,7 +3,7 @@ import type { ContentPage } from '../types';
 export const page: ContentPage = {
   path: '/about',
   kind: 'about',
-  updated: '2026-09-28',
+  updated: '2026-10-02',
   title: 'About MolViewer: License, Citation, Privacy | MolViewer',
   description:
     'MolViewer is a free, open-source 3D molecule viewer that runs in your browser with no install. Who builds it, the MIT license, how to cite it, and privacy.',
@@ -37,11 +37,13 @@ export const page: ContentPage = {
         `<li>Saved sessions and preferences stay in your browser storage.</li>` +
         `<li>We use Cloudflare Web Analytics for anonymous product analytics. It does not use cookies or build personal profiles.</li>` +
         `<li>If the app hits an error, a short error report (the message, the page address and your browser version) is sent to New Relic so the bug can be fixed.</li>` +
-        `</ul>`,
+        `</ul>` +
+        `<p>The full <a href="/privacy">privacy policy</a> also covers anonymous usage counts and the MolViewer app for ChatGPT and Claude. See also the <a href="/terms">terms of use</a>, and <a href="/support">support</a> for questions.</p>`,
     },
   ],
   cta: { label: 'Open the viewer with ubiquitin', href: '/pdb/1UBQ' },
   related: [
+    { label: 'Privacy policy', href: '/privacy' },
     { label: 'Compare web molecule viewers', href: '/compare' },
     { label: 'Online PDB viewer', href: '/pdb-viewer' },
     { label: 'AlphaFold structure viewer', href: '/alphafold-viewer' },

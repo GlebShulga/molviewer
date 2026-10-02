@@ -46,5 +46,5 @@ export interface ContentPage {
   /** ISO date of the last substantive edit. */
   updated: string;
   /** Which section of the site the page belongs to (drives breadcrumbs and the sitemap). */
-  kind: 'tool' | 'learn' | 'about';
+  kind: 'tool' | 'learn' | 'about' | 'legal';
 }

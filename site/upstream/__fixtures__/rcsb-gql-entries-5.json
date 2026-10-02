@@ -1,0 +1,86 @@
+{
+ "data": {
+  "entries": [
+   {
+    "rcsb_id": "2PGH",
+    "struct": {
+     "title": "STRUCTURE DETERMINATION OF AQUOMET PORCINE HEMOGLOBIN AT 2.8 ANGSTROM RESOLUTION"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      2.8
+     ]
+    }
+   },
+   {
+    "rcsb_id": "3PEL",
+    "struct": {
+     "title": "Structure of Greyhound Hemoglobin: Origin of High Oxygen Affinity"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      1.9
+     ]
+    }
+   },
+   {
+    "rcsb_id": "3GOU",
+    "struct": {
+     "title": "Crystal structure of dog (Canis familiaris) hemoglobin"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      3
+     ]
+    }
+   },
+   {
+    "rcsb_id": "6IHX",
+    "struct": {
+     "title": "Crystal Structure Analysis of bovine Hemoglobin modified by SNP"
+    },
+    "exptl": [
+     {
+      "method": "X-RAY DIFFRACTION"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      1.46
+     ]
+    }
+   },
+   {
+    "rcsb_id": "20YJ",
+    "struct": {
+     "title": "Hemoglobin amyloid fibril - PM2"
+    },
+    "exptl": [
+     {
+      "method": "ELECTRON MICROSCOPY"
+     }
+    ],
+    "rcsb_entry_info": {
+     "resolution_combined": [
+      3.4
+     ]
+    }
+   }
+  ]
+ }
+}

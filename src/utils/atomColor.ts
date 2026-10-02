@@ -1,11 +1,13 @@
 import type { Atom, Molecule } from '../types';
 import type { ColorScheme } from '../store/moleculeStore';
+import { UNIPROT_RE } from '../../site/identifiers';
 import {
   getElementColor,
   getChainColor,
   ALL_RESIDUE_COLORS,
   SECONDARY_STRUCTURE_COLORS,
   RAINBOW_ENDPOINTS,
+  getPlddtColor,
 } from '../colors';
 
 /**
@@ -86,6 +88,19 @@ export interface ColorSchemeContext {
   hasResidueNumbers?: boolean;
   hasSecondaryStructure?: boolean;
   hasBackboneData?: boolean;
+  /** AlphaFold model: the B-factor column holds pLDDT, shown in AlphaFold DB's four bands. */
+  isPlddt?: boolean;
+}
+
+/**
+ * AlphaFold models are named "AF-<UniProt accession>": by the loader
+ * (src/utils/structureLoader.ts) and in AlphaFold DB's own file names, so an
+ * uploaded "AF-P69905-F1-model_v4.cif" counts too. The accession must be
+ * valid, so names like "AF-DX 116" (a PubChem compound) don't.
+ */
+export function isAlphaFoldMolecule(molecule: Pick<Molecule, 'name'>): boolean {
+  const accession = /^AF-([A-Z0-9]+)/.exec(molecule.name ?? '')?.[1];
+  return !!accession && UNIPROT_RE.test(accession);
 }
 
 /**
@@ -140,6 +155,7 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
     hasResidueNumbers,
     hasSecondaryStructure,
     hasBackboneData,
+    isPlddt: isAlphaFoldMolecule(molecule),
   };
 }
 
@@ -160,6 +176,7 @@ export function getAtomColor(
     case 'residueType':
       return getResidueTypeColor(atom) ?? cpkColor;
     case 'bfactor':
+      if (context?.isPlddt) return atom.tempFactor === undefined ? cpkColor : getPlddtColor(atom.tempFactor);
       return getBFactorColor(
         atom,
         context?.minBfactor ?? 0,

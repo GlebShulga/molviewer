@@ -4,13 +4,13 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 
 export default [
-  { ignores: ['dist', 'node_modules', 'coverage', 'e2e', 'functions', '.wrangler', '*.config.ts'] },
+  { ignores: ['dist', 'dist-app', 'node_modules', 'coverage', 'e2e', 'functions', '**/.wrangler', '*.config.ts'] },
   js.configs.recommended,
   ...tsPlugin.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parserOptions: { project: ['./tsconfig.json', './site/tsconfig.json', './scripts/tsconfig.json'] },
+      parserOptions: { project: ['./tsconfig.json', './site/tsconfig.json', './scripts/tsconfig.json', './workers/mcp/tsconfig.json', './workers/mcp/dev-host/tsconfig.json'] },
       globals: { ...globals.browser, ...globals.node },
     },
     plugins: {

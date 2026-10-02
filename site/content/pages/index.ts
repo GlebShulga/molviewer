@@ -7,6 +7,9 @@ import { page as xyzViewer } from './xyz-viewer';
 import { page as pymolAlternative } from './pymol-online-alternative';
 import { page as compare } from './compare';
 import { page as about } from './about';
+import { page as privacy } from './privacy';
+import { page as terms } from './terms';
+import { page as support } from './support';
 import { page as howToReadAPdbFile } from './learn/how-to-read-a-pdb-file';
 import { page as alphaHelicesAndBetaSheets } from './learn/alpha-helices-and-beta-sheets';
 import { page as howToViewAnAlphafoldPrediction } from './learn/how-to-view-an-alphafold-prediction';
@@ -21,6 +24,9 @@ export const pages: ContentPage[] = [
   pymolAlternative,
   compare,
   about,
+  privacy,
+  terms,
+  support,
   howToReadAPdbFile,
   alphaHelicesAndBetaSheets,
   howToViewAnAlphafoldPrediction,

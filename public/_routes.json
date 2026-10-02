@@ -5,6 +5,7 @@
   ],
   "exclude": [
     "/assets/*",
+    "/widget/*",
     "/sample-molecules/*",
     "/screenshots/*",
     "/og/*",

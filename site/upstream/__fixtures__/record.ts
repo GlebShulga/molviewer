@@ -1,21 +1,25 @@
 /**
  * Re-record the upstream fixtures from the live APIs:
- *   pnpm exec tsx site/upstream/__fixtures__/record.ts
+ *   pnpm exec tsx site/upstream/__fixtures__/record.ts            (everything)
+ *   pnpm exec tsx site/upstream/__fixtures__/record.ts --search   (MCP search fixtures only)
  * Runs the real fetchers with a recording fetch, then trims large fields so each
  * fixture stays small. Not part of the test run.
  */
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchAfDetails } from '../af';
 import { fetchPdbDetails } from '../pdb';
+import { fetchPubchemCompound, resolvePubchemCid } from '../pubchem';
+import { searchRcsb, searchUniProt } from '../search';
 import { fixtureNameFor } from './routes';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 
 type Trim = (name: string, body: unknown) => unknown;
 
-function recordingFetch(opts: { failHost?: string; trim: Trim }): typeof fetch {
+/** `keepExisting`: never overwrite a fixture another test already relies on. */
+function recordingFetch(opts: { failHost?: string; trim: Trim; keepExisting?: boolean }): typeof fetch {
   return async (input, init) => {
     const url = String(input instanceof Request ? input.url : input);
     if (opts.failHost && new URL(url).host === opts.failHost) {
@@ -24,7 +28,9 @@ function recordingFetch(opts: { failHost?: string; trim: Trim }): typeof fetch {
     const resp = await fetch(url, init);
     const text = await resp.text();
     const name = fixtureNameFor(url);
-    if (name && resp.ok && text.trim()) {
+    if (name && opts.keepExisting && existsSync(join(dir, name))) {
+      console.log(`kept ${name}`);
+    } else if (name && resp.ok && text.trim()) {
       const trimmed = opts.trim(name, JSON.parse(text));
       writeFileSync(join(dir, name), JSON.stringify(trimmed, null, 1) + '\n');
       console.log(`recorded ${name} (${resp.status})`);
@@ -76,6 +82,11 @@ const trim: Trim = (name, body) => {
 };
 
 async function main(): Promise<void> {
+  if (!process.argv.includes('--search')) await recordLandingPages();
+  await recordSearches();
+}
+
+async function recordLandingPages(): Promise<void> {
   const pdb = await fetchPdbDetails('3DNI', {
     fetchImpl: recordingFetch({ trim }),
     timeoutMs: 20000,
@@ -96,6 +107,16 @@ async function main(): Promise<void> {
     fetchImpl: recordingFetch({ trim, failHost: 'rest.uniprot.org' }),
     timeoutMs: 20000,
   });
+}
+
+/** MCP server searches (site/upstream/search.ts, pubchem.ts). */
+async function recordSearches(): Promise<void> {
+  const live = { fetchImpl: recordingFetch({ trim, keepExisting: true }), timeoutMs: 20000 };
+  console.log('rcsb hemoglobin', (await searchRcsb('hemoglobin', 5, live)).status);
+  console.log('uniprot p53', (await searchUniProt('p53', 3, live)).status);
+  console.log('uniprot e. coli lacZ', (await searchUniProt('E. coli lacZ', 3, live)).status);
+  console.log('pubchem caffeine', (await resolvePubchemCid('caffeine', live)).status);
+  console.log('pubchem 2519', (await fetchPubchemCompound(2519, live)).status);
 }
 
 void main();

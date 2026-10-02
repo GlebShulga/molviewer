@@ -754,24 +754,38 @@ async function fetchRelated(
   ).slice(0, MAX_RELATED);
   if (!ids.length) return { accession, related: [], failed: [] };
 
-  const related: RelatedEntry[] = ids.map((id) => ({ id }));
   const titleBudget = withBudget();
-  const titles = titleBudget
-    ? await rcsbGraphql<RawEntriesData>(ENTRIES_QUERY, { ids }, titleBudget)
-    : ({ ok: false, message: 'Time budget exhausted' } as const);
-  if (!titles.ok) return { accession, related, failed: ['relatedTitles'] };
+  if (!titleBudget) return { accession, related: ids.map((id) => ({ id })), failed: ['relatedTitles'] };
+  const summaries = await fetchEntrySummaries(ids, titleBudget);
+  if (!summaries.ok) return { accession, related: ids.map((id) => ({ id })), failed: ['relatedTitles'] };
+  return { accession, related: summaries.entries, failed: [] };
+}
+
+/**
+ * Title, method and resolution for a list of PDB ids, in the order given.
+ * Ids RCSB doesn't return keep only their `id`. Shared by the related-entries
+ * section and the MCP server's search.
+ */
+export async function fetchEntrySummaries(
+  ids: string[],
+  opts: UpstreamOptions
+): Promise<{ ok: true; entries: RelatedEntry[] } | { ok: false; message: string }> {
+  const entries: RelatedEntry[] = ids.map((id) => ({ id }));
+  if (!ids.length) return { ok: true, entries };
+  const titles = await rcsbGraphql<RawEntriesData>(ENTRIES_QUERY, { ids }, opts);
+  if (!titles.ok) return { ok: false, message: titles.message };
 
   const byId = new Map(
     (titles.data.entries ?? []).filter(isDefined).map((e) => [e.rcsb_id?.toUpperCase(), e])
   );
-  for (const entry of related) {
+  for (const entry of entries) {
     const raw = byId.get(entry.id);
     if (!raw) continue;
     entry.title = str(raw.struct?.title);
     entry.resolution = num(raw.rcsb_entry_info?.resolution_combined?.[0]);
     entry.method = str(raw.exptl?.[0]?.method);
   }
-  return { accession, related, failed: [] };
+  return { ok: true, entries };
 }
 
 function isDefined<T>(value: T | null | undefined): value is T {

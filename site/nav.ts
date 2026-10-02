@@ -31,6 +31,9 @@ export const EXPLORE_LINKS: NavLink[] = [
 
 export const ABOUT_LINKS: NavLink[] = [
   { label: 'About', href: '/about' },
+  { label: 'Support', href: '/support' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
   { label: 'GitHub', href: GITHUB_URL },
 ];
 

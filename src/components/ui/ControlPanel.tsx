@@ -40,7 +40,8 @@ export function ControlPanel() {
     [molecule]
   );
 
-  const isAlphaFold = activeStructure?.name?.startsWith('AF-') ?? false;
+  // Same rule as the coloring itself (isAlphaFoldMolecule in utils/atomColor.ts).
+  const isAlphaFold = colorContext?.isPlddt ?? false;
 
   if (!molecule || !activeStructure) {
     return null;
@@ -153,7 +154,7 @@ export function ControlPanel() {
                 className={clsx(styles.controlButton, colorScheme === scheme.value && styles.active)}
                 onClick={() => setColorScheme(scheme.value)}
                 aria-pressed={colorScheme === scheme.value}
-                title={!visible ? 'Structure is hidden' : (available ? (scheme.value === 'bfactor' && isAlphaFold ? 'pLDDT confidence: Blue (low) → Red (high)' : scheme.description) : scheme.disabledDescription)}
+                title={!visible ? 'Structure is hidden' : (available ? (scheme.value === 'bfactor' && isAlphaFold ? 'pLDDT confidence, AlphaFold DB colors: dark blue > 90, light blue 70-90, yellow 50-70, orange < 50' : scheme.description) : scheme.disabledDescription)}
                 disabled={!available}
               >
                 {scheme.label}

@@ -1,0 +1,207 @@
+/**
+ * Compact, model-facing summaries of the landing-page data
+ * (site/upstream). Kept to a few KB: no coordinates, sequences only on
+ * request and capped.
+ */
+import type { AfDetails, Citation, PdbDetails } from '../../../site/upstream/types';
+import type { PubchemCompound } from '../../../site/upstream/pubchem';
+import type { Compound } from '../../../site/dataTypes';
+import { shortName } from '../../../site/render/pdbPage';
+import { toSentenceCase } from '../../../site/render/sentenceCase';
+import { formatMethod, formatRange } from '../../../site/render/format';
+import { SITE_ORIGIN } from '../../../site/nav';
+import { structurePath } from '../../../site/routes';
+
+const MAX_SEQUENCE = 2000;
+const MAX_LIGANDS = 20;
+const MAX_ENTITIES = 12;
+
+export function pdbPageUrl(id: string): string {
+  return `${SITE_ORIGIN}${structurePath({ kind: 'pdb', id })}`;
+}
+
+export function afPageUrl(id: string): string {
+  return `${SITE_ORIGIN}${structurePath({ kind: 'af', id })}`;
+}
+
+export function compoundPageUrl(c: { slug?: string; cid: number }): string {
+  return `${SITE_ORIGIN}${structurePath(c.slug ? { kind: 'compound', slug: c.slug } : { kind: 'cid', cid: c.cid })}`;
+}
+
+/** "Oefner C, Suck D (1986) Title. J Mol Biol 192:605-632. doi:..." */
+export function formatCitation(c: Citation | undefined): string | undefined {
+  if (!c?.title) return undefined;
+  const authors = c.authors.length > 3 ? `${c.authors.slice(0, 3).join(', ')} et al.` : c.authors.join(', ');
+  const pages = c.pageFirst ? `:${c.pageFirst}${c.pageLast ? `-${c.pageLast}` : ''}` : '';
+  const where = [c.journal, c.volume ? `${c.volume}${pages}` : ''].filter(Boolean).join(' ');
+  return [
+    authors && `${authors}${c.year ? ` (${c.year})` : ''}`,
+    c.title.replace(/\.$/, '') + '.',
+    where && `${where}.`,
+    c.doi && `doi:${c.doi}`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function pdbSummary(d: PdbDetails) {
+  const ss = d.secondaryStructure;
+  return {
+    kind: 'pdb' as const,
+    id: d.id,
+    name: shortName(d),
+    title: d.title ? toSentenceCase(d.title) : undefined,
+    method: d.method ? formatMethod(d.method) : undefined,
+    resolutionAngstrom: d.resolution,
+    releaseYear: d.releaseDate ? Number(d.releaseDate.slice(0, 4)) : undefined,
+    organisms: [...new Set(d.entities.flatMap((e) => e.organisms))],
+    polymerChainCount: d.polymerChainCount,
+    molecularWeightKda: d.molecularWeight,
+    entities: d.entities.slice(0, MAX_ENTITIES).map((e) => ({
+      description: e.description ? toSentenceCase(e.description) : undefined,
+      type: e.type,
+      chains: e.chainIds,
+      length: e.length,
+      uniprot: e.uniprotIds,
+    })),
+    ligands: d.ligands.slice(0, MAX_LIGANDS).map((l) => ({
+      id: l.id,
+      name: l.name ? toSentenceCase(l.name) : undefined,
+      copies: l.instanceCount,
+    })),
+    secondaryStructure: ss
+      ? {
+          helices: ss.chains.reduce((n, c) => n + c.helices.length, 0),
+          strands: ss.chains.reduce((n, c) => n + c.strands.length, 0),
+        }
+      : undefined,
+    alphafoldModels: d.alphafoldIds,
+    citation: formatCitation(d.citation),
+    pageUrl: pdbPageUrl(d.id),
+  };
+}
+
+function percent(fraction: number): number {
+  return Math.round(fraction * 1000) / 10;
+}
+
+export function afSummary(d: AfDetails) {
+  const f = d.plddtFractions;
+  return {
+    kind: 'alphafold' as const,
+    id: d.id,
+    protein: d.description ?? d.uniprot?.proteinName,
+    gene: d.gene,
+    organism: d.organism,
+    sequenceLength: d.sequenceLength,
+    meanPlddt: d.meanPlddt,
+    confidencePercent: f
+      ? { veryHighAbove90: percent(f.veryHigh), confident70to90: percent(f.confident), low50to70: percent(f.low), veryLowBelow50: percent(f.veryLow) }
+      : undefined,
+    colorKey:
+      'AlphaFold DB colors: dark blue = very high (pLDDT > 90), light blue = confident (70-90), yellow = low (50-70), orange = very low (< 50, often disordered).',
+    experimentalStructures: d.pdbStructures.slice(0, 8).map((x) => x.id),
+    experimentalStructureCount: d.pdbStructureCount,
+    citation:
+      'Jumper J et al. (2021) Highly accurate protein structure prediction with AlphaFold. Nature 596:583-589; Varadi M et al. AlphaFold Protein Structure Database. Nucleic Acids Res.',
+    pageUrl: afPageUrl(d.id),
+  };
+}
+
+export function compoundSummary(c: Compound | (PubchemCompound & { slug?: string })) {
+  const curated = 'name' in c;
+  return {
+    kind: 'compound' as const,
+    cid: c.cid,
+    slug: c.slug,
+    name: curated ? c.name : c.title,
+    formula: c.formula,
+    molecularWeight: c.weight ? `${c.weight} g/mol` : undefined,
+    iupacName: c.iupac,
+    smiles: c.smiles,
+    pageUrl: compoundPageUrl(c),
+  };
+}
+
+export type DetailSection = 'secondaryStructure' | 'sequence' | 'ligands' | 'citation' | 'related';
+
+/** Extra sections for get_structure_details on a PDB entry. */
+export function pdbSections(d: PdbDetails, sections: DetailSection[]) {
+  const out: Record<string, unknown> = {};
+  if (sections.includes('secondaryStructure')) {
+    const ss = d.secondaryStructure;
+    out.secondaryStructure = ss
+      ? {
+          source: ss.source === 'pdbe' ? 'PDBe' : 'RCSB',
+          numbering:
+            ss.numbering === 'author'
+              ? 'Author residue numbers, as shown in the PDB file and viewers'
+              : 'Sequence positions (label_seq_id), because only the RCSB fallback was available',
+          chains: ss.chains.map((c) => ({
+            chain: c.chainId,
+            helices: c.helices.map(formatRange),
+            strands: c.strands.map((s) => (s.sheetId ? `${formatRange(s)} (sheet ${s.sheetId})` : formatRange(s))),
+          })),
+        }
+      : 'Not available: both PDBe and RCSB failed to answer.';
+  }
+  if (sections.includes('sequence')) {
+    out.sequences = d.entities.slice(0, MAX_ENTITIES).map((e) => ({
+      description: e.description,
+      chains: e.chainIds,
+      length: e.length,
+      sequence: e.sequence && e.sequence.length > MAX_SEQUENCE ? `${e.sequence.slice(0, MAX_SEQUENCE)}...` : e.sequence,
+    }));
+  }
+  if (sections.includes('ligands')) {
+    out.ligands = d.ligands.map((l) => ({
+      id: l.id,
+      name: l.name ? toSentenceCase(l.name) : undefined,
+      formula: l.formula,
+      copies: l.instanceCount,
+      chains: l.chainIds,
+    }));
+    out.excludedAdditives = d.excludedLigandIds;
+  }
+  // `citation` (the formatted string) is already in the summary; this adds the identifiers.
+  // It must not reuse the `citation` key: the output schema declares that one as a string.
+  if (sections.includes('citation') && d.citation) {
+    out.citationIds = { pubmedId: d.citation.pubmedId, doi: d.citation.doi };
+  }
+  if (sections.includes('related')) {
+    out.related = d.related.map((r) => ({
+      id: r.id,
+      title: r.title ? toSentenceCase(r.title) : undefined,
+      method: r.method ? formatMethod(r.method) : undefined,
+      resolutionAngstrom: r.resolution,
+    }));
+  }
+  if (d.partial.length) out.unavailableParts = d.partial;
+  return out;
+}
+
+/** Extra sections for get_structure_details on an AlphaFold model. */
+export function afSections(d: AfDetails, sections: DetailSection[]) {
+  const out: Record<string, unknown> = {};
+  const u = d.uniprot;
+  if (u) {
+    out.function = u.functionText;
+    out.subunit = u.subunit;
+    out.subcellularLocations = u.subcellularLocations;
+    out.diseases = u.diseases;
+  }
+  if (sections.includes('related')) {
+    out.experimentalStructures = d.pdbStructures.map((x) => ({
+      id: x.id,
+      method: x.method,
+      resolutionAngstrom: x.resolution,
+      chains: x.chains,
+    }));
+  }
+  if (sections.includes('secondaryStructure') || sections.includes('ligands')) {
+    out.note =
+      'AlphaFold models have no deposited secondary structure or ligands. Ask about an experimental PDB entry from experimentalStructures for those.';
+  }
+  if (d.partial.length) out.unavailableParts = d.partial;
+  return out;
+}

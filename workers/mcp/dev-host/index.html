@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MolViewer MCP test host</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 900px; }
+  #frame { width: 100%; border: 1px solid #ccc; border-radius: 8px; height: 440px; }
+  #frame.fullscreen { position: fixed; inset: 0; height: 100vh; border-radius: 0; z-index: 10; }
+  #log { font: 12px monospace; white-space: pre-wrap; background: #f6f8fa; padding: 8px; max-height: 240px; overflow: auto; }
+  form { display: flex; gap: 8px; margin-bottom: 12px; }
+  input { flex: 1; }
+</style>
+</head>
+<body>
+<h1>MolViewer MCP test host</h1>
+<p>A minimal MCP Apps host (ext-apps AppBridge) for trying the widget locally. Run <code>pnpm build</code>, <code>pnpm pages:preview</code> (port 8788) and <code>pnpm mcp:dev</code> (port 8787), then <code>pnpm mcp:host</code>.</p>
+<form id="form">
+  <select id="tool"><option>show_structure</option><option>find_structures</option><option>get_structure_details</option></select>
+  <input id="args" value='{"kind":"pdb","id":"4HHB"}'>
+  <label><input type="checkbox" id="dark"> dark</label>
+  <button>Call</button>
+</form>
+<iframe id="frame" title="Widget"></iframe>
+<h2>Log</h2>
+<div id="log"></div>
+<script type="module" src="./host.ts"></script>
+</body>
+</html>

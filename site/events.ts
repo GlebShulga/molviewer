@@ -17,6 +17,10 @@ export const EVENT_NAMES = [
   'representation_changed',
   'measurement_added',
   'onboarding_completed',
+  // The chat app widget (src/widget). The MCP server writes its own
+  // `mcp_tool_call` points straight to the dataset (workers/mcp/src/analytics.ts).
+  'widget_view',
+  'widget_open_full',
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
@@ -37,7 +41,7 @@ export type EventProps = Partial<
 export interface EventPayload {
   e: EventName;
   p?: EventProps;
-  /** Page type the event happened on: home, pdb, af, compound, share, embed, other. */
+  /** Page type the event happened on: home, pdb, af, compound, share, embed, widget, other. */
   page?: string;
 }
 

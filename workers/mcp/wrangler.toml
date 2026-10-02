@@ -1,0 +1,47 @@
+# MolViewer MCP server (ChatGPT / Claude app). Separate from the Pages project
+# so its permanent URL, deploys and logs are independent. See README.md.
+name = "molviewer-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-05-09"
+
+# The URL submitted to OpenAI can't change later: keep this hostname stable.
+routes = [{ pattern = "mcp.molviewer.bio", custom_domain = true }]
+
+[observability]
+enabled = true
+
+[vars]
+# Origin serving the widget bundle (dist/widget/v1 on the Pages project).
+WIDGET_ASSET_ORIGIN = "https://molviewer.bio"
+# ChatGPT's dedicated widget origin (openai/widgetDomain).
+CHATGPT_WIDGET_DOMAIN = "https://molviewer.bio"
+# OPENAI_APPS_CHALLENGE is a secret: pnpm wrangler secret put OPENAI_APPS_CHALLENGE -c workers/mcp/wrangler.toml
+
+# Same dataset as the site's /api/event, so one query script reads both.
+[[analytics_engine_datasets]]
+binding = "EVENTS"
+dataset = "molviewer_events"
+
+# Per connecting IP, every call. Generous: a chat provider's users share its
+# few egress IPs (Claude sends no user id), but it caps a single abusive client.
+[[ratelimits]]
+name = "IP_LIMIT"
+namespace_id = "1003"
+simple = { limit = 600, period = 60 }
+
+# Per ChatGPT user (openai/subject), when one is sent.
+[[ratelimits]]
+name = "USER_LIMIT"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
+# Backstop across all callers. Counted per Cloudflare location, so approximate.
+[[ratelimits]]
+name = "GLOBAL_LIMIT"
+namespace_id = "1002"
+simple = { limit = 3000, period = 60 }
+
+# `wrangler dev` serves the widget from the local Pages preview instead.
+[env.dev.vars]
+WIDGET_ASSET_ORIGIN = "http://localhost:8788"
+CHATGPT_WIDGET_DOMAIN = ""

@@ -41,3 +41,10 @@ debug-screenshot.png
 
 # Misc
 *.local
+
+# ChatGPT app submission ZIP and its rendered logos (pnpm package:app)
+dist-app
+workers/mcp/package/assets/
+
+# Wrangler local state and dev bundles
+.wrangler/

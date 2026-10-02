@@ -1,0 +1,219 @@
+{
+ "results": [
+  {
+   "entryType": "UniProtKB reviewed (Swiss-Prot)",
+   "primaryAccession": "P00722",
+   "organism": {
+    "scientificName": "Escherichia coli (strain K12)",
+    "taxonId": 83333,
+    "lineage": [
+     "Bacteria",
+     "Pseudomonadati",
+     "Pseudomonadota",
+     "Gammaproteobacteria",
+     "Enterobacterales",
+     "Enterobacteriaceae",
+     "Escherichia"
+    ]
+   },
+   "proteinDescription": {
+    "recommendedName": {
+     "fullName": {
+      "value": "Beta-galactosidase"
+     },
+     "shortNames": [
+      {
+       "value": "Beta-gal"
+      }
+     ],
+     "ecNumbers": [
+      {
+       "value": "3.2.1.23"
+      }
+     ]
+    },
+    "alternativeNames": [
+     {
+      "fullName": {
+       "value": "Lactase"
+      }
+     }
+    ]
+   },
+   "genes": [
+    {
+     "geneName": {
+      "value": "lacZ"
+     }
+    }
+   ],
+   "sequence": {
+    "length": 1024
+   },
+   "extraAttributes": {
+    "uniParcId": "UPI0000049419"
+   }
+  },
+  {
+   "entryType": "UniProtKB reviewed (Swiss-Prot)",
+   "primaryAccession": "B5Z2P7",
+   "organism": {
+    "scientificName": "Escherichia coli O157:H7 (strain EC4115 / EHEC)",
+    "taxonId": 444450,
+    "lineage": [
+     "Bacteria",
+     "Pseudomonadati",
+     "Pseudomonadota",
+     "Gammaproteobacteria",
+     "Enterobacterales",
+     "Enterobacteriaceae",
+     "Escherichia"
+    ]
+   },
+   "proteinDescription": {
+    "recommendedName": {
+     "fullName": {
+      "evidences": [
+       {
+        "evidenceCode": "ECO:0000255",
+        "source": "HAMAP-Rule",
+        "id": "MF_01687"
+       }
+      ],
+      "value": "Beta-galactosidase"
+     },
+     "shortNames": [
+      {
+       "evidences": [
+        {
+         "evidenceCode": "ECO:0000255",
+         "source": "HAMAP-Rule",
+         "id": "MF_01687"
+        }
+       ],
+       "value": "Beta-gal"
+      }
+     ],
+     "ecNumbers": [
+      {
+       "evidences": [
+        {
+         "evidenceCode": "ECO:0000255",
+         "source": "HAMAP-Rule",
+         "id": "MF_01687"
+        }
+       ],
+       "value": "3.2.1.23"
+      }
+     ]
+    },
+    "alternativeNames": [
+     {
+      "fullName": {
+       "evidences": [
+        {
+         "evidenceCode": "ECO:0000255",
+         "source": "HAMAP-Rule",
+         "id": "MF_01687"
+        }
+       ],
+       "value": "Lactase"
+      }
+     }
+    ]
+   },
+   "genes": [
+    {
+     "geneName": {
+      "evidences": [
+       {
+        "evidenceCode": "ECO:0000255",
+        "source": "HAMAP-Rule",
+        "id": "MF_01687"
+       }
+      ],
+      "value": "lacZ"
+     }
+    }
+   ],
+   "sequence": {
+    "length": 1024
+   },
+   "extraAttributes": {
+    "uniParcId": "UPI00016C7493"
+   }
+  },
+  {
+   "entryType": "UniProtKB reviewed (Swiss-Prot)",
+   "primaryAccession": "P20035",
+   "organism": {
+    "scientificName": "Plasmodium falciparum (isolate FCR-3 / Gambia)",
+    "taxonId": 5838,
+    "lineage": [
+     "Eukaryota",
+     "Sar",
+     "Alveolata",
+     "Apicomplexa",
+     "Aconoidasida",
+     "Haemosporida",
+     "Plasmodiidae",
+     "Plasmodium",
+     "Laverania"
+    ]
+   },
+   "proteinDescription": {
+    "recommendedName": {
+     "fullName": {
+      "value": "Hypoxanthine-guanine-xanthine phosphoribosyltransferase"
+     },
+     "shortNames": [
+      {
+       "value": "HGPRT"
+      },
+      {
+       "value": "HGXPRT"
+      },
+      {
+       "value": "HGXPRTase"
+      }
+     ],
+     "ecNumbers": [
+      {
+       "evidences": [
+        {
+         "evidenceCode": "ECO:0000250",
+         "source": "UniProtKB",
+         "id": "Q26997"
+        }
+       ],
+       "value": "2.4.2.22"
+      },
+      {
+       "evidences": [
+        {
+         "evidenceCode": "ECO:0000250",
+         "source": "UniProtKB",
+         "id": "Q26997"
+        }
+       ],
+       "value": "2.4.2.8"
+      }
+     ]
+    }
+   },
+   "genes": [
+    {
+     "geneName": {
+      "value": "LACZ"
+     }
+    }
+   ],
+   "sequence": {
+    "length": 231
+   },
+   "extraAttributes": {
+    "uniParcId": "UPI0000110CBD"
+   }
+  }
+ ]
+}

@@ -29,6 +29,7 @@ MolViewer is a molecular visualization application built with:
 - `pnpm preview` - Preview production build
 - `pnpm pages:dev` - Pages Functions over the dev server; `pnpm pages:preview` - Functions over `dist/`
 - `pnpm test:run` - Unit tests once (`pnpm test` is watch mode)
+- `pnpm mcp:dev` / `pnpm mcp:host` / `pnpm mcp:deploy` / `pnpm package:app` - ChatGPT/Claude app server, local test host, deploy, submission ZIP (see `workers/mcp/README.md`)
 
 ## Site / SEO Architecture
 - **Landing pages** (`/pdb/:id`, `/af/:id`, `/s/:id`, `/embed/*`, `/compound/cid/:cid`) are Pages Functions in `functions/`. Data comes from `site/upstream/` (RCSB, PDBe, AlphaFold, UniProt), HTML and metadata from `site/render/`, injected into the SPA shell by `site/render/shell.ts`. Unknown IDs return 404.
@@ -38,6 +39,13 @@ MolViewer is a molecular visualization application built with:
 - The address bar follows the loaded scene (`src/hooks/useUrlSync.ts`); the startup load is `src/hooks/useInitialUrlLoad.ts`. Structures are loaded by `src/utils/structureLoader.ts`.
 - Curated data (`data/*.json`) is validated by `scripts/validate-ids.ts` and `scripts/validate-compounds.ts`.
 - Product events: `src/utils/track.ts` -> `functions/api/event.ts` (Workers Analytics Engine).
+
+## ChatGPT / Claude App (MCP)
+- **Server**: separate Worker in `workers/mcp/` at `https://mcp.molviewer.bio/mcp` (this URL is permanent once submitted to OpenAI). Tools reuse `site/upstream/*`; the catalog search uses `data/*.json`.
+- **Widget**: `src/widget/` is a second Vite build (`vite.widget.config.ts`) into `dist/widget/v1/`, loaded cross-origin by the host's sandboxed iframe. It talks to the host through `@modelcontextprotocol/ext-apps` first and `window.openai` only as a fallback. No New Relic in the widget.
+- **Contract** between server and widget: `site/appContract.ts` (`_meta["molviewer/widget"]` payload, `ui://molviewer/viewer-v1.html`). Breaking changes bump `-v1` in the URI and the asset path together.
+- **AlphaFold confidence** colors use AlphaFold DB's four pLDDT bands (`src/colors/domains/plddt.ts`) for models named `AF-*`, in the app and on the site.
+- Compound lookups in the app refuse Chemical Weapons Convention Schedule 1 agents (`workers/mcp/src/safety.ts`).
 
 ## CSS Rules
 - **Never use hardcoded color values** (e.g., `rgba(88, 166, 255, 0.15)`). Always use CSS custom properties from `src/index.css` (`--accent-color`, `--bg-primary`, etc.). For transparency, use `color-mix(in srgb, var(--accent-color) 15%, transparent)`.

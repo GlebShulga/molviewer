@@ -43,6 +43,9 @@ export {
   RAINBOW_ENDPOINTS,
 } from './gradients';
 
+// AlphaFold confidence (pLDDT) bands
+export { PLDDT_BANDS, getPlddtColor } from './plddt';
+
 // Rendering/scene colors
 export {
   LIGHTING_COLORS,
