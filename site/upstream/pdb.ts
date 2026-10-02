@@ -157,6 +157,14 @@ interface RawEntitiesData {
         } | null;
       } | null;
     }> | null;
+    assemblies?: Array<{
+      pdbx_struct_assembly?: { oligomeric_details?: string | null; oligomeric_count?: number | null } | null;
+      rcsb_struct_symmetry?: Array<{
+        kind?: string | null;
+        oligomeric_state?: string | null;
+        stoichiometry?: string[] | null;
+      } | null> | null;
+    } | null> | null;
   } | null;
 }
 
@@ -234,6 +242,10 @@ const ENTITIES_QUERY = `query($id: String!) {
       rcsb_nonpolymer_entity_container_identifiers { auth_asym_ids nonpolymer_comp_id }
       rcsb_nonpolymer_entity { pdbx_number_of_molecules }
       nonpolymer_comp { chem_comp { id name formula formula_weight } }
+    }
+    assemblies {
+      pdbx_struct_assembly { oligomeric_details oligomeric_count }
+      rcsb_struct_symmetry { kind oligomeric_state stoichiometry }
     }
   }
 }`;
@@ -409,7 +421,7 @@ function normalizeCitation(raw: RawCoreEntry['rcsb_primary_citation']): Citation
 // (2) Entities and ligands
 // ---------------------------------------------------------------------------
 
-type EntitiesFields = Pick<PdbDetails, 'entities' | 'ligands' | 'excludedLigandIds'>;
+type EntitiesFields = Pick<PdbDetails, 'entities' | 'ligands' | 'excludedLigandIds' | 'assembly'>;
 
 async function fetchEntities(
   id: string,
@@ -477,7 +489,22 @@ export function normalizeEntities(raw: RawEntitiesData): EntitiesFields {
     });
   }
 
-  return { entities, ligands, excludedLigandIds: unique(excluded) };
+  return { entities, ligands, excludedLigandIds: unique(excluded), assembly: normalizeAssembly(raw) };
+}
+
+/** RCSB assembly 1, with its global symmetry (pseudo symmetry is ignored). */
+function normalizeAssembly(raw: RawEntitiesData): PdbDetails['assembly'] {
+  const first = (raw.entry?.assemblies ?? []).find(isDefined);
+  if (!first) return undefined;
+  const symmetry = (first.rcsb_struct_symmetry ?? []).filter(isDefined);
+  const global = symmetry.find((s) => s.kind === 'Global Symmetry') ?? symmetry[0];
+  const assembly = {
+    chainCount: num(first.pdbx_struct_assembly?.oligomeric_count),
+    oligomericDetails: str(first.pdbx_struct_assembly?.oligomeric_details),
+    oligomericState: str(global?.oligomeric_state),
+    stoichiometry: (global?.stoichiometry ?? []).filter((s): s is string => typeof s === 'string'),
+  };
+  return assembly.chainCount || assembly.oligomericDetails ? assembly : undefined;
 }
 
 function polymerType(raw: string | null | undefined): PolymerType {

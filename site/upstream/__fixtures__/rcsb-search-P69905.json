@@ -1,0 +1,59 @@
+{
+ "query_id": "f830ad5c-aad6-46a0-ac3a-fc05eea9375a",
+ "result_type": "entry",
+ "total_count": 356,
+ "result_set": [
+  {
+   "identifier": "2W72",
+   "score": 1
+  },
+  {
+   "identifier": "1IRD",
+   "score": 1
+  },
+  {
+   "identifier": "2DN1",
+   "score": 1
+  },
+  {
+   "identifier": "2DN2",
+   "score": 1
+  },
+  {
+   "identifier": "2DN3",
+   "score": 1
+  },
+  {
+   "identifier": "7DY4",
+   "score": 1
+  },
+  {
+   "identifier": "6KA9",
+   "score": 1
+  },
+  {
+   "identifier": "6KAO",
+   "score": 1
+  },
+  {
+   "identifier": "6LCW",
+   "score": 1
+  },
+  {
+   "identifier": "6LCX",
+   "score": 1
+  },
+  {
+   "identifier": "7DY3",
+   "score": 1
+  },
+  {
+   "identifier": "3S66",
+   "score": 1
+  },
+  {
+   "identifier": "1J40",
+   "score": 1
+  }
+ ]
+}

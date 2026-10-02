@@ -117,6 +117,11 @@ async function recordSearches(): Promise<void> {
   console.log('uniprot e. coli lacZ', (await searchUniProt('E. coli lacZ', 3, live)).status);
   console.log('pubchem caffeine', (await resolvePubchemCid('caffeine', live)).status);
   console.log('pubchem 2519', (await fetchPubchemCompound(2519, live)).status);
+  // Biological assembly vs deposited model: 1HHO has 2 of the tetramer's 4 chains, 4HHB all 4.
+  for (const id of ['1HHO', '4HHB']) {
+    const r = await fetchPdbDetails(id, live);
+    console.log(id, r.status, r.status === 'ok' ? JSON.stringify(r.data.assembly) : '');
+  }
 }
 
 void main();

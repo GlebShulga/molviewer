@@ -1,0 +1,154 @@
+{
+ "data": {
+  "entry": {
+   "polymer_entities": [
+    {
+     "rcsb_polymer_entity": {
+      "pdbx_description": "HEMOGLOBIN A (OXY) (BETA CHAIN)"
+     },
+     "rcsb_polymer_entity_container_identifiers": {
+      "entity_id": "2",
+      "auth_asym_ids": [
+       "B"
+      ],
+      "uniprot_ids": [
+       "P68871"
+      ],
+      "reference_sequence_identifiers": [
+       {
+        "database_name": "UniProt",
+        "database_accession": "P68871"
+       }
+      ]
+     },
+     "rcsb_entity_source_organism": [
+      {
+       "scientific_name": "Homo sapiens"
+      }
+     ],
+     "entity_poly": {
+      "pdbx_seq_one_letter_code_can": "VHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPKVKAHGKKVLGAFSDGLAHLDNLKGTFATLSELHCDKLHVDPENFRLLGNVLVCVLAHHFGKEFTPPVQAAYQKVVAGVANALAHKYH",
+      "rcsb_sample_sequence_length": 146,
+      "rcsb_entity_polymer_type": "Protein"
+     }
+    },
+    {
+     "rcsb_polymer_entity": {
+      "pdbx_description": "HEMOGLOBIN A (OXY) (ALPHA CHAIN)"
+     },
+     "rcsb_polymer_entity_container_identifiers": {
+      "entity_id": "1",
+      "auth_asym_ids": [
+       "A"
+      ],
+      "uniprot_ids": [
+       "P69905"
+      ],
+      "reference_sequence_identifiers": [
+       {
+        "database_name": "UniProt",
+        "database_accession": "P69905"
+       }
+      ]
+     },
+     "rcsb_entity_source_organism": [
+      {
+       "scientific_name": "Homo sapiens"
+      }
+     ],
+     "entity_poly": {
+      "pdbx_seq_one_letter_code_can": "VLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSHGSAQVKGHGKKVADALTNAVAHVDDMPNALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVLTSKYR",
+      "rcsb_sample_sequence_length": 141,
+      "rcsb_entity_polymer_type": "Protein"
+     }
+    }
+   ],
+   "nonpolymer_entities": [
+    {
+     "rcsb_nonpolymer_entity_container_identifiers": {
+      "auth_asym_ids": [
+       "A",
+       "B"
+      ],
+      "nonpolymer_comp_id": "OXY"
+     },
+     "rcsb_nonpolymer_entity": {
+      "pdbx_number_of_molecules": 2
+     },
+     "nonpolymer_comp": {
+      "chem_comp": {
+       "id": "OXY",
+       "name": "OXYGEN MOLECULE",
+       "formula": "O2",
+       "formula_weight": 31.999
+      }
+     }
+    },
+    {
+     "rcsb_nonpolymer_entity_container_identifiers": {
+      "auth_asym_ids": [
+       "A",
+       "B"
+      ],
+      "nonpolymer_comp_id": "HEM"
+     },
+     "rcsb_nonpolymer_entity": {
+      "pdbx_number_of_molecules": 2
+     },
+     "nonpolymer_comp": {
+      "chem_comp": {
+       "id": "HEM",
+       "name": "PROTOPORPHYRIN IX CONTAINING FE",
+       "formula": "C34 H32 Fe N4 O4",
+       "formula_weight": 616.487
+      }
+     }
+    },
+    {
+     "rcsb_nonpolymer_entity_container_identifiers": {
+      "auth_asym_ids": [
+       "A"
+      ],
+      "nonpolymer_comp_id": "PO4"
+     },
+     "rcsb_nonpolymer_entity": {
+      "pdbx_number_of_molecules": 1
+     },
+     "nonpolymer_comp": {
+      "chem_comp": {
+       "id": "PO4",
+       "name": "PHOSPHATE ION",
+       "formula": "O4 P",
+       "formula_weight": 94.971
+      }
+     }
+    }
+   ],
+   "assemblies": [
+    {
+     "pdbx_struct_assembly": {
+      "oligomeric_details": "tetrameric",
+      "oligomeric_count": 4
+     },
+     "rcsb_struct_symmetry": [
+      {
+       "kind": "Global Symmetry",
+       "oligomeric_state": "Hetero 4-mer",
+       "stoichiometry": [
+        "A2",
+        "B2"
+       ]
+      },
+      {
+       "kind": "Pseudo Symmetry",
+       "oligomeric_state": "Homo 4-mer",
+       "stoichiometry": [
+        "A4"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

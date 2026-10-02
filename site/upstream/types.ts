@@ -167,6 +167,22 @@ export interface RelatedEntry {
   method?: string;
 }
 
+/**
+ * The first biological assembly (RCSB assembly 1): the functional molecule.
+ * It can be bigger than the deposited model (1HHO's file has one alpha-beta
+ * pair; the assembly is the tetramer) or smaller (several copies in the crystal).
+ */
+export interface AssemblyInfo {
+  /** Polymer chains in the assembly, e.g. 4. */
+  chainCount?: number;
+  /** e.g. "tetrameric". */
+  oligomericDetails?: string;
+  /** Global symmetry, e.g. "Hetero 4-mer". */
+  oligomericState?: string;
+  /** e.g. ["A2", "B2"]. */
+  stoichiometry: string[];
+}
+
 /** Everything the /pdb/:id landing page needs. */
 export interface PdbDetails {
   /** Upper-case PDB id, e.g. "3DNI". */
@@ -202,6 +218,8 @@ export interface PdbDetails {
   citation?: Citation;
   /** Polymer entities in entity-id order. Empty when `partial` includes 'entities'. */
   entities: PolymerEntity[];
+  /** Undefined when RCSB lists no assembly or the entities query failed. */
+  assembly?: AssemblyInfo;
   /** Ligands, excluding water and common crystallization additives (see `excludedLigandIds`). */
   ligands: Ligand[];
   /** CCD ids that were present but filtered out as water/additives, e.g. ["SO4", "GOL"]. */

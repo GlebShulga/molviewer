@@ -116,7 +116,8 @@ export function createServer(
       description:
         'Search for molecular structures by name and get their IDs: proteins and nucleic acids in the PDB, AlphaFold predicted models, and small molecules in PubChem. ' +
         'Use it for requests like "hemoglobin", "insulin hexamer", "caffeine" or "human p53 AlphaFold". ' +
-        'Curated MolViewer catalogs are searched first, then RCSB, UniProt and PubChem. Returns IDs to pass to show_structure or get_structure_details.',
+        'Curated MolViewer catalogs are searched first, then RCSB, UniProt and PubChem. Returns IDs to pass to show_structure or get_structure_details, ' +
+        'best match first: the first result is the canonical, complete structure, so prefer it unless the user asked for a specific state, variant or organism.',
       inputSchema: z.object({
         query: z.string().min(1).max(200).describe('Name of a protein, nucleic acid, compound or topic, e.g. "hemoglobin".'),
         kind: z
@@ -140,6 +141,7 @@ export function createServer(
         'Display a molecular structure in an interactive 3D viewer the user can rotate and zoom: a PDB entry, an AlphaFold DB model, or a PubChem compound. ' +
         'Use it when the user wants to see, show, visualize or look at a structure, or asks what a molecule looks like. ' +
         'Returns key facts (method, resolution, chains, ligands; or pLDDT confidence; or formula) to explain alongside the viewer. ' +
+        'The viewer shows the chains in the entry file (polymerChainCount); if a note says the file is only part of the biological assembly, describe what is shown accordingly. ' +
         'Defaults: cartoon colored by chain for PDB, cartoon colored by confidence for AlphaFold, ball and stick for compounds. ' +
         'Only for visualization: never provide synthesis routes, doses or acquisition advice.',
       inputSchema: z.object({

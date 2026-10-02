@@ -159,7 +159,9 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   }
   const lines = results.map((r) => `- ${r.kind} ${r.id}: ${r.title}${r.subtitle ? ` (${r.subtitle})` : ''}`);
   return {
-    text: `Found ${results.length} for "${args.query}". Use show_structure with kind and id to display one.\n${lines.join('\n')}`,
+    text:
+      `Found ${results.length} for "${args.query}", best match first. Unless the user asked for something specific ` +
+      `(a state, variant, organism or ligand), show the first one with show_structure.\n${lines.join('\n')}`,
     structuredContent: { query: args.query, results },
     status: 'ok',
     cacheable: notes.length === 0,
@@ -372,6 +374,9 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     color = 'bfactor';
     notes.push('Confidence (pLDDT) coloring is for AlphaFold models; this entry is colored by B-factor instead.');
   }
+  // First in the text, where the model reads it before writing its answer.
+  const chainsNote = typeof r.summary.chainsNote === 'string' ? r.summary.chainsNote : undefined;
+  if (chainsNote) notes.unshift(`Note: ${chainsNote}`);
 
   const payload: WidgetPayload = {
     load: r.load,

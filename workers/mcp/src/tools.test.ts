@@ -41,6 +41,7 @@ describe('find_structures', () => {
     const r = await findStructures({ query: 'caffeine', kind: 'compound', limit: 1 }, { fetchImpl: f.fetchImpl });
     expect(f.calls).toEqual([]);
     expect(r.structuredContent?.results).toEqual([expect.objectContaining({ kind: 'compound', id: 'caffeine' })]);
+    expect(r.text).toContain('best match first');
   });
 
   it('puts an exact PubChem name first, ahead of partial catalog matches', async () => {
@@ -113,6 +114,24 @@ describe('show_structure', () => {
     });
     // Coordinates never go through the model.
     expect(JSON.stringify(r.structuredContent).length).toBeLessThan(4000);
+  });
+
+  it('says when the file is only part of the biological assembly (1HHO: 2 of 4 chains)', async () => {
+    const r = await showStructure({ kind: 'pdb', id: '1HHO' }, upstream());
+    expect(r.structuredContent).toMatchObject({
+      polymerChainCount: 2,
+      biologicalAssembly: { chains: 4, description: 'tetrameric', stoichiometry: ['A2', 'B2'] },
+    });
+    // In the text, first: the model reads it before writing its answer.
+    expect(r.text).toMatch(/Note: This entry's file contains 2 of the 4 chains/);
+    expect(r.text.indexOf('Note:')).toBeLessThan(r.text.indexOf('Full viewer'));
+  });
+
+  it('adds no note when the file is the whole assembly (4HHB)', async () => {
+    const r = await showStructure({ kind: 'pdb', id: '4HHB' }, upstream());
+    expect(r.structuredContent).toMatchObject({ polymerChainCount: 4, biologicalAssembly: { chains: 4 } });
+    expect(r.structuredContent?.chainsNote).toBeUndefined();
+    expect(r.text).not.toContain('Note:');
   });
 
   it('reports unknown PDB IDs clearly', async () => {
@@ -231,5 +250,16 @@ describe('isDeniedCompound', () => {
     expect(isDeniedCompound({ cid: 39793 })).toBe(true);
     expect(isDeniedCompound({ names: ['Sulfur mustard'] })).toBe(true);
     expect(isDeniedCompound({ cid: 2519, names: ['Caffeine'] })).toBe(false);
+  });
+});
+
+describe('assemblyNote', () => {
+  it('covers files with more copies than the assembly', async () => {
+    const { assemblyNote } = await import('./summaries');
+    expect(assemblyNote({ polymerChainCount: 4, assembly: { chainCount: 2, oligomericDetails: 'dimeric', stoichiometry: [] } })).toMatch(
+      /several copies/
+    );
+    expect(assemblyNote({ polymerChainCount: 3, assembly: { chainCount: 3, stoichiometry: [] } })).toBeUndefined();
+    expect(assemblyNote({ polymerChainCount: 3 })).toBeUndefined();
   });
 });
