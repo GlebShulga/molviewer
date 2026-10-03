@@ -41,7 +41,7 @@
               "description": "Find a protein by name and show it in 3D",
               "prompt": "Show me human hemoglobin in 3D",
               "tools_triggered": ["find_structures", "show_structure"],
-              "expected_behavior": "The viewer shows a human hemoglobin structure (for example 4HHB or 1HHO) as a cartoon colored by chain. The assistant describes it correctly: the alpha2-beta2 tetramer with four heme groups, and if the entry's file contains only part of the tetramer (1HHO has 2 of the 4 chains), it says so. It links to the full viewer."
+              "expected_behavior": "The viewer shows a human hemoglobin structure (for example 4HHB or 1HHO) as a cartoon colored by chain, with a caption line giving the PDB ID, method, resolution and chain count; for 1HHO it reads \"2 of 4 chains (tetrameric)\", because that file holds half of the tetramer. When the assistant adds text, it describes the alpha2-beta2 tetramer with four heme groups correctly."
             },
             {
               "description": "Answer a factual question about secondary structure without opening the viewer",

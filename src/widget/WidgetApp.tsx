@@ -19,7 +19,7 @@ import { calculateColorSchemeContext } from '../utils/atomColor';
 import { track } from '../utils/track';
 import type { ColorScheme, RepresentationType, StructureSource } from '../types';
 import { openInMolViewerUrl, type WidgetLoad, type WidgetPayload, type WidgetView } from '../../site/appContract';
-import { payloadKey, type HostBridge, type HostSnapshot } from './bridge';
+import type { HostBridge, HostSnapshot } from './bridge';
 import styles from './WidgetApp.module.css';
 
 const STYLES: { value: RepresentationType; label: string }[] = [
@@ -84,13 +84,15 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
   // Load the structure for each new tool result (and on retry).
   useEffect(() => {
     if (!payload) return;
-    const key = payloadKey(payload);
-    const restored = host.loadState(key) ?? payload.view;
+    // Always the view the tool asked for. Restoring the user's last view via
+    // ChatGPT's widget state was dropped: ChatGPT carried it into new chats with
+    // the same request (demo recording, 2026-10-03).
+    const initial = payload.view;
     const controller = new AbortController();
     const store = () => useMoleculeStore.getState();
     store().reset();
     setLoadError(null);
-    setView(restored);
+    setView(initial);
     store().setLoading(true);
     (async () => {
       try {
@@ -98,10 +100,10 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
         if (controller.signal.aborted) return;
         const id = store().addStructure(molecule, name, toSource(payload.load));
         if (id) {
-          store().setStructureRepresentation(id, restored.repr);
-          store().setStructureColorScheme(id, restored.color);
+          store().setStructureRepresentation(id, initial.repr);
+          store().setStructureColorScheme(id, initial.color);
         }
-        store().setAutoRotate(restored.spin);
+        store().setAutoRotate(initial.spin);
         if (warning) store().setError(warning);
         if (attempt === 0) track('widget_view', { source: payload.load.kind, ref: host.hostName });
       } catch (err) {
@@ -123,9 +125,8 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
       if (next.repr) store.setStructureRepresentation(structure.id, next.repr);
       if (next.color) store.setStructureColorScheme(structure.id, next.color);
       if (next.spin !== undefined) store.setAutoRotate(next.spin);
-      host.saveState(payloadKey(payload), merged);
     },
-    [payload, view, structure, host]
+    [payload, view, structure]
   );
 
   const getBoundingBox = useCallback(() => {

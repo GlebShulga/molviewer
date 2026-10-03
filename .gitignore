@@ -48,3 +48,6 @@ workers/mcp/package/assets/
 
 # Wrangler local state and dev bundles
 .wrangler/
+
+# Demo video recordings (workers/mcp/DEMO.md)
+workers/mcp/demo/

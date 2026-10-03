@@ -28,7 +28,7 @@ These are the cases submitted to OpenAI. They must all pass.
 
 | ID | Prompt | Expected tool calls | Pass if |
 |---|---|---|---|
-| P1 | `Show me human hemoglobin in 3D` | `find_structures`, then `show_structure` (pdb) | A viewer shows a hemoglobin structure as a cartoon colored by chain. The answer describes hemoglobin as an α2β2 tetramer with heme groups. **If the entry shown is 1HHO, the answer must say the file shows 2 chains (half of the tetramer).** If it's 4HHB, 4 chains are visible. |
+| P1 | `Show me human hemoglobin in 3D` | `find_structures`, then `show_structure` (pdb) | A viewer shows a hemoglobin structure as a cartoon colored by chain. The caption gives the PDB ID, method, resolution and chains: for 4HHB "4 chains", for 1HHO "2 of 4 chains (tetrameric)". Record whether ChatGPT also wrote text; if it did, it must describe an α2β2 tetramer with heme groups, and for 1HHO say the file shows 2 of the 4 chains. An empty answer is not a failure. |
 | P2 | `Which residues form the beta sheets in PDB 3DNI?` | `get_structure_details` only, **no viewer** | The answer lists strand ranges for chain A. Reference (PDBe, author numbering): 2-11, 34-40, 64-67, 79-84, 89-96, 114-120, 127-132, 163-168, 212-217, 255-258, plus short single-residue strands. At least 8 of the 10 long ranges must appear correctly. |
 | P3 | `I'm revising GCSE chemistry, show me a caffeine molecule as ball and stick` | `show_structure` (compound) | Caffeine in ball and stick, colored by element (grey C, blue N, red O, white H). The caption line at the top of the viewer reads "Caffeine · C8H10N4O2 · 194.19 g/mol · stimulants". Record whether ChatGPT also wrote text; an empty answer is not a failure. |
 | P4 | `Show the AlphaFold prediction for human p53 and tell me how confident it is` | `find_structures` and/or `show_structure` (alphafold, P04637) | Cartoon in four colors: dark blue, light blue, yellow, orange. A legend at the bottom right reads "Very high > 90, Confident 70-90, Low 50-70, Very low < 50". The answer says the folded core is high confidence and the ends (disordered regions) are low. Mean pLDDT is about 75. |
@@ -52,7 +52,7 @@ Use the P1 result (or a new chat with `Show me human hemoglobin in 3D`), then do
 | W7 | Click **Reset view** (the frame icon, first of the round buttons). | The molecule recenters and fits the viewer. |
 | W8 | Hover over an atom for a second. | A tooltip shows atom details (element, residue, chain). |
 | W9 | Click **Open full viewer** (bottom left). | A new tab opens on `https://molviewer.bio/pdb/<ID>?repr=...&color=...&utm_source=chatgpt&utm_medium=app`, and the same structure loads there with the same style and color. Record the exact URL. |
-| W10 | Change Style to Spacefill, then reload the ChatGPT page (F5) and scroll back to the viewer. | Record whether it comes back as Spacefill or as Cartoon. Either is acceptable; just record it. |
+| W10 | Change Style to Spacefill, then reload the ChatGPT page (F5) and scroll back to the viewer. Then open a **new** chat and send the same prompt. | Both come back in the view the assistant asked for (Cartoon), not Spacefill: the widget doesn't restore changed views, because ChatGPT carried them into other chats. |
 | W11 | In ChatGPT settings, switch the theme to Dark (Settings, General, Theme). Look at the viewer, then switch back to what it was. | In dark theme the viewer background and controls are dark too. |
 
 ## C. Robustness and edge cases (ChatGPT web)

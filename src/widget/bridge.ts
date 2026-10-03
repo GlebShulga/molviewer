@@ -2,19 +2,16 @@
  * Talks to the chat host. The standard MCP Apps client
  * (@modelcontextprotocol/ext-apps) is the main path, so the same widget works
  * in ChatGPT and Claude; `window.openai` (ChatGPT's own API) is only a
- * fallback when a standard call isn't available, plus widget state, which
- * has no standard equivalent.
+ * fallback when a standard call isn't available.
  */
 import { App, PostMessageTransport, type McpUiDisplayMode, type McpUiHostContext } from '@modelcontextprotocol/ext-apps';
-import { readWidgetPayload, type WidgetPayload, type WidgetView } from '../../site/appContract';
+import { readWidgetPayload, type WidgetPayload } from '../../site/appContract';
 
 /** The parts of ChatGPT's `window.openai` the widget uses (all optional: other hosts don't have it). */
 interface OpenAiGlobals {
   theme?: 'light' | 'dark';
   displayMode?: McpUiDisplayMode;
   toolResponseMetadata?: Record<string, unknown> | null;
-  widgetState?: unknown;
-  setWidgetState?: (state: unknown) => Promise<void> | void;
   requestDisplayMode?: (args: { mode: McpUiDisplayMode }) => Promise<{ mode: McpUiDisplayMode }>;
   openExternal?: (args: { href: string }) => void;
   /** Areas covered by ChatGPT's own controls (close button, composer), in px. */
@@ -32,13 +29,6 @@ declare global {
   interface Window {
     openai?: OpenAiGlobals;
   }
-}
-
-/** View settings the user changed, kept across chat re-renders (ChatGPT only). */
-export interface SavedState {
-  /** Which structure the state belongs to, so a new tool result starts fresh. */
-  key: string;
-  view: WidgetView;
 }
 
 export interface HostSnapshot {
@@ -67,8 +57,6 @@ export interface HostBridge {
   onToolError(cb: (message: string) => void): void;
   requestDisplayMode(mode: McpUiDisplayMode): Promise<void>;
   openLink(url: string): Promise<void>;
-  loadState(key: string): WidgetView | null;
-  saveState(key: string, view: WidgetView): void;
 }
 
 function hostNameOf(app: App | null): string {
@@ -182,22 +170,5 @@ export function connectHost(): HostBridge {
       if (window.openai?.openExternal) window.openai.openExternal({ href: url });
       else window.open(url, '_blank', 'noopener');
     },
-    loadState(key) {
-      const s = window.openai?.widgetState as SavedState | undefined;
-      return s && s.key === key && s.view ? s.view : null;
-    },
-    saveState(key, view) {
-      try {
-        void window.openai?.setWidgetState?.({ key, view } satisfies SavedState);
-      } catch {
-        // Optional enhancement only.
-      }
-    },
   };
-}
-
-/** Stable identity of a payload's structure, for saved state. */
-export function payloadKey(p: WidgetPayload): string {
-  const l = p.load;
-  return l.kind === 'compound' ? `compound:${l.cid}` : `${l.kind}:${l.id}`;
 }
