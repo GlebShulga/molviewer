@@ -3,7 +3,7 @@
  * /embed viewer, but its input comes from the host bridge instead of the URL,
  * and it adds style/color pickers, fullscreen and a confidence legend.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import { ExternalLink, Maximize2, Minimize2, RotateCw, Scan } from 'lucide-react';
@@ -148,6 +148,17 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
   const isAlphaFold = payload?.load.kind === 'alphafold';
   const showLegend = isAlphaFold && view?.color === 'bfactor' && !!structure;
   const fullscreen = snapshot.displayMode === 'fullscreen';
+  // In fullscreen the host's own controls (ChatGPT's close button, composer) sit
+  // over the frame. Insets the host reports override the CSS fallback for phones.
+  const safeArea = fullscreen ? snapshot.safeArea : undefined;
+  const safeAreaStyle = safeArea
+    ? ({
+        '--safe-top': `${safeArea.top}px`,
+        '--safe-right': `${safeArea.right}px`,
+        '--safe-bottom': `${safeArea.bottom}px`,
+        '--safe-left': `${safeArea.left}px`,
+      } as CSSProperties)
+    : undefined;
 
   const openFull = () => {
     if (!payload || !view) return;
@@ -158,7 +169,7 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
   const theme = THEME_COLORS[snapshot.theme];
 
   return (
-    <div className={fullscreen ? `${styles.widget} ${styles.fullscreen}` : styles.widget}>
+    <div className={fullscreen ? `${styles.widget} ${styles.fullscreen}` : styles.widget} style={safeAreaStyle}>
       {structure && (
         <MoleculeViewer
           ref={viewerRef}

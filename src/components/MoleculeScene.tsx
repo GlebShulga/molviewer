@@ -2,6 +2,7 @@ import { useMoleculeStore } from '../store/moleculeStore';
 import { selectHasStructures } from '../store/selectors';
 import { MeasurementOverlay, Labels3D } from './viewer';
 import { MultiStructureRenderer } from './MultiStructureRenderer';
+import { useTouchTooltip } from '../hooks/useTouchTooltip';
 
 export interface MoleculeSceneProps {
   measurementColors: {
@@ -20,6 +21,8 @@ export interface MoleculeSceneProps {
 export function MoleculeScene({ measurementColors }: MoleculeSceneProps) {
   // Use selectHasStructures for the null check - returns primitive boolean
   const hasStructures = useMoleculeStore(selectHasStructures);
+  // Tap-to-show atom tooltips on touch screens (before the early return: hooks run every render).
+  useTouchTooltip();
 
   if (!hasStructures) return null;
 

@@ -6,6 +6,11 @@
   color: var(--text-primary);
   overflow: hidden;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Room for the host's own controls over the frame (set from the host in fullscreen). */
+  --safe-top: 0px;
+  --safe-right: 0px;
+  --safe-bottom: 0px;
+  --safe-left: 0px;
 }
 
 .fullscreen {
@@ -17,6 +22,14 @@
     height: 360px;
   }
 
+  /* Fullscreen on a phone: ChatGPT's close button covers the top-left corner and
+     its composer the bottom. Fallback room for hosts that don't report insets
+     (reported insets are set inline and win). */
+  .widget.fullscreen {
+    --safe-top: 56px;
+    --safe-bottom: 96px;
+  }
+
   /* Phones: the caption gets its own row. */
   .toolbar .caption {
     flex-basis: 100%;
@@ -25,7 +38,7 @@
   /* Keep the confidence legend clear of "Open full viewer". (.widget .legend: this
      block comes before the base .legend rule, so it needs the extra specificity.) */
   .widget .legend {
-    bottom: 48px;
+    bottom: calc(48px + var(--safe-bottom));
     max-width: calc(100% - 16px);
   }
 }
@@ -75,9 +88,9 @@
 
 .toolbar {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  left: 8px;
+  top: calc(8px + var(--safe-top));
+  right: calc(8px + var(--safe-right));
+  left: calc(8px + var(--safe-left));
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -156,8 +169,8 @@
 
 .legend {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: calc(8px + var(--safe-right));
+  bottom: calc(8px + var(--safe-bottom));
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -186,8 +199,8 @@
 
 .openLink {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
+  left: calc(8px + var(--safe-left));
+  bottom: calc(8px + var(--safe-bottom));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -214,7 +227,7 @@
 /* Non-blocking notice over a loaded structure (e.g. a flat 2D fallback). */
 .note {
   position: absolute;
-  top: 48px;
+  top: calc(48px + var(--safe-top));
   left: 8px;
   right: 8px;
   padding: 6px 10px;

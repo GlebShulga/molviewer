@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
+import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
 import {
   GPUPickingManager,
   pickingVertexShader,
@@ -440,6 +441,8 @@ export function ImpostorAtoms({
   // Pointer move handler
   const handlePointerMove = useCallback(
     (event: THREE.Event & { point?: THREE.Vector3; clientX?: number; clientY?: number }) => {
+      // Fingers don't hover: a tap shows the tooltip instead (handleClick).
+      if (isTouchPointer(event)) return;
       const clientX = (event as unknown as PointerEvent).clientX;
       const clientY = (event as unknown as PointerEvent).clientY;
 
@@ -459,10 +462,15 @@ export function ImpostorAtoms({
     [atomsData, gl.domElement, measurementMode, setHoveredAtom, effectiveStructureId, pickAtom]
   );
 
-  const handlePointerOut = useCallback(() => {
-    gl.domElement.style.cursor = 'auto';
-    setHoveredAtom(null, null, null, null);
-  }, [gl.domElement, setHoveredAtom]);
+  const handlePointerOut = useCallback(
+    (event?: unknown) => {
+      // A finger lifting off fires pointerout: keep the tapped atom's tooltip.
+      if (isTouchPointer(event)) return;
+      gl.domElement.style.cursor = 'auto';
+      setHoveredAtom(null, null, null, null);
+    },
+    [gl.domElement, setHoveredAtom]
+  );
 
   const handleClick = useCallback(
     (event: THREE.Event & { clientX?: number; clientY?: number }) => {
@@ -474,10 +482,14 @@ export function ImpostorAtoms({
       const pickedIndex = pickAtom(clientX, clientY);
 
       if (pickedIndex !== null && pickedIndex >= 0 && pickedIndex < atomsData.length) {
-        selectAtom(effectiveStructureId, atomsData[pickedIndex].index);
+        const data = atomsData[pickedIndex];
+        selectAtom(effectiveStructureId, data.index);
+        if (lastPointerWasTouch()) {
+          setHoveredAtom(data.atom, data.index, effectiveStructureId, { x: clientX, y: clientY });
+        }
       }
     },
-    [atomsData, selectAtom, effectiveStructureId, pickAtom]
+    [atomsData, selectAtom, setHoveredAtom, effectiveStructureId, pickAtom]
   );
 
   if (!isWebGL2) {

@@ -4,7 +4,7 @@
  * opaque origin under the resource's declared CSP (as ChatGPT and Claude
  * do), and drives it through ext-apps' AppBridge.
  *
- * Query parameters: ?server=<mcp url>&tool=<name>&args=<json>&dark=1&auto=1
+ * Query parameters: ?server=<mcp url>&tool=<name>&args=<json>&dark=1&auto=1&safe=<top>,<bottom>
  */
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { AppBridge, PostMessageTransport } from '@modelcontextprotocol/ext-apps/app-bridge';
@@ -87,7 +87,12 @@ async function run(tool: string, args: Record<string, unknown>, dark: boolean): 
     const next = mode === 'fullscreen' ? 'fullscreen' : 'inline';
     frame.classList.toggle('fullscreen', next === 'fullscreen');
     if (next === 'fullscreen') frame.style.height = '';
-    void bridge.sendHostContextChange({ displayMode: next });
+    // ?safe=top,bottom: report safe-area insets in fullscreen, as a host with overlay controls would.
+    const safe = params.get('safe')?.split(',').map(Number);
+    void bridge.sendHostContextChange({
+      displayMode: next,
+      ...(safe && next === 'fullscreen' ? { safeAreaInsets: { top: safe[0] || 0, right: 0, bottom: safe[1] || 0, left: 0 } } : {}),
+    });
     log('display-mode', next);
     return { mode: next };
   };

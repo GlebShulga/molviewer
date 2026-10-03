@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
+import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
 import { MoleculeOctree, LOD_THRESHOLDS, type ClusterData } from '../../utils/octree';
 
 /**
@@ -323,6 +324,8 @@ export function LODAtoms({
   // Picking handler (uses visible atoms only)
   const handlePointerMove = useCallback(
     (event: THREE.Event) => {
+      // Fingers don't hover: a tap shows the tooltip instead (handleClick).
+      if (isTouchPointer(event)) return;
       const clientX = (event as unknown as PointerEvent).clientX;
       const clientY = (event as unknown as PointerEvent).clientY;
       if (clientX === undefined || clientY === undefined) return;
@@ -372,10 +375,15 @@ export function LODAtoms({
     [atomsData, camera, gl.domElement, measurementMode, setHoveredAtom, effectiveStructureId]
   );
 
-  const handlePointerOut = useCallback(() => {
-    gl.domElement.style.cursor = 'auto';
-    setHoveredAtom(null, null, null, null);
-  }, [gl.domElement, setHoveredAtom]);
+  const handlePointerOut = useCallback(
+    (event?: unknown) => {
+      // A finger lifting off fires pointerout: keep the tapped atom's tooltip.
+      if (isTouchPointer(event)) return;
+      gl.domElement.style.cursor = 'auto';
+      setHoveredAtom(null, null, null, null);
+    },
+    [gl.domElement, setHoveredAtom]
+  );
 
   const handleClick = useCallback(
     (event: THREE.Event) => {
@@ -416,10 +424,14 @@ export function LODAtoms({
       }
 
       if (closestIdx >= 0) {
-        selectAtom(effectiveStructureId, atomsData[closestIdx].index);
+        const data = atomsData[closestIdx];
+        selectAtom(effectiveStructureId, data.index);
+        if (lastPointerWasTouch()) {
+          setHoveredAtom(data.atom, data.index, effectiveStructureId, { x: clientX, y: clientY });
+        }
       }
     },
-    [atomsData, camera, gl.domElement, selectAtom, effectiveStructureId]
+    [atomsData, camera, gl.domElement, selectAtom, setHoveredAtom, effectiveStructureId]
   );
 
   if (!isWebGL2) {

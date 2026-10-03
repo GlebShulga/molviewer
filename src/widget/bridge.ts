@@ -17,6 +17,15 @@ interface OpenAiGlobals {
   setWidgetState?: (state: unknown) => Promise<void> | void;
   requestDisplayMode?: (args: { mode: McpUiDisplayMode }) => Promise<{ mode: McpUiDisplayMode }>;
   openExternal?: (args: { href: string }) => void;
+  /** Areas covered by ChatGPT's own controls (close button, composer), in px. */
+  safeArea?: { insets?: Partial<SafeAreaInsets> } | null;
+}
+
+export interface SafeAreaInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
 declare global {
@@ -36,6 +45,16 @@ export interface HostSnapshot {
   theme: 'light' | 'dark';
   displayMode: McpUiDisplayMode;
   canFullscreen: boolean;
+  /** Host-reported insets to keep our controls clear of the host's own (undefined when not reported). */
+  safeArea?: SafeAreaInsets;
+}
+
+/** The host's safe-area insets: MCP Apps host context first, then ChatGPT's window.openai.safeArea. */
+function safeAreaOf(context: McpUiHostContext): SafeAreaInsets | undefined {
+  const raw = context.safeAreaInsets ?? window.openai?.safeArea?.insets;
+  if (!raw) return undefined;
+  const px = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
+  return { top: px(raw.top), right: px(raw.right), bottom: px(raw.bottom), left: px(raw.left) };
 }
 
 export interface HostBridge {
@@ -85,6 +104,7 @@ export function connectHost(): HostBridge {
       theme: context.theme ?? window.openai?.theme ?? 'light',
       displayMode: context.displayMode ?? window.openai?.displayMode ?? 'inline',
       canFullscreen: modes ? modes.includes('fullscreen') : !!window.openai?.requestDisplayMode,
+      safeArea: safeAreaOf(context),
     };
   };
   const emitChange = () => changeListeners.forEach((cb) => cb(snapshot()));

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
+import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
 
 export interface SelectableAtomProps {
   atom: Atom;
@@ -62,14 +63,18 @@ export function SelectableAtom({
 
   const handlePointerOver = useCallback((event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
+    // Fingers don't hover: a tap shows the tooltip instead (handleClick).
+    if (isTouchPointer(event)) return;
     setHovered(true);
     gl.domElement.style.cursor = measurementMode !== 'none' ? 'crosshair' : 'pointer';
     // Use 4-arg signature with structureId
     setHoveredAtom(atom, atomIndex, effectiveStructureId, { x: event.clientX, y: event.clientY });
   }, [atom, atomIndex, effectiveStructureId, gl.domElement.style, measurementMode, setHoveredAtom]);
 
-  const handlePointerOut = useCallback(() => {
+  const handlePointerOut = useCallback((event?: ThreeEvent<PointerEvent>) => {
     setHovered(false);
+    // A finger lifting off fires pointerout: keep the tapped atom's tooltip.
+    if (isTouchPointer(event)) return;
     gl.domElement.style.cursor = 'auto';
     setHoveredAtom(null, null, null, null);
   }, [gl.domElement.style, setHoveredAtom]);
@@ -78,7 +83,10 @@ export function SelectableAtom({
     event.stopPropagation();
     // Use 2-arg signature with structureId
     selectAtom(effectiveStructureId, atomIndex);
-  }, [atomIndex, effectiveStructureId, selectAtom]);
+    if (lastPointerWasTouch()) {
+      setHoveredAtom(atom, atomIndex, effectiveStructureId, { x: event.clientX, y: event.clientY });
+    }
+  }, [atom, atomIndex, effectiveStructureId, selectAtom, setHoveredAtom]);
 
   const handleContextMenu = useCallback((event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
