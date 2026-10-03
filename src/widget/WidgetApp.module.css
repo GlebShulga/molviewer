@@ -16,6 +16,18 @@
   .widget:not(.fullscreen) {
     height: 360px;
   }
+
+  /* Phones: the caption gets its own row. */
+  .toolbar .caption {
+    flex-basis: 100%;
+  }
+
+  /* Keep the confidence legend clear of "Open full viewer". (.widget .legend: this
+     block comes before the base .legend rule, so it needs the extra specificity.) */
+  .widget .legend {
+    bottom: 48px;
+    max-width: calc(100% - 16px);
+  }
 }
 
 .status {
@@ -72,6 +84,27 @@
   gap: 6px;
   z-index: 10;
   pointer-events: none;
+}
+
+/* Fills the row left of the controls; wraps to its own line when the frame is narrow. */
+.caption {
+  flex: 1 1 220px;
+  min-width: 0;
+  align-self: center;
+  margin: 0 auto 0 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  line-height: 18px;
+  /* Up to two lines, then an ellipsis. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .toolbar > * {

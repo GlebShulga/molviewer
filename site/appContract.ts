@@ -52,6 +52,13 @@ export interface WidgetPayload {
   view: WidgetView;
   /** Display title, e.g. "4HHB: Deoxy human hemoglobin". */
   title: string;
+  /**
+   * One line of key facts shown in the viewer, e.g.
+   * "Caffeine · C8H10N4O2 · 194.19 g/mol · stimulants". ChatGPT often writes no
+   * text after the viewer, so the essentials live in the picture too.
+   * Optional: older servers don't send it (the widget falls back to `title`).
+   */
+  caption?: string;
   /** Canonical page on molviewer.bio, without view or tracking parameters. */
   pageUrl: string;
 }

@@ -53,7 +53,7 @@
               "description": "Show a small molecule in a requested style",
               "prompt": "I'm revising GCSE chemistry, show me a caffeine molecule as ball and stick",
               "tools_triggered": ["show_structure"],
-              "expected_behavior": "The viewer shows caffeine (PubChem CID 2519) as ball and stick, colored by element. The assistant gives the formula C8H10N4O2 and explains the structure at a school level."
+              "expected_behavior": "The viewer shows caffeine (PubChem CID 2519) as ball and stick, colored by element, with a caption line at the top: \"Caffeine · C8H10N4O2 · 194.19 g/mol · stimulants\". When the assistant adds text, it explains the structure at a school level."
             },
             {
               "description": "Show an AlphaFold prediction colored by confidence",
@@ -65,7 +65,7 @@
               "description": "Show a large cryo-EM structure with a specific style and color",
               "prompt": "Show the SARS-CoV-2 spike protein as a cartoon colored by chain",
               "tools_triggered": ["show_structure"],
-              "expected_behavior": "The viewer shows PDB entry 6VXX, the trimeric spike glycoprotein, as a cartoon with each of the three chains in its own color. It can be opened in fullscreen. The assistant describes the trimer and the cryo-EM method and resolution."
+              "expected_behavior": "The viewer shows PDB entry 6VXX, the trimeric spike glycoprotein, as a cartoon with each of the three chains in its own color, and a caption line with the method and resolution (cryo-EM 2.8 Å) and the 3 chains. It can be opened in fullscreen. When the assistant adds text, it describes the trimer."
             }
           ],
           "negative": [

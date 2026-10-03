@@ -147,6 +147,59 @@ export function compoundFacts(c: {
     .concat('.');
 }
 
+// ---------------------------------------------------------------------------
+// Captions: one line of key facts shown in the viewer (WidgetPayload.caption)
+// ---------------------------------------------------------------------------
+
+const SEP = ' · ';
+
+/** "X-ray", "cryo-EM", "NMR": short enough for a caption. */
+function shortMethod(method: string | undefined): string | undefined {
+  if (!method) return undefined;
+  const m = method.toUpperCase();
+  if (m.includes('X-RAY')) return 'X-ray';
+  if (m.includes('ELECTRON MICROSCOPY') || m.includes('CRYO')) return 'cryo-EM';
+  if (m.includes('NMR')) return 'NMR';
+  if (m.includes('NEUTRON')) return 'neutron';
+  return formatMethod(method);
+}
+
+export function pdbCaption(d: PdbDetails): string {
+  const method = shortMethod(d.method);
+  const deposited = d.polymerChainCount;
+  const assembled = d.assembly?.chainCount;
+  const chains = !deposited
+    ? undefined
+    : assembled && assembled > deposited
+      ? `${deposited} of ${assembled} chains (${d.assembly?.oligomericDetails ?? 'assembly'})`
+      : `${deposited} chain${deposited === 1 ? '' : 's'}`;
+  return [d.id, shortName(d), method && (d.resolution ? `${method} ${d.resolution} Å` : method), chains].filter(Boolean).join(SEP);
+}
+
+export function afCaption(d: AfDetails): string {
+  const protein = d.description ?? d.uniprot?.proteinName;
+  // Confidence before organism: if the line is cut, the number survives.
+  return [
+    `AlphaFold ${d.id}`,
+    protein && (d.gene ? `${protein} (${d.gene})` : protein),
+    d.meanPlddt !== undefined && `mean pLDDT ${Math.round(d.meanPlddt)}`,
+    d.organism,
+  ]
+    .filter(Boolean)
+    .join(SEP);
+}
+
+export function compoundCaption(c: { name?: string; title?: string; formula?: string; weight?: string; cid: number; category?: CompoundCategory }): string {
+  return [
+    c.name ?? c.title ?? `PubChem CID ${c.cid}`,
+    c.formula,
+    c.weight && `${c.weight} g/mol`,
+    c.category && COMPOUND_CATEGORY_LABELS[c.category].toLowerCase(),
+  ]
+    .filter(Boolean)
+    .join(SEP);
+}
+
 export function pdbSummary(d: PdbDetails) {
   const ss = d.secondaryStructure;
   return {

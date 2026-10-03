@@ -204,6 +204,10 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
 
       {structure && view && (
         <div className={styles.toolbar}>
+          {/* Key facts in the picture: the chat answer under it is sometimes empty. */}
+          <p className={styles.caption} title={payload?.caption ?? payload?.title}>
+            {payload?.caption ?? payload?.title}
+          </p>
           <select
             className={styles.select}
             aria-label="Style"

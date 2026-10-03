@@ -24,13 +24,16 @@ import {
 import { compoundNameFrom, findCompound, hasExactCompoundName, queryTokens, searchCatalog, type FoundStructure } from './catalog';
 import { REFUSAL_MESSAGE, isDeniedCompound, isDeniedQuery } from './safety';
 import {
+  afCaption,
   afFacts,
   afPageUrl,
   afSections,
   afSummary,
+  compoundCaption,
   compoundFacts,
   compoundPageUrl,
   compoundSummary,
+  pdbCaption,
   pdbFacts,
   pdbPageUrl,
   pdbSections,
@@ -227,6 +230,8 @@ type Resolved =
       degraded?: boolean;
       /** Key facts in a sentence or two, for the tool's text content. */
       facts?: string;
+      /** One line of key facts for the viewer (WidgetPayload.caption). */
+      caption?: string;
       details?: unknown;
     }
   | { ok: false; outcome: ToolOutcome };
@@ -268,6 +273,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         partial: false,
         degraded: r.data.partial.length > 0,
         facts: pdbFacts(r.data),
+        caption: pdbCaption(r.data),
         details: r.data,
       };
     }
@@ -304,6 +310,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         partial: false,
         degraded: r.data.partial.length > 0,
         facts: afFacts(r.data),
+        caption: afCaption(r.data),
         details: r.data,
       };
     }
@@ -322,6 +329,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
           summary,
           partial: false,
           facts: compoundFacts(curated),
+          caption: compoundCaption(curated),
         };
       }
       if (isDeniedCompound({ names: [id] })) return { ok: false, outcome: error(REFUSAL_MESSAGE, 'denied') };
@@ -347,6 +355,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         summary,
         partial: props.status !== 'ok',
         facts: props.status === 'ok' ? compoundFacts(props.data) : undefined,
+        caption: props.status === 'ok' ? compoundCaption(props.data) : undefined,
       };
     }
   }
@@ -396,6 +405,7 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     load: r.load,
     view: { repr: toViewerRepresentation(style), color: toViewerColor(color), spin: args.spin ?? false },
     title: r.title,
+    ...(r.caption ? { caption: r.caption } : {}),
     pageUrl: r.pageUrl,
   };
   const colorWords = COLOR_WORDS[color];

@@ -134,6 +134,15 @@ describe('show_structure', () => {
     expect(r.text).not.toContain('Note:');
   });
 
+  it('sends a one-line caption of key facts for the viewer, for every kind', async () => {
+    const caption = async (args: Parameters<typeof showStructure>[0]) =>
+      readWidgetPayload((await showStructure(args, upstream())).meta)?.caption;
+    expect(await caption({ kind: 'compound', id: 'caffeine' })).toBe('Caffeine · C8H10N4O2 · 194.19 g/mol · stimulants');
+    expect(await caption({ kind: 'pdb', id: '4HHB' })).toMatch(/^4HHB · .*haemoglobin · X-ray 1\.74 Å · 4 chains$/i);
+    expect(await caption({ kind: 'pdb', id: '1HHO' })).toMatch(/ · 2 of 4 chains \(tetrameric\)$/);
+    expect(await caption({ kind: 'alphafold', id: 'P69905' })).toMatch(/^AlphaFold P69905 · Hemoglobin subunit alpha \(HBA1\) · mean pLDDT \d+ · Homo sapiens$/);
+  });
+
   it('leads with a request to answer, then the key facts, for every kind', async () => {
     const compound = await showStructure({ kind: 'compound', id: 'caffeine' }, upstream());
     expect(compound.text).toMatch(/Facts: Caffeine \(PubChem CID 2519\); .*formula C8H10N4O2/);
