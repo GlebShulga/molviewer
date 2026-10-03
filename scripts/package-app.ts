@@ -34,7 +34,7 @@ interface PluginJson {
   extensions: {
     'com.openai': {
       interface: Record<string, unknown> & { defaultPrompt: string[] };
-      review: { test_cases: { positive: unknown[]; negative: unknown[] } };
+      review: { demo_recording_url?: unknown; test_cases: { positive: unknown[]; negative: unknown[] } };
     };
   };
 }
@@ -54,9 +54,23 @@ maxLen('developerName', 80);
 for (const url of ['websiteURL', 'supportURL', 'privacyPolicyURL', 'termsOfServiceURL']) {
   if (typeof ui[url] !== 'string' || !(ui[url] as string).startsWith('https://')) problems.push(`${url} must be an https URL`);
 }
+// developers.openai.com/plugins/deploy/submission-errors (plugin_category_unknown)
+const CATEGORIES = ['Productivity', 'Creativity', 'Developer Tools', 'Business & Operations', 'Data & Analytics', 'Communication', 'Education & Research', 'Security', 'Finance', 'Healthcare', 'Travel', 'Entertainment', 'Other'];
+if (!CATEGORIES.includes(ui.category as string)) problems.push(`category must be one of: ${CATEGORIES.join(', ')}`);
+const demo = plugin.extensions['com.openai'].review.demo_recording_url;
+if (typeof demo !== 'string' || !demo.startsWith('https://')) problems.push('review.demo_recording_url must be an https URL (the demo video, e.g. unlisted YouTube)');
 if (ui.defaultPrompt.length > 3 || ui.defaultPrompt.some((p) => p.length > 128)) problems.push('defaultPrompt: at most 3, 128 characters each');
 if (cases.positive.length !== 5) problems.push(`need exactly 5 positive test cases (have ${cases.positive.length})`);
 if (cases.negative.length !== 3) problems.push(`need exactly 3 negative test cases (have ${cases.negative.length})`);
+// The upload form rejects anything but plain strings here (tools_triggered too: comma-separated, not an array).
+const checkCase = (kind: string, fields: string[]) => (c: unknown, i: number) => {
+  for (const field of fields) {
+    const v = (c as Record<string, unknown>)[field];
+    if (typeof v !== 'string' || !v) problems.push(`test_cases.${kind}.${i}.${field} must be a non-empty string`);
+  }
+};
+cases.positive.forEach(checkCase('positive', ['description', 'prompt', 'tools_triggered', 'expected_behavior']));
+cases.negative.forEach(checkCase('negative', ['description', 'prompt']));
 if (problems.length) {
   console.error(`plugin.json problems:\n- ${problems.join('\n- ')}`);
   process.exit(1);

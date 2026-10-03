@@ -69,7 +69,7 @@ The widget bundle ships with the site (`pnpm build` writes `dist/widget/v1/`), s
 4. **Domain verification:** the dashboard gives a token. Store it and redeploy:
    `pnpm wrangler secret put OPENAI_APPS_CHALLENGE -c workers/mcp/wrangler.toml`
    It's then served at `https://mcp.molviewer.bio/.well-known/openai-apps-challenge`.
-5. Add screenshots (optional) and a 2-3 minute **demo video** showing the 8 test cases in ChatGPT.
+5. Upload a 2-3 minute **demo video** showing the 8 test cases in ChatGPT (unlisted YouTube), put its link in `review.demo_recording_url` in `plugin.json`, rebuild the ZIP and upload it as a new version.
 6. Run the scan, fix anything it reports, and submit.
 
 Server changes go live after OpenAI's daily rescan if they pass the automatic checks. Listing changes (descriptions, test cases) need a new ZIP.
