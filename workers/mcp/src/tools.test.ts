@@ -134,14 +134,20 @@ describe('show_structure', () => {
     expect(r.text).not.toContain('Note:');
   });
 
-  it('puts the key facts and a request to answer in the text, for every kind', async () => {
+  it('leads with a request to answer, then the key facts, for every kind', async () => {
     const compound = await showStructure({ kind: 'compound', id: 'caffeine' }, upstream());
-    expect(compound.text).toMatch(/Facts: Caffeine \(PubChem CID 2519\), formula C8H10N4O2/);
+    expect(compound.text).toMatch(/Facts: Caffeine \(PubChem CID 2519\); .*formula C8H10N4O2/);
+    // Compounds get substance beyond the formula: category and other names.
+    expect(compound.text).toMatch(/catalog category: stimulants; also known as Guaranine, 1,3,7-Trimethylxanthine/);
+    expect(compound.structuredContent).toMatchObject({ category: 'Stimulants', otherNames: expect.arrayContaining(['Theine']) });
     const pdb = await showStructure({ kind: 'pdb', id: '3DNI' }, upstream());
     expect(pdb.text).toMatch(/Facts: .*PDB 3DNI.*X-ray diffraction at 2 Å.*1 polymer chain in the file/);
     const af = await showStructure({ kind: 'alphafold', id: 'P69905' }, upstream());
     expect(af.text).toMatch(/Facts: AlphaFold model of .*mean pLDDT \d+\.\d.*very high \(>90\)/);
-    for (const r of [compound, pdb, af]) expect(r.text).toContain('Now reply to the user in their language');
+    for (const r of [compound, pdb, af]) {
+      expect(r.lead).toMatch(/^The 3D viewer is already shown to the user, but it has no text\. You must now write a reply/);
+      expect(r.text).not.toContain('You must now write');
+    }
   });
 
   it('reports unknown PDB IDs clearly', async () => {

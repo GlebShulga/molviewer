@@ -5,7 +5,7 @@
  */
 import type { AfDetails, Citation, PdbDetails } from '../../../site/upstream/types';
 import type { PubchemCompound } from '../../../site/upstream/pubchem';
-import type { Compound } from '../../../site/dataTypes';
+import { COMPOUND_CATEGORY_LABELS, type Compound, type CompoundCategory } from '../../../site/dataTypes';
 import { shortName } from '../../../site/render/pdbPage';
 import { toSentenceCase } from '../../../site/render/sentenceCase';
 import { formatMethod, formatRange } from '../../../site/render/format';
@@ -111,11 +111,39 @@ export function afFacts(d: AfDetails): string {
     .concat('.');
 }
 
-export function compoundFacts(c: { name?: string; title?: string; formula?: string; weight?: string; iupac?: string; cid: number }): string {
+/** Other names worth mentioning: synonyms that differ from the name, at most four. */
+function otherNames(c: { name?: string; synonyms?: string[] }): string[] {
+  const seen = new Set([c.name?.toLowerCase()]);
+  return (c.synonyms ?? []).filter((s) => !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase())).slice(0, 4);
+}
+
+/**
+ * Compounds give the model little to say beyond a formula, and ChatGPT tends
+ * to stay silent after their viewer, so catalog compounds add their category
+ * and other names (caffeine: stimulant, also called theine, guaranine).
+ */
+export function compoundFacts(c: {
+  name?: string;
+  title?: string;
+  formula?: string;
+  weight?: string;
+  iupac?: string;
+  cid: number;
+  category?: CompoundCategory;
+  synonyms?: string[];
+}): string {
   const name = c.name ?? c.title ?? `PubChem CID ${c.cid}`;
-  return [`${name} (PubChem CID ${c.cid})`, c.formula && `formula ${c.formula}`, c.weight && `${c.weight} g/mol`, c.iupac && `IUPAC name ${c.iupac}`]
+  const aka = otherNames(c);
+  return [
+    `${name} (PubChem CID ${c.cid})`,
+    c.category && `MolViewer catalog category: ${COMPOUND_CATEGORY_LABELS[c.category].toLowerCase()}`,
+    aka.length > 0 && `also known as ${aka.join(', ')}`,
+    c.formula && `formula ${c.formula}`,
+    c.weight && `${c.weight} g/mol`,
+    c.iupac && `IUPAC name ${c.iupac}`,
+  ]
     .filter(Boolean)
-    .join(', ')
+    .join('; ')
     .concat('.');
 }
 
@@ -200,6 +228,8 @@ export function compoundSummary(c: Compound | (PubchemCompound & { slug?: string
     cid: c.cid,
     slug: c.slug,
     name: curated ? c.name : c.title,
+    category: curated ? COMPOUND_CATEGORY_LABELS[c.category] : undefined,
+    otherNames: curated ? otherNames(c) : undefined,
     formula: c.formula,
     molecularWeight: c.weight ? `${c.weight} g/mol` : undefined,
     iupacName: c.iupac,
