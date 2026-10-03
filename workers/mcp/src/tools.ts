@@ -24,11 +24,14 @@ import {
 import { compoundNameFrom, findCompound, hasExactCompoundName, queryTokens, searchCatalog, type FoundStructure } from './catalog';
 import { REFUSAL_MESSAGE, isDeniedCompound, isDeniedQuery } from './safety';
 import {
+  afFacts,
   afPageUrl,
   afSections,
   afSummary,
+  compoundFacts,
   compoundPageUrl,
   compoundSummary,
+  pdbFacts,
   pdbPageUrl,
   pdbSections,
   pdbSummary,
@@ -220,6 +223,8 @@ type Resolved =
       partial: boolean;
       /** Answered, but some optional sections failed (details.partial): don't cache. */
       degraded?: boolean;
+      /** Key facts in a sentence or two, for the tool's text content. */
+      facts?: string;
       details?: unknown;
     }
   | { ok: false; outcome: ToolOutcome };
@@ -230,7 +235,10 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
     case 'pdb': {
       const upper = id.toUpperCase();
       if (!PDB_ID_RE.test(upper) || !/\d/.test(upper)) {
-        return { ok: false, outcome: error(`"${id}" is not a PDB ID (4 characters, e.g. 4HHB). Use find_structures to search by name.`, 'invalid') };
+        return {
+          ok: false,
+          outcome: error(`"${id}" is not a valid PDB ID: PDB IDs have 4 characters and start with a digit, e.g. 4HHB. Use find_structures to search by name.`, 'invalid'),
+        };
       }
       const r = await fetchPdbDetails(upper, upstream);
       if (r.status === 'not-found') {
@@ -257,6 +265,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         summary,
         partial: false,
         degraded: r.data.partial.length > 0,
+        facts: pdbFacts(r.data),
         details: r.data,
       };
     }
@@ -292,6 +301,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         summary,
         partial: false,
         degraded: r.data.partial.length > 0,
+        facts: afFacts(r.data),
         details: r.data,
       };
     }
@@ -309,6 +319,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
           pageUrl: summary.pageUrl,
           summary,
           partial: false,
+          facts: compoundFacts(curated),
         };
       }
       if (isDeniedCompound({ names: [id] })) return { ok: false, outcome: error(REFUSAL_MESSAGE, 'denied') };
@@ -333,6 +344,7 @@ async function resolve(ref: StructureRef, upstream: UpstreamOptions): Promise<Re
         pageUrl: summary.pageUrl as string,
         summary,
         partial: props.status !== 'ok',
+        facts: props.status === 'ok' ? compoundFacts(props.data) : undefined,
       };
     }
   }
@@ -386,10 +398,16 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
   };
   const colorWords = COLOR_WORDS[color];
   const text = [
-    `Showing ${r.title} as ${style}, colored by ${colorWords}. The user can rotate and zoom it in the viewer.`,
+    `Showing ${r.title} as ${style}, colored by ${colorWords} in the 3D viewer.`,
     ...notes,
+    r.facts && `Facts: ${r.facts}`,
+    // Without this, models often stay silent once the viewer renders.
+    'Now reply to the user in their language with 2-4 sentences on what this structure is and what is notable about it, ' +
+      "using these facts. Don't describe colors or say that it is displayed: the viewer shows the picture.",
     `Full viewer: ${r.pageUrl}`,
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return {
     text,

@@ -67,6 +67,58 @@ export function assemblyNote(d: Pick<PdbDetails, 'assembly' | 'polymerChainCount
   );
 }
 
+/**
+ * One-paragraph facts for the tool's text content. Models tend to stay silent
+ * after a widget renders unless the text gives them something to say, so the
+ * essentials go here too, not only in structuredContent.
+ */
+export function pdbFacts(d: PdbDetails): string {
+  const method = d.method ? formatMethod(d.method) : undefined;
+  const parts = [
+    `${shortName(d)} (PDB ${d.id})`,
+    method && (d.resolution ? `${method} at ${d.resolution} Å` : method),
+    d.releaseDate && `released ${d.releaseDate.slice(0, 4)}`,
+    [...new Set(d.entities.flatMap((e) => e.organisms))].slice(0, 3).join(', ') || undefined,
+  ].filter(Boolean);
+  const chains = d.entities
+    .slice(0, MAX_ENTITIES)
+    .map((e) => `${e.description ? toSentenceCase(e.description) : `entity ${e.entityId}`} (chain${e.chainIds.length > 1 ? 's' : ''} ${e.chainIds.join(', ')})`)
+    .join('; ');
+  const ligands = d.ligands
+    .slice(0, 6)
+    .map((l) => `${l.id}${l.name ? ` (${toSentenceCase(l.name)})` : ''}${l.instanceCount > 1 ? ` x${l.instanceCount}` : ''}`)
+    .join(', ');
+  return [
+    `${parts.join(', ')}.`,
+    d.polymerChainCount ? `${d.polymerChainCount} polymer chain${d.polymerChainCount === 1 ? '' : 's'} in the file: ${chains}.` : chains && `Chains: ${chains}.`,
+    ligands && `Ligands: ${ligands}.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function afFacts(d: AfDetails): string {
+  const f = d.plddtFractions;
+  return [
+    `AlphaFold model of ${d.description ?? d.uniprot?.proteinName ?? d.id}${d.gene ? ` (${d.gene})` : ''}${d.organism ? `, ${d.organism}` : ''}, UniProt ${d.id}`,
+    d.sequenceLength && `${d.sequenceLength} residues`,
+    d.meanPlddt !== undefined && `mean pLDDT ${d.meanPlddt.toFixed(1)}`,
+    f &&
+      `${percent(f.veryHigh)}% very high (>90), ${percent(f.confident)}% confident (70-90), ${percent(f.low)}% low (50-70), ${percent(f.veryLow)}% very low (<50, often disordered)`,
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .concat('.');
+}
+
+export function compoundFacts(c: { name?: string; title?: string; formula?: string; weight?: string; iupac?: string; cid: number }): string {
+  const name = c.name ?? c.title ?? `PubChem CID ${c.cid}`;
+  return [`${name} (PubChem CID ${c.cid})`, c.formula && `formula ${c.formula}`, c.weight && `${c.weight} g/mol`, c.iupac && `IUPAC name ${c.iupac}`]
+    .filter(Boolean)
+    .join(', ')
+    .concat('.');
+}
+
 export function pdbSummary(d: PdbDetails) {
   const ss = d.secondaryStructure;
   return {

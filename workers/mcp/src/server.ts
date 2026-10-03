@@ -34,7 +34,9 @@ export const SERVER_VERSION = '1.0.0';
 
 const INSTRUCTIONS = `MolViewer shows public molecular structures in interactive 3D: PDB entries, AlphaFold DB models and PubChem small molecules.
 - To display a structure, call show_structure. If you only have a name, call find_structures first, unless you already know the exact PDB ID, UniProt accession or compound name.
-- For factual questions (helix and strand ranges, ligands, chains, citation) call get_structure_details; it doesn't open the viewer.
+- After show_structure, always answer in text too: a few sentences on what the structure is, from the facts the tool returns. The viewer shows only the picture.
+- For factual questions about a PDB entry, AlphaFold model or compound (method, resolution, authors and citation, chains, ligands, helix and strand ranges, confidence) call get_structure_details; it reads the source databases directly and doesn't open the viewer.
+- Citation authors come as surname and initials ("Teeter, M.M."). Keep them that way: never expand initials into first names.
 - MolViewer is for looking at structures. It never gives synthesis routes, doses or acquisition advice, and it refuses chemical warfare agents.`;
 
 const kindSchema = z.enum(['pdb', 'alphafold', 'compound']);
@@ -171,8 +173,10 @@ export function createServer(
     {
       title: 'Get structure details',
       description:
-        'Facts about a PDB entry, AlphaFold model or compound without opening the viewer: helix and beta-strand residue ranges per chain, sequences, ligands, citation and related entries for PDB; ' +
-        'function, confidence and experimental structures for AlphaFold. Use it to answer questions like "which residues form the beta sheets in 3DNI?".',
+        'Facts about a PDB entry, AlphaFold model or compound without opening the viewer, straight from RCSB PDB, PDBe, AlphaFold DB, UniProt and PubChem: ' +
+        'experimental method, resolution, release year, authors and citation, organism, chains, ligands, helix and beta-strand residue ranges per chain, sequences and related entries for PDB; ' +
+        'function, confidence and experimental structures for AlphaFold. Use it for questions like "what is the resolution of 1CRN and who published it?" or "which residues form the beta sheets in 3DNI?". ' +
+        'Citation authors are surname and initials; keep them as given.',
       inputSchema: z.object({
         kind: kindSchema.describe('pdb, alphafold or compound.'),
         id: z.string().min(1).max(100).describe(idDescription),

@@ -134,6 +134,16 @@ describe('show_structure', () => {
     expect(r.text).not.toContain('Note:');
   });
 
+  it('puts the key facts and a request to answer in the text, for every kind', async () => {
+    const compound = await showStructure({ kind: 'compound', id: 'caffeine' }, upstream());
+    expect(compound.text).toMatch(/Facts: Caffeine \(PubChem CID 2519\), formula C8H10N4O2/);
+    const pdb = await showStructure({ kind: 'pdb', id: '3DNI' }, upstream());
+    expect(pdb.text).toMatch(/Facts: .*PDB 3DNI.*X-ray diffraction at 2 Å.*1 polymer chain in the file/);
+    const af = await showStructure({ kind: 'alphafold', id: 'P69905' }, upstream());
+    expect(af.text).toMatch(/Facts: AlphaFold model of .*mean pLDDT \d+\.\d.*very high \(>90\)/);
+    for (const r of [compound, pdb, af]) expect(r.text).toContain('Now reply to the user in their language');
+  });
+
   it('reports unknown PDB IDs clearly', async () => {
     const r = await showStructure({ kind: 'pdb', id: 'ZZZ9' }, upstream());
     expect(r).toMatchObject({ isError: true, status: 'not_found' });

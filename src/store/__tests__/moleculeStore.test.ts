@@ -23,11 +23,51 @@ function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   };
 }
 
+/** A protein residue plus a ligand: classified as multi-component (smart defaults). */
+function createProteinWithLigand(): Molecule {
+  const atom = (id: number, name: string, element: string, residueName: string, residueNumber: number) => ({
+    id, name, element, x: id * 1.5, y: 0, z: 0, residueName, residueNumber, chainId: 'A',
+  });
+  return {
+    name: '4HHB',
+    atoms: [
+      atom(0, 'N', 'N', 'ALA', 1),
+      atom(1, 'CA', 'C', 'ALA', 1),
+      atom(2, 'C', 'C', 'ALA', 1),
+      atom(3, 'O', 'O', 'ALA', 1),
+      atom(4, 'FE', 'Fe', 'HEM', 2),
+      atom(5, 'C1', 'C', 'HEM', 2),
+    ],
+    bonds: [],
+  };
+}
+
 describe('moleculeStore', () => {
   beforeEach(() => {
     useMoleculeStore.getState().reset();
     // Clear undo history
     temporalStore.getState().clear();
+  });
+
+  describe('setStructureRepresentation with components', () => {
+    it('restyles the polymer components, keeps ligands, and restores cartoon', () => {
+      const store = () => useMoleculeStore.getState();
+      const id = store().addStructure(createProteinWithLigand(), '4HHB');
+      const components = () => store().structures.get(id)!.componentSettings;
+      const repOf = (type: string) => components().find((c) => c.type === type)?.representation;
+      expect(store().structures.get(id)!.classification?.hasMultipleTypes).toBe(true);
+      const ligandBefore = repOf('ligand');
+
+      store().setStructureRepresentation(id, 'stick');
+      expect(repOf('protein')).toBe('stick');
+      expect(repOf('ligand')).toBe(ligandBefore);
+
+      store().setStructureRepresentation(id, 'surface-vdw');
+      expect(repOf('protein')).toBe('stick');
+
+      store().setStructureRepresentation(id, 'cartoon');
+      expect(repOf('protein')).toBe('cartoon');
+    });
   });
 
   describe('addStructure', () => {

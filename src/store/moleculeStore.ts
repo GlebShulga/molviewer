@@ -84,7 +84,11 @@ import {
   classifyMolecule,
   type MoleculeClassification,
   type ComponentSettings,
+  type MoleculeComponentType,
 } from '../utils/moleculeTypeClassifier';
+
+/** Components that follow the structure's Style choice (the rest keep their smart defaults). */
+const POLYMER_COMPONENTS = new Set<MoleculeComponentType>(['protein', 'dna', 'rna']);
 
 // Re-export types for backward compatibility
 export type {
@@ -561,8 +565,23 @@ export const useMoleculeStore = create<MoleculeState>()(
     const structure = structures.get(id);
     if (!structure || structure.representation === rep) return; // Early exit if unchanged
 
+    // Multi-component structures (protein + ligands, ...) are drawn from
+    // componentSettings, so the new style must reach the polymer components too:
+    // otherwise picking Stick for 4HHB changes nothing. Ligands, ions and water
+    // keep their own styles; Cartoon restores the polymers' smart default.
+    // Surfaces are drawn from `representation` alone, so componentSettings stay
+    // as they were and switching back from a surface restores them.
+    const isSurface = rep === 'surface-vdw' || rep === 'surface-sas';
+    const newComponentSettings = isSurface
+      ? structure.componentSettings
+      : structure.componentSettings.map((cs) =>
+          POLYMER_COMPONENTS.has(cs.type)
+            ? { ...cs, representation: rep === 'cartoon' ? SMART_DEFAULTS[cs.type].representation : rep }
+            : cs
+        );
+
     const newStructures = new Map(structures);
-    newStructures.set(id, { ...structure, representation: rep });
+    newStructures.set(id, { ...structure, representation: rep, componentSettings: newComponentSettings });
     set({ structures: newStructures });
   },
 
