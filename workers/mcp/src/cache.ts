@@ -7,7 +7,7 @@ import type { ToolOutcome } from './tools';
 
 const TTL_SECONDS = 86400;
 /** Bump when the shape of tool results changes. */
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 
 function cacheStore(): Cache | undefined {
   return typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default : undefined;

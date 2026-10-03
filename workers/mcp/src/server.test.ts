@@ -66,11 +66,10 @@ describe('MCP server', () => {
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent).toMatchObject({ kind: 'pdb', id: '3DNI', shown: { style: 'cartoon' } });
     expect(readWidgetPayload(result._meta)?.load).toEqual({ kind: 'pdb', id: '3DNI' });
-    // The reply instruction is its own, first text block; the facts follow.
+    // One text block: description, facts, a short request to answer, the link.
     const blocks = result.content as { type: string; text: string }[];
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0].text).toMatch(/^The 3D viewer is already shown to the user/);
-    expect(blocks[1].text).toMatch(/^Showing 3DNI/);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].text).toMatch(/^Showing 3DNI.*Reply with 2-4 sentences/);
   });
 
   it('passes output-schema validation for every tool and kind', async () => {

@@ -135,15 +135,20 @@ describe('show_structure', () => {
   });
 
   it('sends a one-line caption of key facts for the viewer, for every kind', async () => {
-    const caption = async (args: Parameters<typeof showStructure>[0]) =>
-      readWidgetPayload((await showStructure(args, upstream())).meta)?.caption;
+    const NB = String.fromCharCode(0xa0);
+    const raw = async (args: Parameters<typeof showStructure>[0]) =>
+      readWidgetPayload((await showStructure(args, upstream())).meta)?.caption ?? '';
+    // Numbers and units are joined by non-breaking spaces; compare as plain text.
+    const caption = async (args: Parameters<typeof showStructure>[0]) => (await raw(args)).split(NB).join(' ');
+    expect(await raw({ kind: 'pdb', id: '4HHB' })).toContain(`1.74${NB}Å · 4${NB}chains`);
+    expect(await raw({ kind: 'compound', id: 'caffeine' })).toContain(`194.19${NB}g/mol`);
     expect(await caption({ kind: 'compound', id: 'caffeine' })).toBe('Caffeine · C8H10N4O2 · 194.19 g/mol · stimulants');
     expect(await caption({ kind: 'pdb', id: '4HHB' })).toMatch(/^4HHB · .*haemoglobin · X-ray 1\.74 Å · 4 chains$/i);
     expect(await caption({ kind: 'pdb', id: '1HHO' })).toMatch(/ · 2 of 4 chains \(tetrameric\)$/);
     expect(await caption({ kind: 'alphafold', id: 'P69905' })).toMatch(/^AlphaFold P69905 · Hemoglobin subunit alpha \(HBA1\) · mean pLDDT \d+ · Homo sapiens$/);
   });
 
-  it('leads with a request to answer, then the key facts, for every kind', async () => {
+  it('gives the key facts and a short request to answer, for every kind', async () => {
     const compound = await showStructure({ kind: 'compound', id: 'caffeine' }, upstream());
     expect(compound.text).toMatch(/Facts: Caffeine \(PubChem CID 2519\); .*formula C8H10N4O2/);
     // Compounds get substance beyond the formula: category and other names.
@@ -154,8 +159,8 @@ describe('show_structure', () => {
     const af = await showStructure({ kind: 'alphafold', id: 'P69905' }, upstream());
     expect(af.text).toMatch(/Facts: AlphaFold model of .*mean pLDDT \d+\.\d.*very high \(>90\)/);
     for (const r of [compound, pdb, af]) {
-      expect(r.lead).toMatch(/^The 3D viewer is already shown to the user, but it has no text\. You must now write a reply/);
-      expect(r.text).not.toContain('You must now write');
+      expect(r.text).toMatch(/^Showing /);
+      expect(r.text).toMatch(/Reply with 2-4 sentences in the user's language .* Full viewer: https:\/\/molviewer\.bio\//);
     }
   });
 

@@ -69,7 +69,7 @@ function normalize(text: string): string {
   return text
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '') // combining accents left by NFKD
     .replace(/β/g, 'beta')
     .replace(/α/g, 'alpha')
     .replace(/haem/g, 'hem')

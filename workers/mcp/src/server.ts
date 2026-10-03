@@ -75,7 +75,7 @@ const summarySchema = z.looseObject({
 
 function toResult(o: ToolOutcome): CallToolResult {
   return {
-    content: [...(o.lead ? [{ type: 'text' as const, text: o.lead }] : []), { type: 'text', text: o.text }],
+    content: [{ type: 'text', text: o.text }],
     ...(o.structuredContent ? { structuredContent: o.structuredContent } : {}),
     ...(o.meta ? { _meta: o.meta } : {}),
     ...(o.isError ? { isError: true } : {}),

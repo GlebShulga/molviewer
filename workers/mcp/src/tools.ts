@@ -43,8 +43,6 @@ import {
 
 /** What a tool returns, before it becomes an MCP CallToolResult. */
 export interface ToolOutcome {
-  /** Sent as its own text block before `text`: instructions the model should read first. */
-  lead?: string;
   text: string;
   structuredContent?: Record<string, unknown>;
   /** Widget-only `_meta` (hidden from the model). */
@@ -409,23 +407,21 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     pageUrl: r.pageUrl,
   };
   const colorWords = COLOR_WORDS[color];
-  // A separate first block: without it models often stay silent once the viewer
-  // renders, most of all for small molecules (browser test run, 2026-10-03).
-  const lead =
-    'The 3D viewer is already shown to the user, but it has no text. You must now write a reply in the user\'s language: ' +
-    '2-4 sentences on what this structure is and what is notable about it, using the facts below. ' +
-    "Don't describe colors or say that it is displayed.";
+  // ChatGPT often writes nothing after the viewer whatever this text says (three
+  // wordings tried in the 2026-10-03 test runs, including a separate first block,
+  // which seemed to make it worse). The key facts are in the viewer's caption,
+  // so this stays a short, plain request.
   const text = [
     `Showing ${r.title} as ${style}, colored by ${colorWords} in the 3D viewer.`,
     ...notes,
     r.facts && `Facts: ${r.facts}`,
+    "Reply with 2-4 sentences in the user's language on what this structure is, using these facts; don't describe the colors.",
     `Full viewer: ${r.pageUrl}`,
   ]
     .filter(Boolean)
     .join(' ');
 
   return {
-    lead,
     text,
     structuredContent: { ...r.summary, shown: { style, color } },
     meta: { [WIDGET_META_KEY]: payload },

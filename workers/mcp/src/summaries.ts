@@ -153,6 +153,9 @@ export function compoundFacts(c: {
 
 const SEP = ' · ';
 
+/** Non-breaking space: keeps a number with its unit when the caption wraps ("3 chains", "2.8 Å"). */
+const NB = String.fromCharCode(0xa0);
+
 /** "X-ray", "cryo-EM", "NMR": short enough for a caption. */
 function shortMethod(method: string | undefined): string | undefined {
   if (!method) return undefined;
@@ -171,9 +174,9 @@ export function pdbCaption(d: PdbDetails): string {
   const chains = !deposited
     ? undefined
     : assembled && assembled > deposited
-      ? `${deposited} of ${assembled} chains (${d.assembly?.oligomericDetails ?? 'assembly'})`
-      : `${deposited} chain${deposited === 1 ? '' : 's'}`;
-  return [d.id, shortName(d), method && (d.resolution ? `${method} ${d.resolution} Å` : method), chains].filter(Boolean).join(SEP);
+      ? `${deposited}${NB}of${NB}${assembled}${NB}chains (${d.assembly?.oligomericDetails ?? 'assembly'})`
+      : `${deposited}${NB}chain${deposited === 1 ? '' : 's'}`;
+  return [d.id, shortName(d), method && (d.resolution ? `${method}${NB}${d.resolution}${NB}Å` : method), chains].filter(Boolean).join(SEP);
 }
 
 export function afCaption(d: AfDetails): string {
@@ -182,7 +185,7 @@ export function afCaption(d: AfDetails): string {
   return [
     `AlphaFold ${d.id}`,
     protein && (d.gene ? `${protein} (${d.gene})` : protein),
-    d.meanPlddt !== undefined && `mean pLDDT ${Math.round(d.meanPlddt)}`,
+    d.meanPlddt !== undefined && `mean${NB}pLDDT${NB}${Math.round(d.meanPlddt)}`,
     d.organism,
   ]
     .filter(Boolean)
@@ -193,7 +196,7 @@ export function compoundCaption(c: { name?: string; title?: string; formula?: st
   return [
     c.name ?? c.title ?? `PubChem CID ${c.cid}`,
     c.formula,
-    c.weight && `${c.weight} g/mol`,
+    c.weight && `${c.weight}${NB}g/mol`,
     c.category && COMPOUND_CATEGORY_LABELS[c.category].toLowerCase(),
   ]
     .filter(Boolean)
