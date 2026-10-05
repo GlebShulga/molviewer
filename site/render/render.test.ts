@@ -13,6 +13,8 @@ import { fetchAfDetails } from '../upstream/af';
 import { fixtureFetch } from '../upstream/__fixtures__/fixtureFetch';
 import { SHELL_MARKER } from '../routing';
 import { LANDING_DATA_ELEMENT_ID } from '../landingData';
+import { renderFooter, CHATGPT_APP_URL } from '../nav';
+import { FEATURED_COLLECTIONS } from '../collections';
 
 const ORIGIN = 'https://molviewer.bio';
 // The shell as the build produces it: home content between the page-info markers,
@@ -275,5 +277,32 @@ describe('AlphaFold "no model" answers agree across pages', () => {
     const { fetchImpl } = fixtureFetch({ 'af-P69905.json': { status: 422 } });
     const { status } = renderAfLanding('P69905', await fetchAfDetails('P69905', { fetchImpl }), ORIGIN);
     expect(status).toBe(404);
+  });
+});
+
+describe('renderFooter', () => {
+  const groups = (html: string) => [...html.matchAll(/<details open><summary><h2>([^<]+)<\/h2>/g)].map((m) => m[1]);
+
+  it('ships four open groups with every featured collection in Topics', () => {
+    const html = renderFooter(FEATURED_COLLECTIONS);
+    expect(groups(html)).toEqual(['Viewers', 'Topics', 'Explore', 'Project']);
+    for (const c of FEATURED_COLLECTIONS) expect(html).toContain(`href="/collections/${c.slug}"`);
+    expect(FEATURED_COLLECTIONS).toHaveLength(8);
+  });
+
+  it('skips the Topics group rather than leaving an empty column', () => {
+    expect(groups(renderFooter())).toEqual(['Viewers', 'Explore', 'Project']);
+  });
+
+  it('gives share and compound-CID pages their Topics column too', () => {
+    const { meta } = renderShareLanding('abcdefgh1234', { structures: [] }, ORIGIN);
+    expect(meta.pageInfoHtml).toContain('<h2>Topics</h2>');
+  });
+
+  it('links the ChatGPT app from Explore, not from Project', () => {
+    const html = renderFooter(FEATURED_COLLECTIONS);
+    const explore = html.slice(html.indexOf('<h2>Explore</h2>'), html.indexOf('<h2>Project</h2>'));
+    expect(explore).toContain(CHATGPT_APP_URL);
+    expect(html.slice(html.indexOf('<h2>Project</h2>'))).not.toContain(CHATGPT_APP_URL);
   });
 });

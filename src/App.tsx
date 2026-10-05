@@ -27,7 +27,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { OnboardingProvider, useOnboardingContext, WelcomeScreen } from './components/onboarding';
 import { THEME_COLORS } from './config';
 import { isWebGL2Supported } from './utils/webglDetection';
-import { useInitialUrlLoad } from './hooks/useInitialUrlLoad';
+import { useInitialUrlLoad, loadStructureFromParams } from './hooks/useInitialUrlLoad';
 import { useUrlSync } from './hooks/useUrlSync';
 import { getWatermarkText } from './utils/watermark';
 import { track } from './utils/track';
@@ -78,8 +78,33 @@ function OnboardingSpotlight({ setSidebarOpen }: { setSidebarOpen: (open: boolea
 function EmptyOrWelcome() {
   const onboarding = useOnboardingContext();
 
+  // The example links under "Get started" load into the viewer; useUrlSync then
+  // puts the structure's path in the address bar, as for a sidebar load.
+  const { completeWithExample } = onboarding;
+  const loadExample = useCallback(async (path: string) => {
+    const params = parsePathnameParams(path);
+    if (!params) return;
+    const store = useMoleculeStore.getState();
+    store.setLoading(true);
+    try {
+      const { warning } = await loadStructureFromParams(params, new AbortController().signal, 'welcome_example');
+      if (warning) store.setError(warning);
+      completeWithExample();
+    } catch (err) {
+      store.setError(err instanceof Error ? err.message : 'Failed to load molecule');
+    } finally {
+      store.setLoading(false);
+    }
+  }, [completeWithExample]);
+
   if (onboarding.phase === 'welcome' || onboarding.phase === 'loading') {
-    return <WelcomeScreen onStart={onboarding.startTour} isLoading={onboarding.phase === 'loading'} />;
+    return (
+      <WelcomeScreen
+        onStart={onboarding.startTour}
+        isLoading={onboarding.phase === 'loading'}
+        onExample={loadExample}
+      />
+    );
   }
 
   return (
@@ -157,6 +182,13 @@ function AppContent() {
 
   // Check if we have any structures loaded
   const hasStructures = structureOrder.length > 0;
+
+  // The welcome screen carries its own heading, so the header tagline would be
+  // a second slogan on the same screen. It comes back as soon as the screen is
+  // gone, whichever way the first structure arrived (the onboarding phase alone
+  // would not say: a sidebar load leaves it at 'welcome').
+  const showWelcome =
+    !hasStructures && !isLoading && !error && (onboarding.phase === 'welcome' || onboarding.phase === 'loading');
 
   useEffect(() => {
     loadSavedMoleculesIndex();
@@ -338,7 +370,7 @@ function AppContent() {
           <Menu size={20} />
         </button>
         <span className={styles.brand} data-testid="app-title">MolViewer</span>
-        <span className={styles.tagline}>Interactive 3D Molecule Viewer</span>
+        {!showWelcome && <span className={styles.tagline}>Interactive 3D Molecule Viewer</span>}
         <a
           href="https://github.com/GlebShulga/molviewer"
           target="_blank"

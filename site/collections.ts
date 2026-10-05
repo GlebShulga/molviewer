@@ -1,6 +1,6 @@
 /**
  * Curated topic collections (data/collections.json): hub pages
- * (/collections/:slug), the home-page "Popular structures" grid and the
+ * (/collections/:slug), the Topics column in the site footer and the
  * "Part of" links on landing pages.
  */
 import data from '../data/collections.json';

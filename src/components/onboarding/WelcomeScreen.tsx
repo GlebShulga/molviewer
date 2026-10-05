@@ -1,12 +1,36 @@
+import type { MouseEvent } from 'react';
 import { WelcomeMolecule } from './WelcomeMolecule';
 import styles from './WelcomeScreen.module.css';
 
 interface WelcomeScreenProps {
   onStart: () => void;
   isLoading: boolean;
+  /** Loads an example into the viewer instead of following the link. */
+  onExample: (path: string) => void;
 }
 
-export function WelcomeScreen({ onStart, isLoading }: WelcomeScreenProps) {
+const EXAMPLES = [
+  { path: '/pdb/4HHB', label: 'Hemoglobin 4HHB' },
+  { path: '/af/P04637', label: 'p53 AlphaFold' },
+  { path: '/compound/caffeine', label: 'Caffeine' },
+];
+
+export function WelcomeScreen({ onStart, isLoading, onExample }: WelcomeScreenProps) {
+  // Real links, so they can be opened in a new tab and copied, but a plain
+  // click loads the structure in place instead of reloading the page. While the
+  // tour's demo molecule is on its way the links are inert: a second structure
+  // would load on top of it, and ending onboarding would close the tour that is
+  // about to start.
+  const handleExample = (e: MouseEvent<HTMLAnchorElement>, path: string) => {
+    if (isLoading) {
+      e.preventDefault();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    onExample(path);
+  };
+
   return (
     <div className={styles.welcome} data-onboarding="welcome-screen">
       <WelcomeMolecule />
@@ -22,11 +46,12 @@ export function WelcomeScreen({ onStart, isLoading }: WelcomeScreenProps) {
           <span>MolViewer</span>
         </div>
         <h2 className={styles.title}>
-          Interactive 3D<br />Molecule Viewer
+          Free online<br />3D molecule viewer
         </h2>
         <p className={styles.description}>
-          Explore protein structures, measure distances, and visualize molecules
-          in multiple representations.
+          View proteins, DNA, AlphaFold predictions and small molecules in 3D, right in
+          your browser. Enter a PDB ID, a UniProt accession or a compound name, or open
+          your own file. Free, open source, nothing to install.
         </p>
         <button
           className={styles.cta}
@@ -49,7 +74,22 @@ export function WelcomeScreen({ onStart, isLoading }: WelcomeScreenProps) {
             </svg>
           </span>
         </button>
-        <p className={styles.hint}>Supports PDB, SDF, MOL, XYZ</p>
+        <p className={`${styles.examples} ${isLoading ? styles.examplesDisabled : ''}`}>
+          or open an example:{' '}
+          {EXAMPLES.map((example, i) => (
+            <span key={example.path}>
+              {i > 0 && <span className={styles.separator}>·</span>}
+              <a
+                href={example.path}
+                aria-disabled={isLoading || undefined}
+                onClick={(e) => handleExample(e, example.path)}
+              >
+                {example.label}
+              </a>
+            </span>
+          ))}
+        </p>
+        <p className={styles.hint}>PDB, mmCIF, SDF, MOL, XYZ</p>
       </div>
     </div>
   );

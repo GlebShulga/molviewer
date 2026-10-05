@@ -1,9 +1,10 @@
 import type { ContentPage } from '../types';
+import { CHATGPT_APP_URL } from '../../nav';
 
 export const page: ContentPage = {
   path: '/support',
   kind: 'legal',
-  updated: '2026-10-02',
+  updated: '2026-10-05',
   title: 'Support and contact | MolViewer',
   description:
     'Get help with MolViewer and its ChatGPT and Claude app: report a bug, ask a question or suggest a feature by email or on GitHub. Free and open source.',
@@ -28,6 +29,7 @@ export const page: ContentPage = {
     {
       heading: 'The MolViewer app in ChatGPT and Claude',
       html:
+        `<p>In ChatGPT, add MolViewer from its <a href="${CHATGPT_APP_URL}" rel="noopener">page in the plugin directory</a>.</p>` +
         `<p>Ask the assistant to show a structure, for example "Show me hemoglobin in 3D", "What does caffeine look like?" or "Show the AlphaFold model of human p53". The viewer appears in the chat. Use "Open full viewer" for measurements, sharing and export on molviewer.bio.</p>` +
         `<ul>` +
         `<li><strong>Nothing appears:</strong> the source database may be slow or down. Use the Retry button in the viewer, or ask again a minute later.</li>` +

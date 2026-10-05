@@ -8,6 +8,7 @@
 import type { ShellMeta } from './shell';
 import { escapeHtml } from './html';
 import { renderFooter } from '../nav';
+import { FEATURED_COLLECTIONS } from '../collections';
 import { ogImageUrl } from '../ogImages';
 import { sourceRoute, structurePath, type SourceLike, type StructureRoute } from '../routes';
 
@@ -101,7 +102,7 @@ export function renderShareLanding(
 <ul>${list}</ul>
 <p><a href="/s/${escapeHtml(id)}">Permanent link to this scene</a></p>
 </div>
-${renderFooter()}`,
+${renderFooter(FEATURED_COLLECTIONS)}`,
     },
   };
 }

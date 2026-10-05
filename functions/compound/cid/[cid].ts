@@ -12,6 +12,7 @@ import { fetchPubchemSummary } from '../../../site/upstream/pubchem';
 import { isGetOrHead, shellResponse } from '../../../site/render/respond';
 import { escapeHtml } from '../../../site/render/html';
 import { renderFooter } from '../../../site/nav';
+import { FEATURED_COLLECTIONS } from '../../../site/collections';
 
 export const onRequest: PagesFunction = async ({ request, params, next }) => {
   const raw = String(params.cid ?? '');
@@ -36,7 +37,7 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
         description: `PubChem has no compound with CID ${cid}.`,
         canonicalUrl: null,
         robots: 'noindex, follow',
-        pageInfoHtml: `<div class="page-info-inner"><h1>PubChem CID ${cid} not found</h1><p class="lead">PubChem has no compound with this ID. Search by name in the PubChem box in the sidebar, or browse <a href="/compounds">small molecules</a>.</p></div>${renderFooter()}`,
+        pageInfoHtml: `<div class="page-info-inner"><h1>PubChem CID ${cid} not found</h1><p class="lead">PubChem has no compound with this ID. Search by name in the PubChem box in the sidebar, or browse <a href="/compounds">small molecules</a>.</p></div>${renderFooter(FEATURED_COLLECTIONS)}`,
       },
       404
     );
@@ -50,6 +51,6 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
     description: `Interactive 3D model of ${name}${formula} from PubChem. Rotate it and measure bond lengths and angles, free in your browser.`,
     canonicalUrl: null,
     robots: 'noindex, follow',
-    pageInfoHtml: `<div class="page-info-inner"><h1>${escapeHtml(name)} in 3D</h1><p class="lead">PubChem compound CID ${cid}${escapeHtml(formula)}. <a href="https://pubchem.ncbi.nlm.nih.gov/compound/${cid}" rel="noopener">View on PubChem</a>.</p><p><a class="more" href="/compounds">Browse curated small molecules</a></p></div>${renderFooter()}`,
+    pageInfoHtml: `<div class="page-info-inner"><h1>${escapeHtml(name)} in 3D</h1><p class="lead">PubChem compound CID ${cid}${escapeHtml(formula)}. <a href="https://pubchem.ncbi.nlm.nih.gov/compound/${cid}" rel="noopener">View on PubChem</a>.</p><p><a class="more" href="/compounds">Browse curated small molecules</a></p></div>${renderFooter(FEATURED_COLLECTIONS)}`,
   });
 };

@@ -1,5 +1,5 @@
 {
-  "_comment": "Topic collections for /collections/:slug hub pages. The first 8 entries with featured=true form the home-page 'Popular structures' grid, in this order. Every pdb item must exist in popularPdbs.json and every af item in alphafold.json; run scripts/validate-ids.ts --check after editing.",
+  "_comment": "Topic collections for /collections/:slug hub pages. The 8 entries with featured=true fill the Topics column in the site footer (and the list on 404 PDB pages), in this order. Every pdb item must exist in popularPdbs.json and every af item in alphafold.json; run scripts/validate-ids.ts --check after editing.",
   "collections": [
     {
       "slug": "hemoglobin-oxygen-transport",

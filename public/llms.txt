@@ -21,6 +21,7 @@
 - Embeddable viewer: https://molviewer.bio/embed/pdb/{PDB_ID} (also /embed/af/..., /embed/compound/...), with ?spin=1 and ?bg=light. oEmbed: https://molviewer.bio/oembed?url=...
 - Topic collections: https://molviewer.bio/collections
 - Guides: https://molviewer.bio/learn (reading PDB files, helices and β-sheets, AlphaFold models, pLDDT)
+- MolViewer app for ChatGPT (shows the 3D viewer in the chat): https://chatgpt.com/plugins/plugin_asdk_app_6ac11a7d87588191b586f23b757df123. MCP server: https://mcp.molviewer.bio/mcp
 - Format-specific viewers: /pdb-viewer, /alphafold-viewer, /mmcif-viewer, /sdf-viewer, /xyz-viewer; comparison with other tools: /compare
 
 ## Technology
