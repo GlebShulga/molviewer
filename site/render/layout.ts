@@ -5,6 +5,7 @@
  */
 import { escapeHtml, jsonForScript } from './html';
 import { SITE_NAME, SITE_ORIGIN, TOOL_LINKS, renderFooter } from '../nav';
+import { FEATURED_COLLECTIONS } from '../collections';
 
 export interface Crumb {
   label: string;
@@ -76,6 +77,7 @@ export function renderStaticDocument(doc: StaticDocument): string {
 <head>
 <meta charset="UTF-8">
 <script src="/theme-init.js"></script>
+<script src="/footer.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${t}</title>
 <meta name="description" content="${d}">
@@ -103,7 +105,7 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${jsonForScript(j)}</scr
 ${doc.breadcrumbs?.length ? renderBreadcrumbs(doc.breadcrumbs) : ''}
 ${doc.mainHtml}
 </main>
-${renderFooter(doc.footerCollections ?? [])}
+${renderFooter(doc.footerCollections ?? FEATURED_COLLECTIONS)}
 ${ANALYTICS_SNIPPET}
 </body>
 </html>

@@ -347,41 +347,129 @@
   font-size: 0.9375rem;
 }
 
-/* Footer (static pages and below the viewer) */
+/* Footer (static pages and below the viewer).
+   Must stay below the generic .page-info / .static-page rules above: the
+   footer's own <details> and <h2> rules have the same specificity as those and
+   win only on source order. */
 .site-footer {
   max-width: var(--content-width, 960px);
-  margin: 24px auto 0;
-  padding: 24px 16px 40px;
-  border-top: 1px solid var(--border-color);
+  margin: 0 auto;
+  padding: 40px 16px 0;
   font-size: 0.875rem;
+}
+
+/* A rule above the footer only where content sits above it. On the home page
+   #page-info holds nothing else, and its own border-top is that rule. */
+.page-info-inner + .site-footer,
+.static-page main + .site-footer {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
 }
 
 .site-footer nav {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px 32px;
 }
 
 .site-footer h2 {
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 
 .site-footer ul {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
 .site-footer li {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.site-footer nav a {
+  color: var(--text-primary);
+}
+
+.site-footer nav a:hover {
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+/* Footer groups are <details> so they can collapse on phones. None of the
+   framed-details styling used for FASTA blocks applies to them. */
+.site-footer details {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.site-footer details > :not(summary) {
+  padding: 0;
+}
+
+.site-footer summary {
+  padding: 0;
+  font-weight: inherit;
+  list-style: none;
+  cursor: default;
+}
+
+.site-footer summary::-webkit-details-marker {
+  display: none;
+}
+
+.site-footer summary .chev {
+  display: none;
 }
 
 .site-footer-note {
-  margin-top: 16px;
+  margin-top: 32px;
+  padding: 16px 0 28px;
+  border-top: 1px solid var(--border-color);
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+/* The page's only H1 on the home page: in the HTML in every state, off screen. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* On the home page #page-info holds nothing but the footer, which lines up
+   with the app header's brand. Landing pages (/pdb/…, /af/…, /compound/…,
+   /s/…) keep their centered column, footer included. */
+.page-info .site-footer {
+  max-width: 1120px;
+  margin-inline: 0;
+  padding-inline: 24px;
+}
+
+.page-info .page-info-inner + .site-footer {
+  max-width: var(--content-width, 960px);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+@media (max-width: 1024px) {
+  .site-footer nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
@@ -393,5 +481,63 @@
   .page-info-inner,
   .static-page main {
     padding-top: 24px;
+  }
+
+  .page-info .site-footer {
+    padding-inline: 16px;
+  }
+
+  /* Phones: one collapsible group per row (public/footer.js closes them). */
+  .site-footer {
+    padding-top: 8px;
+  }
+
+  .site-footer nav {
+    display: block;
+  }
+
+  .site-footer details {
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .site-footer summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    cursor: pointer;
+  }
+
+  .site-footer summary h2 {
+    margin: 0;
+    font-size: 0.75rem;
+  }
+
+  .site-footer summary .chev {
+    display: block;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+  }
+
+  .site-footer details[open] .chev {
+    transform: rotate(180deg);
+  }
+
+  .site-footer details ul {
+    padding-bottom: 12px;
+  }
+
+  .site-footer li {
+    margin-bottom: 0;
+  }
+
+  .site-footer li a {
+    display: block;
+    padding: 7px 0;
+  }
+
+  .site-footer-note {
+    margin-top: 0;
+    border-top: 0;
   }
 }

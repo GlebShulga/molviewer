@@ -38,15 +38,15 @@
   color: var(--text-primary);
   letter-spacing: -0.02em;
   line-height: 1.15;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .description {
-  max-width: 380px;
+  max-width: 520px;
   color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.6;
-  margin-bottom: 36px;
+  margin-bottom: 28px;
 }
 
 .cta {
@@ -109,6 +109,28 @@
   }
 }
 
+.examples {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.examples a {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* While the demo molecule loads, so a click cannot start a second load. */
+.examplesDisabled a {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.separator {
+  margin: 0 6px;
+  opacity: 0.5;
+}
+
 .hint {
   font-size: 12px;
   color: var(--text-secondary);
@@ -131,7 +153,13 @@
 
   .description {
     font-size: 13px;
+    max-width: 320px;
+    margin-bottom: 24px;
+  }
+
+  .examples {
     max-width: 300px;
+    line-height: 1.8;
   }
 
   .cta {

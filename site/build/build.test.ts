@@ -66,7 +66,7 @@ describe('embeds', () => {
 });
 
 describe('collections data', () => {
-  it('has the 8 featured home-page topics with unique slugs', () => {
+  it('has the 8 featured collections with unique slugs', () => {
     expect(FEATURED_COLLECTIONS).toHaveLength(8);
     expect(new Set(COLLECTIONS.map((c) => c.slug)).size).toBe(COLLECTIONS.length);
   });

@@ -47,6 +47,29 @@ function trackSource(source: StructureSource): string {
   return source.type === 'alphafold' ? 'af' : source.type === 'inline' ? 'file' : source.type;
 }
 
+/**
+ * Loads one structure from parsed URL params and adds it to the store. Shared
+ * by the startup load below and the example links on the welcome screen
+ * (src/App.tsx), so both report the same event. Everything that belongs to the
+ * startup load only (view params, embed tracking, the initial-load gate) stays
+ * at the call site.
+ */
+export async function loadStructureFromParams(
+  params: UrlMoleculeParams,
+  signal: AbortSignal,
+  /** Goes into the event's `value`, to tell example clicks from URL loads. */
+  via?: string
+): Promise<{ structId: string | null; source: StructureSource; warning?: string }> {
+  const store = useMoleculeStore.getState();
+  const source = await toSource(params, signal);
+  const { molecule, name, warning } = await loadStructureFromSource(source, signal);
+  if (signal.aborted) return { structId: null, source, warning };
+
+  const structId = store.addStructure(molecule, name, source);
+  track('structure_loaded', { source: trackSource(source), entry: entryKind(), ...(via ? { value: via } : {}) });
+  return { structId, source, warning };
+}
+
 export function useInitialUrlLoad(): void {
   useEffect(() => {
     if (useMoleculeStore.getState().structureOrder.length > 0) {
@@ -99,17 +122,14 @@ export function useInitialUrlLoad(): void {
     (async () => {
       store().setLoading(true);
       try {
-        const source = await toSource(params, signal);
-        const { molecule, name, warning } = await loadStructureFromSource(source, signal);
+        const { structId, source, warning } = await loadStructureFromParams(params, signal);
         if (signal.aborted) return;
 
-        const structId = store().addStructure(molecule, name, source);
         if (structId) {
           if (viewParams.repr) store().setStructureRepresentation(structId, viewParams.repr);
           if (viewParams.color) store().setStructureColorScheme(structId, viewParams.color);
         }
         if (warning) store().setError(warning);
-        track('structure_loaded', { source: trackSource(source), entry: entryKind() });
         if (params.embed) {
           track('embed_view', { source: trackSource(source), ref: referrerHost() });
         }

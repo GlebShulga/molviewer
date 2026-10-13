@@ -8,6 +8,8 @@ View proteins, DNA and RNA from the PDB, AlphaFold predictions and PubChem small
 
 Try it: [hemoglobin 4HHB](https://molviewer.bio/pdb/4HHB) · [p53 AlphaFold model](https://molviewer.bio/af/P04637) · [caffeine](https://molviewer.bio/compound/caffeine) · [structure collections](https://molviewer.bio/collections)
 
+**In ChatGPT:** add the [MolViewer app](https://chatgpt.com/plugins/plugin_asdk_app_6ac11a7d87588191b586f23b757df123) and ask "Show me hemoglobin in 3D": the viewer opens right in the chat.
+
 <!-- After the first Zenodo release, add its DOI badge here, e.g.
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
 

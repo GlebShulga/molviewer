@@ -16,6 +16,8 @@ export interface OnboardingState {
   nextStep: () => void;
   prevStep: () => void;
   skipTour: () => void;
+  /** The visitor started from an example link instead of the tour. */
+  completeWithExample: () => void;
 }
 
 function isOnboardingCompleted(): boolean {
@@ -107,5 +109,13 @@ export function useOnboarding(): OnboardingState {
     track('onboarding_completed', { value: 'skipped' });
   }, []);
 
-  return { phase, tourStep, startTour, nextStep, prevStep, skipTour };
+  // An example link is a way through onboarding too: the welcome screen does
+  // not come back on the next visit, or if the viewer is emptied again.
+  const completeWithExample = useCallback(() => {
+    markOnboardingCompleted();
+    setPhase('completed');
+    track('onboarding_completed', { value: 'example' });
+  }, []);
+
+  return { phase, tourStep, startTour, nextStep, prevStep, skipTour, completeWithExample };
 }
