@@ -15,6 +15,7 @@ import { SITE_ORIGIN } from '../../../site/nav';
 import { structurePath } from '../../../site/routes';
 import type { AppKind } from '../../../site/appContract';
 import { UNIPROT_RE } from '../../../site/identifiers';
+import { hasPart } from '../../../site/upstream/text';
 
 export const PDB_SEEDS: PdbSeed[] = (pdbData as { pdbs: PdbSeed[] }).pdbs;
 export const AF_SEEDS: AfSeed[] = (afData as { entries: AfSeed[] }).entries;
@@ -254,18 +255,6 @@ export function searchCatalog(query: string, kind: AppKind | 'any', limit: numbe
   }
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit).map((s) => s.entry.result);
-}
-
-/** Whole-word match, or a prefix for words of 4+ letters ("hemoglobin" finds "hemoglobins"). */
-function hasWord(haystack: string, token: string): boolean {
-  const padded = ` ${haystack} `;
-  if (padded.includes(` ${token} `)) return true;
-  return token.length >= 4 && padded.includes(` ${token}`);
-}
-
-/** hasWord, or inside a longer word for 5+ letters ("hemoglobin" finds "deoxyhemoglobin"). */
-function hasPart(haystack: string, token: string): boolean {
-  return hasWord(haystack, token) || (token.length >= 5 && haystack.includes(token));
 }
 
 /** True when a catalog compound's name, slug or synonym equals the query (as written or without filler). */

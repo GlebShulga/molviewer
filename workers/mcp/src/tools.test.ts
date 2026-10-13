@@ -118,6 +118,37 @@ describe('find_structures', () => {
     expect(r.text).toMatch(/^Too general/);
   });
 
+  it('says when UniProt\'s best match has no AlphaFold model (titin)', async () => {
+    const entry = (accession: string, name: string, gene: string) =>
+      ({ primaryAccession: accession, proteinDescription: { recommendedName: { fullName: { value: name } } }, genes: [{ geneName: { value: gene } }], organism: { scientificName: 'Homo sapiens' } });
+    const r = await findStructures(
+      { query: 'titin', kind: 'alphafold', limit: 3 },
+      upstream({
+        'uniprot-search-titin-human.json': { status: 200, body: JSON.stringify({ results: [entry('Q8WZ42', 'Titin', 'TTN'), entry('O15273', 'Telethonin', 'TCAP')] }) },
+        'af-O15273.json': { status: 200, body: '[{}]' },
+      })
+    );
+    expect(r.status).toBe('ok');
+    expect((r.structuredContent?.results as { id: string }[]).map((x) => x.id)).toContain('O15273');
+    expect(r.text).toContain("UniProt's best match, Titin (Homo sapiens, Q8WZ42), has no AlphaFold DB model.");
+    expect(r.diag?.sources).toMatch(/ p- r- u1\/1!$/);
+    expect(r.cacheable).toBe(true);
+  });
+
+  it('shows experimental PDB structures when nothing UniProt found has an AlphaFold model', async () => {
+    const r = await findStructures(
+      { query: 'zz virus protease', kind: 'alphafold', limit: 3 },
+      upstream({
+        'uniprot-search-zz-virus-protease.json': { status: 200, body: '{"results":[{"primaryAccession":"P04585","proteinDescription":{"recommendedName":{"fullName":{"value":"Gag-Pol polyprotein"}}}}]}' },
+        'rcsb-fulltext-zz-virus-protease.json': { status: 200, body: '{"result_set":[{"identifier":"9ABC"}]}' },
+      })
+    );
+    expect(r.status).toBe('ok');
+    expect(r.structuredContent?.results).toEqual([expect.objectContaining({ kind: 'pdb', id: '9ABC' })]);
+    expect(r.text).toMatch(/has no AlphaFold DB model\. .* Showing experimental PDB structures instead\.\n- pdb 9ABC/);
+    expect(r.diag?.sources).toBe('c0 p- r1 u0/1!');
+  });
+
   it('refuses chemical warfare agents and drops them from mixed results', async () => {
     const compound = await findStructures({ query: 'sarin', kind: 'compound' }, upstream());
     expect(compound).toMatchObject({ isError: true, status: 'denied' });
@@ -166,7 +197,7 @@ describe('find_structures analytics', () => {
     const uniprot = await findStructures({ query: 'zzz p53', kind: 'alphafold', limit: 3 }, upstream({
       'uniprot-search-zzz-p53-human.json': { status: 200, body: '{"results":[{"primaryAccession":"P04637"}]}' },
     }));
-    expect(uniprot.diag?.sources).toBe('c0 p- r- u1');
+    expect(uniprot.diag?.sources).toBe('c0 p- r- u1/0');
   });
 
   it('reports an empty search with a failed source as upstream_error', async () => {

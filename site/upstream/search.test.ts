@@ -50,13 +50,56 @@ describe('searchUniProt', () => {
     expect(r.status === 'ok' && r.data[0].accession).toBe('P00722');
   });
 
-  it('drops hits without an AlphaFold model but keeps hits whose check failed', async () => {
+  it('marks hits without an AlphaFold model, in UniProt order, and counts failed checks as a model', async () => {
     const { fetchImpl } = fixtureFetch({
       'af-O15350.json': { status: 404 },
       'af-Q00987.json': { status: 503 },
     });
     const r = await searchUniProt('p53', 3, { fetchImpl });
-    expect(r.status === 'ok' && r.data.map((h) => h.accession)).toEqual(['P04637', 'Q00987']);
+    expect(r.status === 'ok' && r.data.map((h) => [h.accession, h.hasModel])).toEqual([
+      ['P04637', true],
+      ['O15350', false],
+      ['Q00987', true],
+    ]);
+  });
+
+  it('searches all organisms when no human entry is named like the query', async () => {
+    const entry = (accession: string, name: string, organism: string) =>
+      ({ primaryAccession: accession, proteinDescription: { recommendedName: { fullName: { value: name } } }, organism: { scientificName: organism } });
+    const human = { status: 200, body: JSON.stringify({ results: [entry('O00370', 'LINE-1 retrotransposable element ORF2 protein', 'Homo sapiens')] }) };
+    const all = { status: 200, body: JSON.stringify({ results: [entry('Q99ZW2', 'CRISPR-associated endonuclease Cas9/Csn1', 'Streptococcus pyogenes')] }) };
+
+    const wider = fixtureFetch({ 'uniprot-search-cas9-human.json': human, 'uniprot-search-cas9.json': all });
+    const r = await searchUniProt('cas9', 3, { fetchImpl: wider.fetchImpl });
+    expect(wider.calls[1]).not.toContain('9606');
+    expect(r.status === 'ok' && r.data.map((h) => h.accession)).toEqual(['Q99ZW2']);
+
+    // Nothing better among all organisms (none, or none named like the query): keep the human entries.
+    const unrelated = { status: 200, body: JSON.stringify({ results: [entry('Q873X9', 'Endochitinase B1', 'Aspergillus fumigatus')] }) };
+    for (const other of [{ status: 200, body: '{"results":[]}' }, unrelated]) {
+      const none = fixtureFetch({ 'uniprot-search-cas9-human.json': human, 'uniprot-search-cas9.json': other });
+      const kept = await searchUniProt('cas9', 3, { fetchImpl: none.fetchImpl });
+      expect(kept.status === 'ok' && kept.data.map((h) => h.accession)).toEqual(['O00370']);
+    }
+  });
+
+  it('keeps human first when a human entry is named like the query (Ig lambda is not phage lambda)', async () => {
+    const lambda = {
+      status: 200,
+      body: JSON.stringify({ results: [{ primaryAccession: 'P0DOY2', proteinDescription: { recommendedName: { fullName: { value: 'Immunoglobulin lambda constant 2' } } } }] }),
+    };
+    const { fetchImpl, calls } = fixtureFetch({ 'uniprot-search-ig-lambda-light-chain-human.json': lambda });
+    const r = await searchUniProt('Ig lambda light chain', 3, { fetchImpl });
+    expect(calls.filter((u) => u.includes('uniprotkb/search'))).toEqual([expect.stringContaining('organism_id%3A9606')]);
+    expect(r.status === 'ok' && r.data[0].accession).toBe('P0DOY2');
+  });
+
+  it('skips the human filter for viruses and other organisms named in the query', async () => {
+    for (const q of ['Ebola glycoprotein', 'T4 lysozyme', 'rice rubisco', 'SARS-CoV-2 spike']) {
+      const { fetchImpl, calls } = fixtureFetch();
+      await searchUniProt(q, 3, { fetchImpl });
+      expect(calls[0], q).not.toContain('9606');
+    }
   });
 
   it('falls back to all organisms when no human protein matches', async () => {

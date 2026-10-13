@@ -125,7 +125,10 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   const results: FoundStructure[] = searchCatalog(args.query, kind, limit).filter(
     (r) => r.kind !== 'compound' || (allowCompounds && !isDeniedCompound({ cid: findCompound(r.id)?.cid, names: [r.title] }))
   );
-  const notes: string[] = [];
+  // Outages: the answer is returned but not cached.
+  const degraded: string[] = [];
+  // Explanations for the model, part of the answer (cached).
+  const info: string[] = [];
   const catalogCount = results.length;
   let sources = 'p- r- u-';
 
@@ -138,11 +141,24 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     const wantPdb = needMore && (kind === 'pdb' || kind === 'any');
     const wantAf = needMore && (kind === 'alphafold' || (kind === 'any' && (AF_HINT.test(args.query) || results.length === 0)));
 
-    const [pubchem, rcsb, uniprot] = await Promise.all([
+    const [pubchem, firstRcsb, uniprot] = await Promise.all([
       wantCompound ? lookupCompound(compoundName, upstream) : null,
       wantPdb && text ? searchRcsb(text, limit, upstream) : null,
       wantAf && text ? searchUniProt(text, Math.min(limit, 5), upstream) : null,
     ]);
+    const uniprotHits = uniprot?.status === 'ok' ? uniprot.data : [];
+    const top = uniprotHits[0];
+    if (top && !top.hasModel) {
+      const where = [top.organism, top.accession].filter(Boolean).join(', ');
+      info.push(
+        `UniProt's best match, ${top.proteinName ?? top.accession} (${where}), has no AlphaFold DB model. ` +
+          'AlphaFold DB has few viral proteins and no proteins longer than 2,700 residues.'
+      );
+    }
+    // Nothing with a model (often a viral or very long protein): experimental structures are the next best answer.
+    const pdbInstead = kind === 'alphafold' && !results.length && uniprotHits.length > 0 && !uniprotHits.some((h) => h.hasModel);
+    const rcsb = pdbInstead ? await searchRcsb(text, limit, upstream) : firstRcsb;
+    if (pdbInstead && rcsb?.status === 'ok') info.push('Showing experimental PDB structures instead.');
 
     // An exact PubChem name match beats partial catalog matches: it goes first. In
     // mixed searches only small molecules do: PubChem also names peptides and
@@ -166,26 +182,26 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
             pageUrl: pdbPageUrl(e.id),
           }))
         : [];
-    const fromUniprot: FoundStructure[] =
-      uniprot?.status === 'ok'
-        ? uniprot.data.map((h) => ({
-            kind: 'alphafold',
-            id: h.accession,
-            title: h.proteinName ?? h.accession,
-            subtitle: [h.organism, h.gene, h.length ? `${h.length} residues` : ''].filter(Boolean).join(', ') || undefined,
-            why: 'UniProt search, AlphaFold model available',
-            pageUrl: afPageUrl(h.accession),
-          }))
-        : [];
-    // Degraded answers are returned but not cached (cacheable: false below).
-    if (pubchem?.error) notes.push('PubChem did not answer');
-    if (rcsb?.status === 'error') notes.push('RCSB search did not answer');
-    if (rcsb?.status === 'ok' && rcsb.data.some((e) => !e.title)) notes.push('RCSB titles are temporarily unavailable');
-    if (uniprot?.status === 'error') notes.push('UniProt search did not answer');
+    const fromUniprot: FoundStructure[] = uniprotHits
+      .filter((h) => h.hasModel)
+      .map((h) => ({
+        kind: 'alphafold',
+        id: h.accession,
+        title: h.proteinName ?? h.accession,
+        subtitle: [h.organism, h.gene, h.length ? `${h.length} residues` : ''].filter(Boolean).join(', ') || undefined,
+        why: 'UniProt search, AlphaFold model available',
+        pageUrl: afPageUrl(h.accession),
+      }));
+    if (pubchem?.error) degraded.push('PubChem did not answer');
+    if (rcsb?.status === 'error') degraded.push('RCSB search did not answer');
+    if (rcsb?.status === 'ok' && rcsb.data.some((e) => !e.title)) degraded.push('RCSB titles are temporarily unavailable');
+    if (uniprot?.status === 'error') degraded.push('UniProt search did not answer');
+    // UniProt: with a model / without, and "!" when the best match has none.
+    const uniprotSources = `${fromUniprot.length}/${uniprotHits.length - fromUniprot.length}${top && !top.hasModel ? '!' : ''}`;
     sources = [
       `p${!pubchem ? '-' : pubchem.hit ? 1 : pubchem.error ? 'e' : 0}`,
       `r${!rcsb ? '-' : rcsb.status === 'error' ? 'e' : fromRcsb.length}`,
-      `u${!uniprot ? '-' : uniprot.status === 'error' ? 'e' : fromUniprot.length}`,
+      `u${!uniprot ? '-' : uniprot.status === 'error' ? 'e' : uniprotSources}`,
     ].join(' ');
 
     const ordered = [
@@ -204,13 +220,13 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   if (!results.length) {
     const text = deniedQuery
       ? REFUSAL_MESSAGE
-      : `No structures found for "${args.query}". Try another name, a 4-character PDB ID or a UniProt accession.`;
+      : [`No structures found for "${args.query}". Try another name, a 4-character PDB ID or a UniProt accession.`, ...info].join(' ');
     return {
-      text: notes.length ? `${text} (${notes.join('; ')}.)` : text,
+      text: degraded.length ? `${text} (${degraded.join('; ')}.)` : text,
       structuredContent: { query: args.query, results: [] },
       // A source being down is not the same as nothing to find.
-      status: deniedQuery ? 'denied' : notes.length ? 'upstream_error' : 'not_found',
-      cacheable: notes.length === 0,
+      status: deniedQuery ? 'denied' : degraded.length ? 'upstream_error' : 'not_found',
+      cacheable: degraded.length === 0,
       diag,
     };
   }
@@ -218,10 +234,12 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   return {
     text:
       `Found ${results.length} for "${args.query}", best match first. Unless the user asked for something specific ` +
-      `(a state, variant, organism or ligand), show the first one with show_structure.\n${lines.join('\n')}`,
+      `(a state, variant, organism or ligand), show the first one with show_structure.\n` +
+      (info.length ? `${info.join(' ')}\n` : '') +
+      lines.join('\n'),
     structuredContent: { query: args.query, results },
     status: 'ok',
-    cacheable: notes.length === 0,
+    cacheable: degraded.length === 0,
     diag,
   };
 }

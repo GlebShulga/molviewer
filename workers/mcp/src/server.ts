@@ -30,7 +30,7 @@ export interface Env {
   CHATGPT_WIDGET_DOMAIN?: string;
 }
 
-export const SERVER_VERSION = '1.0.0';
+export const SERVER_VERSION = '1.0.1';
 
 const INSTRUCTIONS = `MolViewer shows public molecular structures in interactive 3D: PDB entries, AlphaFold DB models and PubChem small molecules.
 - To display a structure, call show_structure. If you only have a name, call find_structures first, unless you already know the exact PDB ID, UniProt accession or compound name.
