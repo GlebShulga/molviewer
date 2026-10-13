@@ -129,6 +129,8 @@ export function createServer(
       description:
         'Search for molecular structures by name and get their IDs: proteins and nucleic acids in the PDB, AlphaFold predicted models, and small molecules in PubChem. ' +
         'Use it for requests like "hemoglobin", "insulin hexamer", "caffeine" or "human p53 AlphaFold". ' +
+        'Pass a short English name, not a sentence: translate names from other languages and leave out words like "show", "3D" or "ball and stick". ' +
+        'AlphaFold DB has no models for most viral proteins and for very long proteins; search kind "pdb" for those. ' +
         'Curated MolViewer catalogs are searched first, then RCSB, UniProt and PubChem. Returns IDs to pass to show_structure or get_structure_details, ' +
         'best match first: the first result is the canonical, complete structure, so prefer it unless the user asked for a specific state, variant or organism.',
       inputSchema: z.object({

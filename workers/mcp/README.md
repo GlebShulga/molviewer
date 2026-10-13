@@ -73,6 +73,7 @@ The widget bundle ships with the site (`pnpm build` writes `dist/widget/v1/`), s
 6. Run the scan, fix anything it reports, and submit.
 
 Server changes go live after OpenAI's daily rescan if they pass the automatic checks. Listing changes (descriptions, test cases) need a new ZIP.
+You can request a rescan under MCPs; tool metadata changes go through the same scan. A `tools/list` snapshot in `server.test.ts` flags any change to tool names, descriptions or schemas.
 
 For Claude: add `https://mcp.molviewer.bio/mcp` as a custom connector; the same server and widget work there. Submitting to Anthropic's connector directory is a separate later step.
 
@@ -80,5 +81,5 @@ For Claude: add `https://mcp.molviewer.bio/mcp` as a custom connector; the same 
 
 - **Rate limits** (`wrangler.toml`, `src/rateLimit.ts`): 600 tool calls/min per connecting IP on every call (a chat provider's users share its few IPs; this mainly caps one abusive client), 30/min per ChatGPT user (`openai/subject`) when one is sent, and about 3,000/min overall. Claude sends no user id, so all Claude users together share the per-IP allowance of Anthropic's servers: watch `rate_limited` outcomes in `query-events.ts --app` and raise `IP_LIMIT` if they appear. The overall limit is counted per Cloudflare location, so it's approximate.
 - **Caching:** tool results for 24 h in the Cache API (`src/cache.ts`); upstream responses are edge-cached too. Bump `CACHE_VERSION` when result shapes change.
-- **Analytics:** `mcp_tool_call` points (tool, kind, client, outcome, seconds; never search text or IDs) go to the site's `molviewer_events` dataset, and the widget sends `widget_view` / `widget_open_full`. Summary: `pnpm exec tsx scripts/query-events.ts --app 30`.
+- **Analytics:** `mcp_tool_call` points (tool, kind, client, outcome, seconds; for `find_structures` also the query shape, word count and what each source returned; never search text or IDs) go to the site's `molviewer_events` dataset, and the widget sends `widget_view` / `widget_open_full`. Summary: `pnpm exec tsx scripts/query-events.ts --app 30`; why searches come back empty: `--search 7`.
 - **Logs:** Workers observability is enabled; tail live with `pnpm wrangler tail -c workers/mcp/wrangler.toml`.
