@@ -51,6 +51,7 @@ One-time setup:
 1. **Workers Paid plan** ($5/month). The free plan's 100k requests/day are shared by the site's Functions and this Worker.
 2. Deploy: `pnpm mcp:deploy`. The `routes` entry in `wrangler.toml` creates the `mcp.molviewer.bio` custom domain (DNS record and certificate) on first deploy.
 3. Check: `curl https://mcp.molviewer.bio/health`.
+4. **Automatic deploys:** the `deploy-mcp` job in `.github/workflows/ci.yml` runs `pnpm mcp:deploy` on pushes to `main` after the CI checks pass, when `workers/mcp/`, `site/`, `data/`, `package.json` or `pnpm-lock.yaml` changed, then checks that `/health` reports the repo's `SERVER_VERSION`. Pages builds the site in parallel and is usually live first; for a widget change that needs the new assets, check the site before the Worker deploy finishes. It needs two repository secrets: `CLOUDFLARE_API_TOKEN` (an API token from the "Edit Cloudflare Workers" template, limited to this account) and `CLOUDFLARE_ACCOUNT_ID`. `pnpm mcp:deploy` by hand still works, for example to deploy commits pushed before a change to those paths.
 
 The widget bundle ships with the site (`pnpm build` writes `dist/widget/v1/`), so deploy the Pages site first whenever the widget changes. `public/_headers` gives `/widget/*` CORS and cache headers; `public/_routes.json` keeps it out of Functions.
 

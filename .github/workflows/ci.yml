@@ -20,3 +20,62 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test -- --run
+
+  # The ChatGPT/Claude app server (workers/mcp, mcp.molviewer.bio). Cloudflare
+  # Pages deploys the site by itself; this Worker only deploys from here, after
+  # the checks above pass and only when code it bundles changed.
+  deploy-mcp:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: deploy-mcp
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Did code the Worker bundles change?
+        id: changed
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          # It imports from site/ (upstream fetchers, contract, catalog helpers) and data/ (catalogs).
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "No previous commit to compare with: deploying."
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "$BEFORE" "$AFTER" -- workers/mcp site data package.json pnpm-lock.yaml; then
+            echo "Nothing the Worker uses changed: skipping."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            git diff --stat "$BEFORE" "$AFTER" -- workers/mcp site data package.json pnpm-lock.yaml | tail -n 1
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.changed.outputs.deploy == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.deploy == 'true'
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install
+        if: steps.changed.outputs.deploy == 'true'
+      - run: pnpm mcp:deploy
+        if: steps.changed.outputs.deploy == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Health check
+        if: steps.changed.outputs.deploy == 'true'
+        run: |
+          expected=$(sed -n "s/.*SERVER_VERSION = '\([^']*\)'.*/\1/p" workers/mcp/src/server.ts)
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -fsS https://mcp.molviewer.bio/health || true)
+            echo "$body"
+            echo "$body" | grep -q "\"version\":\"$expected\"" && exit 0
+            sleep 10
+          done
+          echo "::error::mcp.molviewer.bio/health does not report version $expected"
+          exit 1
