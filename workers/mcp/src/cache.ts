@@ -13,19 +13,20 @@ function cacheStore(): Cache | undefined {
   return typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default : undefined;
 }
 
+/** `cached` is true when the answer came from the cache (for analytics). */
 export async function cachedOutcome(
   tool: string,
   args: unknown,
   fn: () => Promise<ToolOutcome>,
   waitUntil: (p: Promise<unknown>) => void
-): Promise<ToolOutcome> {
+): Promise<{ outcome: ToolOutcome; cached: boolean }> {
   const cache = cacheStore();
-  if (!cache) return fn();
+  if (!cache) return { outcome: await fn(), cached: false };
   const key = new Request(
     `https://mcp-cache.molviewer.bio/${CACHE_VERSION}/${tool}?args=${encodeURIComponent(JSON.stringify(args))}`
   );
   const hit = await cache.match(key);
-  if (hit) return (await hit.json()) as ToolOutcome;
+  if (hit) return { outcome: (await hit.json()) as ToolOutcome, cached: true };
 
   const outcome = await fn();
   if (outcome.status === 'ok' && outcome.cacheable !== false) {
@@ -34,5 +35,5 @@ export async function cachedOutcome(
     });
     waitUntil(cache.put(key, resp));
   }
-  return outcome;
+  return { outcome, cached: false };
 }

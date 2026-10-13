@@ -14,6 +14,7 @@ import { formatMethod, formatResolution } from '../../../site/render/format';
 import { SITE_ORIGIN } from '../../../site/nav';
 import { structurePath } from '../../../site/routes';
 import type { AppKind } from '../../../site/appContract';
+import { UNIPROT_RE } from '../../../site/identifiers';
 
 export const PDB_SEEDS: PdbSeed[] = (pdbData as { pdbs: PdbSeed[] }).pdbs;
 export const AF_SEEDS: AfSeed[] = (afData as { entries: AfSeed[] }).entries;
@@ -44,6 +45,51 @@ export function queryTokens(query: string): string[] {
   return normalize(query)
     .split(' ')
     .filter((t) => t && !STOPWORDS.has(t));
+}
+
+/** What a search query looks like, for analytics (the text itself is never stored). */
+export type QueryShape =
+  | 'non_latin'
+  | 'stopwords_only'
+  | 'cid'
+  | 'pdb_id'
+  | 'uniprot'
+  | 'formula'
+  | 'smiles'
+  | 'w1_2'
+  | 'w3_4'
+  | 'w5plus';
+
+const ELEMENTS = new Set(
+  (
+    'H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr ' +
+    'Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt ' +
+    'Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr'
+  ).split(' ')
+);
+
+/** H2O, C8H10N4O2: element symbols with counts, at least one digit. ATP, EGFR, BRCA1 are not. */
+function isFormula(text: string): boolean {
+  if (!/^([A-Z][a-z]?\d*)+$/.test(text) || !/\d/.test(text)) return false;
+  return [...text.matchAll(/([A-Z][a-z]?)\d*/g)].every((m) => ELEMENTS.has(m[1]));
+}
+
+/**
+ * The first class that fits, in this order. Mixed text ("белок p53",
+ * "γ-secretase") is not non_latin: its Latin part still searches.
+ */
+export function queryShape(query: string): QueryShape {
+  const q = query.trim();
+  if (/\p{L}/u.test(q) && !/[a-z]/.test(normalize(q))) return 'non_latin';
+  if (!queryTokens(q).length) return 'stopwords_only';
+  if (/^(cid[:\s]*)?\d+$/i.test(q)) return 'cid';
+  // PDB_ID_RE takes any 4 characters (KRAS, ACE2); real PDB IDs start with a digit.
+  if (/^[1-9][A-Za-z0-9]{3}$/.test(q)) return 'pdb_id';
+  if (UNIPROT_RE.test(q.toUpperCase())) return 'uniprot';
+  if (isFormula(q)) return 'formula';
+  if (!/\s/.test(q) && /[=#()[\]@]/.test(q)) return 'smiles';
+  const words = compoundNameFrom(q).split(/\s+/).filter(Boolean).length;
+  return words <= 2 ? 'w1_2' : words <= 4 ? 'w3_4' : 'w5plus';
 }
 
 /**

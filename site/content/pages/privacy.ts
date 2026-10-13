@@ -3,7 +3,7 @@ import type { ContentPage } from '../types';
 export const page: ContentPage = {
   path: '/privacy',
   kind: 'legal',
-  updated: '2026-10-02',
+  updated: '2026-10-13',
   title: 'Privacy policy | MolViewer',
   description:
     'What MolViewer collects on molviewer.bio and in its ChatGPT and Claude app: anonymous usage counts, no accounts, no tracking cookies, and no sale of data.',
@@ -30,7 +30,7 @@ export const page: ContentPage = {
         `<ul>` +
         `<li><strong>What the server receives:</strong> only the tool request, meaning the search text or structure ID the assistant chose (for example "hemoglobin" or "4HHB") and view options such as style and color. ChatGPT also sends an anonymized user identifier, which is used only to apply rate limits and is not stored. MolViewer never receives your conversation, name, email address or account details.</li>` +
         `<li><strong>What the server does with it:</strong> it looks the request up in MolViewer's catalogs and in RCSB PDB, PDBe, AlphaFold DB, UniProt and PubChem, and returns structure facts. Answers about public structures are cached for 24 hours, keyed by the request, without any user identifier.</li>` +
-        `<li><strong>What is recorded:</strong> an anonymous count per request: which tool ran, the kind of structure, which chat service called, whether it succeeded and how long it took. Search text and structure IDs are not recorded.</li>` +
+        `<li><strong>What is recorded:</strong> an anonymous count per request: which tool ran, the kind of structure, which chat service called, whether it succeeded and how long it took. For searches it also records the general type of query (for example a name, an ID or a formula), how many words it had and which databases returned results. Search text and structure IDs are not recorded.</li>` +
         `<li><strong>The 3D viewer in the chat</strong> downloads the structure file directly from RCSB, AlphaFold DB or PubChem, as the website does, and records two anonymous events: that the viewer was shown, and whether "Open full viewer" was used.</li>` +
         `</ul>`,
     },

@@ -3,7 +3,7 @@
  * End to end through the real MCP handler, with the SDK client on the other
  * side: what ChatGPT and Claude see when they connect.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { fixtureFetch } from '../../../site/upstream/__fixtures__/fixtureFetch';
@@ -16,6 +16,7 @@ let client: Client | null = null;
 afterEach(async () => {
   await client?.close();
   client = null;
+  vi.unstubAllGlobals();
 });
 
 async function connect(env: Env = {}): Promise<Client> {
@@ -95,6 +96,34 @@ describe('MCP server', () => {
     const result = await c.callTool({ name: 'show_structure', arguments: { kind: 'pdb', id: 'ZZZ9' } });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain('No PDB entry');
+  });
+
+  it('keeps tool names, descriptions and schemas as approved', async () => {
+    // OpenAI reviews tool metadata: a change here goes through its scan, so make it on purpose.
+    const c = await connect();
+    const { tools } = await c.listTools();
+    const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name));
+    expect(sorted.map(({ name, title, description, inputSchema, outputSchema, annotations }) => ({ name, title, description, inputSchema, outputSchema, annotations }))).toMatchSnapshot();
+  });
+
+  it('records search analytics, and cache hits as such', async () => {
+    const points: AnalyticsEngineDataPoint[] = [];
+    const env: Env = { EVENTS: { writeDataPoint: (p?: AnalyticsEngineDataPoint) => p && points.push(p) } as AnalyticsEngineDataset };
+    const store = new Map<string, string>();
+    vi.stubGlobal('caches', {
+      default: {
+        match: async (req: Request) => (store.has(req.url) ? new Response(store.get(req.url)) : undefined),
+        put: async (req: Request, resp: Response) => void store.set(req.url, await resp.text()),
+      },
+    });
+    const c = await connect(env);
+    await c.callTool({ name: 'find_structures', arguments: { query: 'caffeine', kind: 'compound' } });
+    await c.callTool({ name: 'find_structures', arguments: { query: 'caffeine', kind: 'compound' } });
+    // blob3 = entry (shape), blob4 = format (sources), double1 = scale (words).
+    expect(points.map((p) => [p.blobs?.[2], p.blobs?.[3], p.doubles?.[0]])).toEqual([
+      ['w1_2', 'c1 p- r- u-', 1],
+      ['w1_2', 'cache', 1],
+    ]);
   });
 
   it('answers with a busy message when the caller is rate limited', async () => {

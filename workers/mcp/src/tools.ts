@@ -21,7 +21,16 @@ import {
   type WidgetLoad,
   type WidgetPayload,
 } from '../../../site/appContract';
-import { compoundNameFrom, findCompound, hasExactCompoundName, queryTokens, searchCatalog, type FoundStructure } from './catalog';
+import {
+  compoundNameFrom,
+  findCompound,
+  hasExactCompoundName,
+  queryShape,
+  queryTokens,
+  searchCatalog,
+  type FoundStructure,
+  type QueryShape,
+} from './catalog';
 import { REFUSAL_MESSAGE, isDeniedCompound, isDeniedQuery } from './safety';
 import {
   afCaption,
@@ -52,6 +61,19 @@ export interface ToolOutcome {
   cacheable?: boolean;
   /** For analytics: ok, not_found, denied, upstream_error, invalid. */
   status: 'ok' | 'not_found' | 'denied' | 'upstream_error' | 'invalid';
+  /** find_structures only, for analytics: what the query looked like and what each source gave. */
+  diag?: SearchDiag;
+}
+
+export interface SearchDiag {
+  shape: QueryShape;
+  /**
+   * Catalog, PubChem, RCSB and UniProt results: a count, `-` when the source
+   * wasn't asked, `e` when it failed. E.g. "c0 p- r3 u0".
+   */
+  sources: string;
+  /** Words in the compound name, as the PubChem length check counts them. */
+  words: number;
 }
 
 function error(text: string, status: ToolOutcome['status']): ToolOutcome {
@@ -82,6 +104,9 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     (r) => r.kind !== 'compound' || (allowCompounds && !isDeniedCompound({ cid: findCompound(r.id)?.cid, names: [r.title] }))
   );
   const notes: string[] = [];
+  const shape = queryShape(args.query);
+  const catalogCount = results.length;
+  let sources = 'p- r- u-';
 
   // Full-text searches get the content words; PubChem's exact-name lookup gets the name as written.
   const text = queryTokens(args.query).join(' ');
@@ -140,6 +165,11 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     if (rcsb?.status === 'error') notes.push('RCSB search did not answer');
     if (rcsb?.status === 'ok' && rcsb.data.some((e) => !e.title)) notes.push('RCSB titles are temporarily unavailable');
     if (uniprot?.status === 'error') notes.push('UniProt search did not answer');
+    sources = [
+      `p${!pubchem ? '-' : pubchem.hit ? 1 : pubchem.error ? 'e' : 0}`,
+      `r${!rcsb ? '-' : rcsb.status === 'error' ? 'e' : fromRcsb.length}`,
+      `u${!uniprot ? '-' : uniprot.status === 'error' ? 'e' : fromUniprot.length}`,
+    ].join(' ');
 
     const ordered = [
       ...(AF_HINT.test(args.query) ? [...fromUniprot, ...fromRcsb] : [...fromRcsb, ...fromUniprot]),
@@ -152,6 +182,8 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     results.splice(limit);
   }
 
+  const diag: SearchDiag = { shape, sources: `c${catalogCount} ${sources}`, words };
+
   if (!results.length) {
     const text = deniedQuery
       ? REFUSAL_MESSAGE
@@ -159,8 +191,10 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     return {
       text: notes.length ? `${text} (${notes.join('; ')}.)` : text,
       structuredContent: { query: args.query, results: [] },
-      status: deniedQuery ? 'denied' : 'not_found',
+      // A source being down is not the same as nothing to find.
+      status: deniedQuery ? 'denied' : notes.length ? 'upstream_error' : 'not_found',
       cacheable: notes.length === 0,
+      diag,
     };
   }
   const lines = results.map((r) => `- ${r.kind} ${r.id}: ${r.title}${r.subtitle ? ` (${r.subtitle})` : ''}`);
@@ -171,6 +205,7 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
     structuredContent: { query: args.query, results },
     status: 'ok',
     cacheable: notes.length === 0,
+    diag,
   };
 }
 

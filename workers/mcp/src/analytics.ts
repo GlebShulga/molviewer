@@ -5,6 +5,9 @@
  *   blob1 = event name, blob2.. = STRING_FIELDS (source, entry, format, kind, ref, value),
  *   blob8 = page kind ("mcp"), blob9 = country, double1.. = NUMBER_FIELDS (scale, seconds)
  * Here: source = tool, kind = structure kind, ref = client, value = outcome.
+ * For find_structures also entry = query shape (queryShape in catalog.ts),
+ * format = what each source returned (SearchDiag in tools.ts) or "cache" for
+ * a cached answer, scale = words in the query.
  * Arguments (search text, ids) are never stored.
  */
 import { NUMBER_FIELDS, STRING_FIELDS } from '../../../site/events';
@@ -16,19 +19,22 @@ export interface ToolCallEvent {
   client: string;
   status: string;
   ms: number;
+  entry?: string;
+  format?: string;
+  scale?: number;
 }
 
 export function recordToolCall(env: Env, e: ToolCallEvent): void {
   if (!env.EVENTS) return;
   const strings: Record<(typeof STRING_FIELDS)[number], string> = {
     source: e.tool,
-    entry: '',
-    format: '',
+    entry: e.entry ?? '',
+    format: e.format ?? '',
     kind: e.kind,
     ref: e.client,
     value: e.status,
   };
-  const numbers: Record<(typeof NUMBER_FIELDS)[number], number> = { scale: 0, seconds: e.ms / 1000 };
+  const numbers: Record<(typeof NUMBER_FIELDS)[number], number> = { scale: e.scale ?? 0, seconds: e.ms / 1000 };
   try {
     env.EVENTS.writeDataPoint({
       indexes: ['mcp_tool_call'],

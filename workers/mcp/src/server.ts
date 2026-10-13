@@ -101,13 +101,24 @@ export function createServer(
       recordToolCall(env, { tool, kind, client, status: 'rate_limited', ms: Date.now() - started });
       return toResult(outcome);
     }
+    let cached = false;
     try {
-      outcome = await cachedOutcome(tool, args, fn, waitUntil);
+      ({ outcome, cached } = await cachedOutcome(tool, args, fn, waitUntil));
     } catch (err) {
       console.error(`${tool} failed`, err);
       outcome = { text: 'MolViewer hit an unexpected error. Please try again.', isError: true, status: 'upstream_error' };
     }
-    recordToolCall(env, { tool, kind, client, status: outcome.status, ms: Date.now() - started });
+    const d = outcome.diag;
+    recordToolCall(env, {
+      tool,
+      kind,
+      client,
+      status: outcome.status,
+      ms: Date.now() - started,
+      entry: d?.shape,
+      format: cached ? 'cache' : d?.sources,
+      scale: d?.words,
+    });
     return toResult(outcome);
   }
 

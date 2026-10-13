@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fixtureFetch } from '../../../site/upstream/__fixtures__/fixtureFetch';
 import { WIDGET_META_KEY, readWidgetPayload } from '../../../site/appContract';
 import { findStructures, getStructureDetails, showStructure } from './tools';
-import { compoundNameFrom, searchCatalog } from './catalog';
+import { compoundNameFrom, queryShape, searchCatalog } from './catalog';
 import { isDeniedCompound } from './safety';
 
 function upstream(overrides?: Parameters<typeof fixtureFetch>[0]) {
@@ -80,10 +80,12 @@ describe('find_structures', () => {
   });
 
   it('falls back to RCSB and UniProt for the rest', async () => {
-    const r = await findStructures({ query: 'zzz-unknown hemoglobin', kind: 'pdb', limit: 3 }, upstream());
-    // No fixture for this text: RCSB answers 404, reported as an empty search.
+    const empty = { 'rcsb-fulltext-zzz-unknown-hemoglobin.json': { status: 200, body: '{"result_set":[]}' } };
+    const r = await findStructures({ query: 'zzz-unknown hemoglobin', kind: 'pdb', limit: 3 }, upstream(empty));
     expect(r.status).toBe('not_found');
     expect(r.isError).toBeUndefined();
+    // No fixture for this text: RCSB answers 404, which is an outage, not an empty search.
+    expect((await findStructures({ query: 'zzz-unknown hemoglobin', kind: 'pdb', limit: 3 }, upstream())).status).toBe('upstream_error');
   });
 
   it('refuses chemical warfare agents and drops them from mixed results', async () => {
@@ -92,6 +94,58 @@ describe('find_structures', () => {
     const any = await findStructures({ query: 'sarin', kind: 'any' }, upstream());
     const results = (any.structuredContent?.results ?? []) as { kind: string }[];
     expect(results.every((x) => x.kind !== 'compound')).toBe(true);
+  });
+});
+
+describe('queryShape', () => {
+  const shapes = (queries: string[]) => Object.fromEntries(queries.map((q) => [q, queryShape(q)]));
+  const all = (queries: string[], shape: string) => Object.fromEntries(queries.map((q) => [q, shape]));
+
+  it('classifies queries by their first matching shape', () => {
+    expect(shapes(['кофеин', '咖啡因'])).toEqual(all(['кофеин', '咖啡因'], 'non_latin'));
+    expect(shapes(['protein', 'show me the molecule'])).toEqual(all(['protein', 'show me the molecule'], 'stopwords_only'));
+    expect(shapes(['2519', 'CID 2519'])).toEqual(all(['2519', 'CID 2519'], 'cid'));
+    expect(shapes(['4HHB', '1crn'])).toEqual(all(['4HHB', '1crn'], 'pdb_id'));
+    expect(shapes(['P04637', 'p04637'])).toEqual(all(['P04637', 'p04637'], 'uniprot'));
+    expect(shapes(['H2O', 'CO2', 'C8H10N4O2'])).toEqual(all(['H2O', 'CO2', 'C8H10N4O2'], 'formula'));
+    expect(queryShape('CN1C=NC2=C1C(=O)N(C(=O)N2C)C')).toBe('smiles');
+    expect(shapes(['human hemoglobin', 'insulin receptor tyrosine kinase', 'structure of the insulin receptor kinase domain'])).toEqual({
+      'human hemoglobin': 'w1_2',
+      'insulin receptor tyrosine kinase': 'w3_4',
+      'structure of the insulin receptor kinase domain': 'w5plus',
+    });
+  });
+
+  it('keeps gene names, mixed text and plain names out of the special classes', () => {
+    const names = ['ATP', 'GFP', 'DNA', 'EGFR', 'KRAS', 'BRCA1', 'HER2', 'CD4', 'ACE2', 'p53', 'IL6', '2,4-dinitrophenol', 'белок p53', 'γ-secretase'];
+    expect(shapes(names)).toEqual(all(names, 'w1_2'));
+  });
+});
+
+describe('find_structures analytics', () => {
+  it('records the shape, the words and what each source returned', async () => {
+    const catalog = await findStructures({ query: 'caffeine', kind: 'compound', limit: 1 }, upstream());
+    expect(catalog.diag).toEqual({ shape: 'w1_2', sources: 'c1 p- r- u-', words: 1 });
+
+    const rcsb = await findStructures(
+      { query: 'zzz hemoglobin', kind: 'pdb', limit: 10 },
+      upstream({ 'rcsb-fulltext-zzz-hemoglobin.json': { status: 200, body: '{"result_set":[{"identifier":"9ABC"}]}' } })
+    );
+    expect(rcsb.diag?.sources).toBe('c0 p- r1 u-');
+
+    const uniprot = await findStructures({ query: 'zzz p53', kind: 'alphafold', limit: 3 }, upstream({
+      'uniprot-search-zzz-p53-human.json': { status: 200, body: '{"results":[{"primaryAccession":"P04637"}]}' },
+    }));
+    expect(uniprot.diag?.sources).toBe('c0 p- r- u1');
+  });
+
+  it('reports an empty search with a failed source as upstream_error', async () => {
+    const r = await findStructures({ query: 'zzunknownchem', kind: 'compound' }, upstream({ 'pubchem-name-zzunknownchem.json': { status: 503 } }));
+    expect(r.status).toBe('upstream_error');
+    expect(r.diag?.sources).toBe('c0 pe r- u-');
+    const empty = await findStructures({ query: 'zzunknownchem', kind: 'compound' }, upstream());
+    expect(empty.status).toBe('not_found');
+    expect(empty.diag?.sources).toBe('c0 p0 r- u-');
   });
 });
 

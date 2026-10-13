@@ -1,0 +1,380 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP server > keeps tool names, descriptions and schemas as approved 1`] = `
+[
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+    },
+    "description": "Search for molecular structures by name and get their IDs: proteins and nucleic acids in the PDB, AlphaFold predicted models, and small molecules in PubChem. Use it for requests like "hemoglobin", "insulin hexamer", "caffeine" or "human p53 AlphaFold". Curated MolViewer catalogs are searched first, then RCSB, UniProt and PubChem. Returns IDs to pass to show_structure or get_structure_details, best match first: the first result is the canonical, complete structure, so prefer it unless the user asked for a specific state, variant or organism.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "kind": {
+          "description": "Limit to one database. "alphafold" searches proteins with AlphaFold models. Default: any.",
+          "enum": [
+            "pdb",
+            "alphafold",
+            "compound",
+            "any",
+          ],
+          "type": "string",
+        },
+        "limit": {
+          "description": "Maximum results (1-10, default 5).",
+          "maximum": 10,
+          "minimum": 1,
+          "type": "integer",
+        },
+        "query": {
+          "description": "Name of a protein, nucleic acid, compound or topic, e.g. "hemoglobin".",
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "query",
+      ],
+      "type": "object",
+    },
+    "name": "find_structures",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+              },
+              "kind": {
+                "enum": [
+                  "pdb",
+                  "alphafold",
+                  "compound",
+                ],
+                "type": "string",
+              },
+              "pageUrl": {
+                "type": "string",
+              },
+              "subtitle": {
+                "type": "string",
+              },
+              "title": {
+                "type": "string",
+              },
+              "why": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "kind",
+              "id",
+              "title",
+              "why",
+              "pageUrl",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "query",
+        "results",
+      ],
+      "type": "object",
+    },
+    "title": "Find structures",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+    },
+    "description": "Facts about a PDB entry, AlphaFold model or compound without opening the viewer, straight from RCSB PDB, PDBe, AlphaFold DB, UniProt and PubChem: experimental method, resolution, release year, authors and citation, organism, chains, ligands, helix and beta-strand residue ranges per chain, sequences and related entries for PDB; function, confidence and experimental structures for AlphaFold. Use it for questions like "what is the resolution of 1CRN and who published it?" or "which residues form the beta sheets in 3DNI?". Citation authors are surname and initials; keep them as given.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "description": "PDB ID (e.g. "4HHB") for pdb, UniProt accession (e.g. "P04637") for alphafold, or compound name, slug or PubChem CID (e.g. "caffeine", "2519") for compound.",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "description": "pdb, alphafold or compound.",
+          "enum": [
+            "pdb",
+            "alphafold",
+            "compound",
+          ],
+          "type": "string",
+        },
+        "sections": {
+          "description": "Which extra sections to include. Default: secondaryStructure, ligands, citation. Sequences are long; ask only when needed.",
+          "items": {
+            "enum": [
+              "secondaryStructure",
+              "sequence",
+              "ligands",
+              "citation",
+              "related",
+            ],
+            "type": "string",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "kind",
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "get_structure_details",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": {},
+      "properties": {
+        "cid": {
+          "description": "PubChem CID (compounds)",
+          "type": "number",
+        },
+        "citation": {
+          "type": "string",
+        },
+        "formula": {
+          "type": "string",
+        },
+        "id": {
+          "description": "PDB ID or UniProt accession",
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "pdb",
+            "alphafold",
+            "compound",
+          ],
+          "type": "string",
+        },
+        "meanPlddt": {
+          "type": "number",
+        },
+        "method": {
+          "type": "string",
+        },
+        "name": {
+          "type": "string",
+        },
+        "note": {
+          "type": "string",
+        },
+        "organism": {
+          "type": "string",
+        },
+        "organisms": {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "pageUrl": {
+          "type": "string",
+        },
+        "protein": {
+          "type": "string",
+        },
+        "resolutionAngstrom": {
+          "type": "number",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "pageUrl",
+      ],
+      "type": "object",
+    },
+    "title": "Get structure details",
+  },
+  {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+    },
+    "description": "Display a molecular structure in an interactive 3D viewer the user can rotate and zoom: a PDB entry, an AlphaFold DB model, or a PubChem compound. Use it when the user wants to see, show, visualize or look at a structure, or asks what a molecule looks like. Returns key facts (method, resolution, chains, ligands; or pLDDT confidence; or formula) to explain alongside the viewer. The viewer shows the chains in the entry file (polymerChainCount); if a note says the file is only part of the biological assembly, describe what is shown accordingly. Defaults: cartoon colored by chain for PDB, cartoon colored by confidence for AlphaFold, ball and stick for compounds. Only for visualization: never provide synthesis routes, doses or acquisition advice.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "color": {
+          "description": "secondaryStructure, chain, cpk (by element), residueType, bfactor, confidence (AlphaFold pLDDT in the standard AlphaFold DB colors; AlphaFold only) or rainbow (N to C terminus).",
+          "enum": [
+            "secondaryStructure",
+            "chain",
+            "cpk",
+            "residueType",
+            "bfactor",
+            "confidence",
+            "rainbow",
+          ],
+          "type": "string",
+        },
+        "id": {
+          "description": "PDB ID (e.g. "4HHB") for pdb, UniProt accession (e.g. "P04637") for alphafold, or compound name, slug or PubChem CID (e.g. "caffeine", "2519") for compound.",
+          "maxLength": 100,
+          "minLength": 1,
+          "type": "string",
+        },
+        "kind": {
+          "description": "pdb, alphafold or compound.",
+          "enum": [
+            "pdb",
+            "alphafold",
+            "compound",
+          ],
+          "type": "string",
+        },
+        "spin": {
+          "description": "Slowly rotate the structure.",
+          "type": "boolean",
+        },
+        "style": {
+          "description": "cartoon (proteins, nucleic acids), ball-and-stick, stick, spacefill or surface (molecular surface).",
+          "enum": [
+            "cartoon",
+            "ball-and-stick",
+            "stick",
+            "spacefill",
+            "surface",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "id",
+      ],
+      "type": "object",
+    },
+    "name": "show_structure",
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": {},
+      "properties": {
+        "cid": {
+          "description": "PubChem CID (compounds)",
+          "type": "number",
+        },
+        "citation": {
+          "type": "string",
+        },
+        "formula": {
+          "type": "string",
+        },
+        "id": {
+          "description": "PDB ID or UniProt accession",
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "pdb",
+            "alphafold",
+            "compound",
+          ],
+          "type": "string",
+        },
+        "meanPlddt": {
+          "type": "number",
+        },
+        "method": {
+          "type": "string",
+        },
+        "name": {
+          "type": "string",
+        },
+        "note": {
+          "type": "string",
+        },
+        "organism": {
+          "type": "string",
+        },
+        "organisms": {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "pageUrl": {
+          "type": "string",
+        },
+        "protein": {
+          "type": "string",
+        },
+        "resolutionAngstrom": {
+          "type": "number",
+        },
+        "shown": {
+          "additionalProperties": false,
+          "properties": {
+            "color": {
+              "enum": [
+                "secondaryStructure",
+                "chain",
+                "cpk",
+                "residueType",
+                "bfactor",
+                "confidence",
+                "rainbow",
+              ],
+              "type": "string",
+            },
+            "style": {
+              "enum": [
+                "cartoon",
+                "ball-and-stick",
+                "stick",
+                "spacefill",
+                "surface",
+              ],
+              "type": "string",
+            },
+          },
+          "required": [
+            "style",
+            "color",
+          ],
+          "type": "object",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "pageUrl",
+        "shown",
+      ],
+      "type": "object",
+    },
+    "title": "Show structure in 3D",
+  },
+]
+`;
