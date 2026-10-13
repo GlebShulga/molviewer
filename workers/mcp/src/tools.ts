@@ -99,19 +99,36 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   const deniedQuery = isDeniedQuery(args.query);
   if (deniedQuery && kind === 'compound') return { ...error(REFUSAL_MESSAGE, 'denied') };
   const allowCompounds = !deniedQuery && (kind === 'compound' || kind === 'any');
+  const shape = queryShape(args.query);
+  // Full-text searches get the content words; PubChem's exact-name lookup gets the name as written.
+  const text = queryTokens(args.query).join(' ');
+  const compoundName = compoundNameFrom(args.query);
+  const words = compoundName.split(/\s+/).filter(Boolean).length;
+
+  // No source knows these, so answer at once with what to send instead. ChatGPT
+  // retries an empty search anyway; this makes the retry a good one.
+  const hint =
+    shape === 'non_latin'
+      ? `Search works with English names. Call find_structures again with the English name for "${args.query}" (for example "caffeine" for "кофеин").`
+      : shape === 'stopwords_only'
+        ? 'Too general: search for a specific name such as "hemoglobin" or "caffeine".'
+        : null;
+  if (hint) {
+    return {
+      text: hint,
+      structuredContent: { query: args.query, results: [] },
+      status: 'not_found',
+      diag: { shape, sources: 'c- p- r- u-', words },
+    };
+  }
 
   const results: FoundStructure[] = searchCatalog(args.query, kind, limit).filter(
     (r) => r.kind !== 'compound' || (allowCompounds && !isDeniedCompound({ cid: findCompound(r.id)?.cid, names: [r.title] }))
   );
   const notes: string[] = [];
-  const shape = queryShape(args.query);
   const catalogCount = results.length;
   let sources = 'p- r- u-';
 
-  // Full-text searches get the content words; PubChem's exact-name lookup gets the name as written.
-  const text = queryTokens(args.query).join(' ');
-  const compoundName = compoundNameFrom(args.query);
-  const words = compoundName.split(/\s+/).filter(Boolean).length;
   // Compound names are short; skip PubChem for sentence-like queries. Partial catalog
   // matches don't count: "Coenzyme A" must still get PubChem's exact answer.
   const wantCompound = allowCompounds && words > 0 && words <= 4 && !hasExactCompoundName(args.query);

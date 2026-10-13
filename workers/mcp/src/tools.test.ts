@@ -88,6 +88,36 @@ describe('find_structures', () => {
     expect((await findStructures({ query: 'zzz-unknown hemoglobin', kind: 'pdb', limit: 3 }, upstream())).status).toBe('upstream_error');
   });
 
+  it('finds compounds asked for in a sentence with a rendering style', async () => {
+    for (const query of ['show caffeine in ball and stick', 'ball and stick model of ethanol molecule', 'show caffeine as a 3D ball-and-stick model']) {
+      const f = fixtureFetch();
+      const r = await findStructures({ query, kind: 'compound' }, { fetchImpl: f.fetchImpl });
+      expect((r.structuredContent?.results as { id: string }[])[0]?.id, query).toMatch(/^(caffeine|ethanol)$/);
+      expect(f.calls, query).toEqual([]);
+    }
+  });
+
+  it('asks for the English name of non-Latin queries, without searching', async () => {
+    const f = fixtureFetch();
+    const r = await findStructures({ query: 'кофеин', kind: 'compound' }, { fetchImpl: f.fetchImpl });
+    expect(f.calls).toEqual([]);
+    expect(r).toMatchObject({ status: 'not_found', diag: { shape: 'non_latin', sources: 'c- p- r- u-' } });
+    expect(r.text).toContain('Call find_structures again with the English name for "кофеин"');
+  });
+
+  it('still searches the Latin part of mixed text', async () => {
+    const r = await findStructures({ query: 'белок p53', kind: 'alphafold', limit: 1 }, upstream());
+    expect(r.structuredContent?.results).toEqual([expect.objectContaining({ id: 'P04637' })]);
+  });
+
+  it('asks for a specific name when the query is only filler', async () => {
+    const f = fixtureFetch();
+    const r = await findStructures({ query: 'show me a protein', kind: 'any' }, { fetchImpl: f.fetchImpl });
+    expect(f.calls).toEqual([]);
+    expect(r).toMatchObject({ status: 'not_found', diag: { shape: 'stopwords_only' } });
+    expect(r.text).toMatch(/^Too general/);
+  });
+
   it('refuses chemical warfare agents and drops them from mixed results', async () => {
     const compound = await findStructures({ query: 'sarin', kind: 'compound' }, upstream());
     expect(compound).toMatchObject({ isError: true, status: 'denied' });
@@ -326,6 +356,14 @@ describe('compoundNameFrom', () => {
     expect(compoundNameFrom('2,4-dinitrophenol')).toBe('2,4-dinitrophenol');
     expect(compoundNameFrom('Show me a caffeine molecule in 3D?')).toBe('caffeine');
     expect(compoundNameFrom('what does aspirin look like')).toBe('aspirin');
+  });
+
+  it('drops rendering styles', () => {
+    expect(compoundNameFrom('ball and stick model of ethanol molecule')).toBe('ethanol');
+    expect(compoundNameFrom('show caffeine in ball and stick')).toBe('caffeine');
+    expect(compoundNameFrom('show caffeine as a 3D ball-and-stick model')).toBe('caffeine');
+    expect(compoundNameFrom('3D model of glucose')).toBe('glucose');
+    expect(compoundNameFrom('benzene in spacefill style')).toBe('benzene');
   });
 });
 

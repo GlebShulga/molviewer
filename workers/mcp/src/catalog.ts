@@ -37,7 +37,8 @@ const STOPWORDS = new Set(
   (
     'a an the of in on for and or with me show display view render see open find get look looks like what does do is ' +
     'its it 3d structure structures molecule molecules molecular model models protein proteins pdb entry entries ' +
-    'alphafold af prediction predicted compound compounds chemical please'
+    'alphafold af prediction predicted compound compounds chemical please ' +
+    'ball stick sticks spacefill wireframe cartoon style rendering interactive rotating image picture diagram'
   ).split(' ')
 );
 
@@ -94,7 +95,8 @@ export function queryShape(query: string): QueryShape {
 
 /**
  * The compound name as the user wrote it, minus request words: "Show me a
- * caffeine molecule in 3D?" -> "caffeine". Case, digits and punctuation stay
+ * caffeine molecule in 3D?" -> "caffeine", "show caffeine as a 3D
+ * ball-and-stick model" -> "caffeine". Case, digits and punctuation stay
  * ("2,4-dinitrophenol", "Vitamin A"), because PubChem matches names exactly.
  */
 export function compoundNameFrom(query: string): string {
@@ -103,9 +105,14 @@ export function compoundNameFrom(query: string): string {
     prev = name;
     name = name
       .replace(/^(please\s+|can you\s+|show( me)?\s+|display\s+|draw\s+|view\s+|find\s+|what (does|is)\s+|what's\s+|the\s+|a\s+|an\s+)/i, '')
+      .replace(/^(3-?d\s+)?(ball[- ]and[- ]stick\s+|3-?d\s+)?model\s+of\s+/i, '')
       .replace(/\s+(look|looks) like$/i, '')
       .replace(/\s+(in )?3-?d$/i, '')
       .replace(/\s+(molecule|structure|compound|model)$/i, '')
+      .replace(
+        /\s+(in|as)\s+(a\s+)?(3-?d\s+)?(ball[- ]and[- ]stick|stick|spacefill|space[- ]filling|wireframe)(\s+(model|style|view|representation))?$/i,
+        ''
+      )
       .trim();
   }
   return name;
