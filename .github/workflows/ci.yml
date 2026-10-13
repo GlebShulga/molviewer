@@ -43,14 +43,16 @@ jobs:
           AFTER: ${{ github.sha }}
         run: |
           # It imports from site/ (upstream fetchers, contract, catalog helpers) and data/ (catalogs).
+          # This workflow is included so a change to the deploy job is tried at once.
+          paths="workers/mcp site data package.json pnpm-lock.yaml .github/workflows/ci.yml"
           if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             echo "No previous commit to compare with: deploying."
             echo "deploy=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "$BEFORE" "$AFTER" -- workers/mcp site data package.json pnpm-lock.yaml; then
+          elif git diff --quiet "$BEFORE" "$AFTER" -- $paths; then
             echo "Nothing the Worker uses changed: skipping."
             echo "deploy=false" >> "$GITHUB_OUTPUT"
           else
-            git diff --stat "$BEFORE" "$AFTER" -- workers/mcp site data package.json pnpm-lock.yaml | tail -n 1
+            git diff --stat "$BEFORE" "$AFTER" -- $paths | tail -n 1
             echo "deploy=true" >> "$GITHUB_OUTPUT"
           fi
       - uses: pnpm/action-setup@v4
@@ -58,7 +60,8 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.changed.outputs.deploy == 'true'
         with:
-          node-version: 20
+          # Wrangler 4 needs Node 22+.
+          node-version: 22
           cache: pnpm
       - run: pnpm install
         if: steps.changed.outputs.deploy == 'true'
