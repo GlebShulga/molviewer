@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { WelcomeMolecule } from './WelcomeMolecule';
+import { WelcomeMoleculeArt } from './WelcomeMoleculeArt';
 import styles from './WelcomeScreen.module.css';
 
 interface WelcomeScreenProps {
@@ -33,7 +33,7 @@ export function WelcomeScreen({ onStart, isLoading, onExample }: WelcomeScreenPr
 
   return (
     <div className={styles.welcome} data-onboarding="welcome-screen">
-      <WelcomeMolecule />
+      <WelcomeMoleculeArt className={styles.art} />
       <div className={styles.overlay}>
         <div className={styles.badge}>
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">

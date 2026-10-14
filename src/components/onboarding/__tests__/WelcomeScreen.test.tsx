@@ -2,9 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { WelcomeScreen } from '../WelcomeScreen';
 
-// The background molecule renders through react-three-fiber, which needs WebGL.
-vi.mock('../WelcomeMolecule', () => ({ WelcomeMolecule: () => null }));
-
 function renderScreen(isLoading: boolean) {
   const onExample = vi.fn();
   render(<WelcomeScreen onStart={() => {}} isLoading={isLoading} onExample={onExample} />);
@@ -42,5 +39,16 @@ describe('WelcomeScreen example links', () => {
     expect(onExample).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(true);
     expect(link.getAttribute('aria-disabled')).toBe('true');
+  });
+});
+
+describe('WelcomeScreen background', () => {
+  it('draws the molecule as a static SVG, without a WebGL canvas', () => {
+    const { container } = render(<WelcomeScreen onStart={() => {}} isLoading={false} onExample={() => {}} />);
+    const welcome = container.querySelector('[data-onboarding="welcome-screen"]')!;
+
+    expect(welcome.querySelector(':scope > svg')).not.toBeNull();
+    expect(welcome.querySelectorAll(':scope > svg circle')).toHaveLength(24);
+    expect(welcome.querySelector('canvas')).toBeNull();
   });
 });
