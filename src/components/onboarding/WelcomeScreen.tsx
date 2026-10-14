@@ -7,6 +7,8 @@ interface WelcomeScreenProps {
   isLoading: boolean;
   /** Loads an example into the viewer instead of following the link. */
   onExample: (path: string) => void;
+  /** The visitor is about to start: hovering, focusing or touching a way in. */
+  onIntent?: () => void;
 }
 
 const EXAMPLES = [
@@ -15,7 +17,9 @@ const EXAMPLES = [
   { path: '/compound/caffeine', label: 'Caffeine' },
 ];
 
-export function WelcomeScreen({ onStart, isLoading, onExample }: WelcomeScreenProps) {
+export function WelcomeScreen({ onStart, isLoading, onExample, onIntent }: WelcomeScreenProps) {
+  const intentHandlers = { onPointerEnter: onIntent, onFocus: onIntent, onTouchStart: onIntent };
+
   // Real links, so they can be opened in a new tab and copied, but a plain
   // click loads the structure in place instead of reloading the page. While the
   // tour's demo molecule is on its way the links are inert: a second structure
@@ -57,6 +61,7 @@ export function WelcomeScreen({ onStart, isLoading, onExample }: WelcomeScreenPr
           className={styles.cta}
           onClick={onStart}
           disabled={isLoading}
+          {...intentHandlers}
         >
           {isLoading && (
             <span className={styles.loadingOverlay}>
@@ -83,6 +88,7 @@ export function WelcomeScreen({ onStart, isLoading, onExample }: WelcomeScreenPr
                 href={example.path}
                 aria-disabled={isLoading || undefined}
                 onClick={(e) => handleExample(e, example.path)}
+                {...intentHandlers}
               >
                 {example.label}
               </a>

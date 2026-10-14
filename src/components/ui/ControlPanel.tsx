@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import clsx from 'clsx';
 import { useMoleculeStore, type RepresentationType, type ColorScheme } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
-import { calculateColorSchemeContext } from '../../utils';
+import { calculateColorSchemeContext } from '../../utils/atomColor';
 import styles from './ControlPanel.module.css';
 
 const REPRESENTATIONS: { value: RepresentationType; label: string; description?: string; disabledDescription?: string }[] = [

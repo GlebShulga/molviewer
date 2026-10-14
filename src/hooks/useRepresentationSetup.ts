@@ -3,7 +3,7 @@ import type { Molecule } from '../types';
 import { useMoleculeStore } from '../store/moleculeStore';
 import { selectActiveStructureId } from '../store/selectors';
 import { useSelectedAtomsForStructure } from './useSelectedAtomsForStructure';
-import { calculateColorSchemeContext, type ColorSchemeContext } from '../utils';
+import { calculateColorSchemeContext, type ColorSchemeContext } from '../utils/atomColor';
 
 /**
  * Shared setup logic for representation components (BallAndStick, Stick, Spacefill).

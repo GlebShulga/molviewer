@@ -1,6 +1,6 @@
 import type { Atom, Bond, Molecule, SecondaryStructure } from "../types";
 import { PARSER_CONFIG } from "../config";
-import { inferBondsFromDistance } from "../utils";
+import { inferBondsFromDistance } from "../utils/bondInference";
 
 export interface MMCIFParserOptions {
   inferBonds?: boolean;

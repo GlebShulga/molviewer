@@ -3,6 +3,7 @@ import { useMoleculeStore } from '../../store/moleculeStore';
 import { parseMMCIF } from '../../parsers';
 import { getInitialUrlLoad } from '../../utils/urlParams';
 import { track } from '../../utils/track';
+import { loadViewerStage } from '../viewer/loadViewerStage';
 import { TOUR_STEPS } from './tourSteps';
 
 const STORAGE_KEY = 'mol3d-onboarding-completed';
@@ -60,6 +61,10 @@ export function useOnboarding(): OnboardingState {
 
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // The tour doesn't set isLoading, so App's preload wouldn't start the
+    // viewer download until 1CRN arrives. Start it alongside the fetch.
+    loadViewerStage().catch(() => {});
 
     try {
       const resp = await fetch('https://files.rcsb.org/download/1CRN.cif', {

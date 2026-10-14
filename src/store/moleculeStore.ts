@@ -17,7 +17,7 @@ import {
 /** Maximum number of undo/redo history states to prevent memory issues */
 const UNDO_HISTORY_LIMIT = 50;
 import { createMeasurementFromAtomRefs, type Measurement, type MeasurementType } from '../utils/measurements';
-import { detectAromaticRings } from '../utils';
+import { detectAromaticRings } from '../utils/aromaticDetection';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';

@@ -1,5 +1,4 @@
 import type { Atom, Bond, AromaticRing, Molecule } from '../types';
-import * as THREE from 'three';
 
 interface RingCandidate {
   atomIndices: number[];
@@ -132,16 +131,22 @@ function isAromaticRing(
 function calculateRingGeometry(
   atomIndices: number[],
   atoms: Atom[]
-): { center: THREE.Vector3; normal: THREE.Vector3; radius: number } {
+): Pick<AromaticRing, 'center' | 'normal' | 'radius'> {
+  // Plain math rather than THREE.Vector3: the store runs this on every load,
+  // and three.js should stay out of the startup bundle.
   // Calculate center
-  const center = new THREE.Vector3();
+  const center = { x: 0, y: 0, z: 0 };
   atomIndices.forEach(idx => {
-    center.add(new THREE.Vector3(atoms[idx].x, atoms[idx].y, atoms[idx].z));
+    center.x += atoms[idx].x;
+    center.y += atoms[idx].y;
+    center.z += atoms[idx].z;
   });
-  center.divideScalar(atomIndices.length);
+  center.x /= atomIndices.length;
+  center.y /= atomIndices.length;
+  center.z /= atomIndices.length;
 
   // Calculate normal using Newell's method for better accuracy with non-planar rings
-  const normal = new THREE.Vector3();
+  const normal = { x: 0, y: 0, z: 0 };
   for (let i = 0; i < atomIndices.length; i++) {
     const curr = atoms[atomIndices[i]];
     const next = atoms[atomIndices[(i + 1) % atomIndices.length]];
@@ -150,13 +155,16 @@ function calculateRingGeometry(
     normal.y += (curr.z - next.z) * (curr.x + next.x);
     normal.z += (curr.x - next.x) * (curr.y + next.y);
   }
-  normal.normalize();
+  // Same as Vector3.normalize(): a zero vector stays zero.
+  const length = Math.hypot(normal.x, normal.y, normal.z) || 1;
+  normal.x /= length;
+  normal.y /= length;
+  normal.z /= length;
 
   // Calculate average radius
   let radius = 0;
   atomIndices.forEach(idx => {
-    const pos = new THREE.Vector3(atoms[idx].x, atoms[idx].y, atoms[idx].z);
-    radius += center.distanceTo(pos);
+    radius += Math.hypot(atoms[idx].x - center.x, atoms[idx].y - center.y, atoms[idx].z - center.z);
   });
   radius /= atomIndices.length;
 
@@ -181,13 +189,9 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
 
   for (const candidate of candidates) {
     if (isAromaticRing(candidate, atoms, bonds)) {
-      const { center, normal, radius } = calculateRingGeometry(candidate.atomIndices, atoms);
-
       aromaticRings.push({
         atomIndices: candidate.atomIndices,
-        center: { x: center.x, y: center.y, z: center.z },
-        normal: { x: normal.x, y: normal.y, z: normal.z },
-        radius,
+        ...calculateRingGeometry(candidate.atomIndices, atoms),
       });
     }
   }

@@ -1,6 +1,6 @@
 import type { Atom, Bond, Molecule, SecondaryStructure, BiologicalAssembly } from "../types";
 import { PARSER_CONFIG } from "../config";
-import { inferBondsFromDistance } from "../utils";
+import { inferBondsFromDistance } from "../utils/bondInference";
 
 export interface PDBParserOptions {
   inferBonds?: boolean;

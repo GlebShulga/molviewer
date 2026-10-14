@@ -6,7 +6,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { ShareButton } from './ShareButton';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
-import { getStorageUsage } from '../../utils';
+import { getStorageUsage } from '../../utils/moleculeStorage';
 import { viewerHandle } from '../../utils/viewerHandle';
 import { logError } from '../../utils/errorReporter';
 import styles from './SavedMoleculesPanel.module.css';

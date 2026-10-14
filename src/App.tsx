@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
-import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, type MeasurementMode } from './store/moleculeStore';
 import { selectActiveStructure, selectSelectedAtomIndices, selectTotalVisibleAtomCount, selectVisibleStructuresBoundingBox } from './store/selectors';
-import { MoleculeViewer, type MoleculeViewerHandle } from './components/viewer';
+// Type only: the viewer (and three.js) loads lazily through ViewerStage.
+import type { MoleculeViewerHandle } from './components/viewer/MoleculeViewer';
+import { loadViewerStage, viewerLoadFailed } from './components/viewer/loadViewerStage';
 import { viewerHandle } from './utils/viewerHandle';
-import { MoleculeScene } from './components/MoleculeScene';
 import {
   FileUpload,
   ControlPanel,
@@ -44,6 +44,22 @@ import './styles/globals.css';
 // moment a structure loads or a key is pressed.
 const MeasurementPanel = lazy(() => import('./components/ui/MeasurementPanel').then((m) => ({ default: m.MeasurementPanel })));
 const SpotlightTour = lazy(() => import('./components/onboarding/SpotlightTour').then((m) => ({ default: m.SpotlightTour })));
+// The 3D viewer and three.js: started early by preloadViewer below.
+const ViewerStage = lazy(loadViewerStage);
+
+type StoreState = ReturnType<typeof useMoleculeStore.getState>;
+
+/** A structure is loading or loaded, so the 3D viewer will be needed. */
+const wantsViewer = (s: StoreState) => s.isLoading || s.structureOrder.length > 0;
+
+/**
+ * Starts the viewer download early. Never on idle: import() also runs the
+ * module, and running three.js during first load would add blocking time.
+ * A failure shows up later through ViewerStage's ErrorBoundary.
+ */
+const preloadViewer = () => {
+  loadViewerStage().catch(() => {});
+};
 
 function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
@@ -103,6 +119,7 @@ function EmptyOrWelcome() {
         onStart={onboarding.startTour}
         isLoading={onboarding.phase === 'loading'}
         onExample={loadExample}
+        onIntent={preloadViewer}
       />
     );
   }
@@ -171,14 +188,16 @@ function AppContent() {
   const totalAtomCount = useMoleculeStore(selectTotalVisibleAtomCount);
   const boundingBoxData = useMoleculeStore(selectVisibleStructuresBoundingBox);
 
-  // Convert bounding box data to THREE.Vector3 objects
-  const getBoundingBox = useCallback(() => {
-    if (!boundingBoxData) return null;
-    const min = new THREE.Vector3(boundingBoxData.minX, boundingBoxData.minY, boundingBoxData.minZ);
-    const max = new THREE.Vector3(boundingBoxData.maxX, boundingBoxData.maxY, boundingBoxData.maxZ);
-    const center = new THREE.Vector3(boundingBoxData.centerX, boundingBoxData.centerY, boundingBoxData.centerZ);
-    return { min, max, center };
-  }, [boundingBoxData]);
+  // "Try again" remounts the viewer after a render error. If the chunk itself
+  // failed to download, the browser won't fetch it again, so it reloads.
+  const [viewerBoundaryKey, setViewerBoundaryKey] = useState(0);
+  const retryViewer = useCallback(() => {
+    if (viewerLoadFailed()) {
+      window.location.reload();
+      return;
+    }
+    setViewerBoundaryKey((k) => k + 1);
+  }, []);
 
   // Check if we have any structures loaded
   const hasStructures = structureOrder.length > 0;
@@ -193,6 +212,17 @@ function AppContent() {
   useEffect(() => {
     loadSavedMoleculesIndex();
   }, [loadSavedMoleculesIndex]);
+
+  // Start downloading the viewer as soon as a structure is on its way, so the
+  // chunk loads alongside the structure fetch instead of after it. Registered
+  // before useInitialUrlLoad; the first check covers a load already under way.
+  useEffect(() => {
+    const preload = (state: StoreState) => {
+      if (wantsViewer(state)) preloadViewer();
+    };
+    preload(useMoleculeStore.getState());
+    return useMoleculeStore.subscribe(preload);
+  }, []);
 
   // Load what the startup URL asks for, then keep the address bar in sync.
   useInitialUrlLoad();
@@ -471,22 +501,32 @@ function AppContent() {
                 onShowShortcuts={handleShowShortcuts}
               />
               <ErrorBoundary
+                key={viewerBoundaryKey}
                 fallback={
                   <div className={styles.errorBoundaryFallback}>
-                    <h2>Rendering Error</h2>
-                    <p>Failed to render the molecule. Please try a different file.</p>
+                    <h2>Viewer error</h2>
+                    <p>The 3D viewer could not be loaded or failed to render.</p>
+                    <button type="button" onClick={retryViewer}>Try again</button>
                   </div>
                 }
               >
-                <MoleculeViewer
-                  ref={setViewerRef}
-                  autoRotate={autoRotate}
-                  backgroundColor={THEME_COLORS[theme].background}
-                  atomCount={totalAtomCount}
-                  getBoundingBox={getBoundingBox}
+                <Suspense
+                  fallback={
+                    <div className={styles.loadingOverlay}>
+                      <div className={styles.spinner}></div>
+                      <span>Loading viewer...</span>
+                    </div>
+                  }
                 >
-                  <MoleculeScene measurementColors={THEME_COLORS[theme].measurement} />
-                </MoleculeViewer>
+                  <ViewerStage
+                    ref={setViewerRef}
+                    autoRotate={autoRotate}
+                    backgroundColor={THEME_COLORS[theme].background}
+                    atomCount={totalAtomCount}
+                    boundingBox={boundingBoxData}
+                    measurementColors={THEME_COLORS[theme].measurement}
+                  />
+                </Suspense>
               </ErrorBoundary>
             </>
           )}
