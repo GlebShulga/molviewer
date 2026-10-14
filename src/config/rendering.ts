@@ -24,6 +24,14 @@ export const CAMERA = {
   far: 1000,
 } as const;
 
+/**
+ * Upper bound for the main canvas pixel ratio. Touch devices (often 3x
+ * screens) render at 1.5x: much less GPU work for a small loss of sharpness.
+ * PNG export sets its own pixel ratio, so exports are unaffected.
+ */
+export const MAX_DPR =
+  typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches ? 1.5 : 2;
+
 export const LIGHTING = {
   ambient: {
     intensity: 0.4, // Reduced for better SSAO contrast

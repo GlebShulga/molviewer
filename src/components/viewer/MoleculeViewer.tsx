@@ -4,7 +4,7 @@ import { EffectComposer, N8AO, SMAA } from "@react-three/postprocessing";
 import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, type ReactNode } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
-import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, getQualityPreset } from "../../config";
+import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, MAX_DPR, getQualityPreset } from "../../config";
 import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
 import { drawWatermark } from "../../utils/exportImage";
@@ -304,6 +304,9 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
       <Canvas
         style={{ background: backgroundColor, ...style }}
         className={className}
+        dpr={[1, MAX_DPR]}
+        // antialias stays on: exportImage renders with gl.render directly, past
+        // the composer's SMAA, so canvas MSAA is all a PNG export gets.
         gl={{ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }}
         onCreated={(state: RootState) => {
           // Set refs immediately when Canvas context is created
