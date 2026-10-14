@@ -61,6 +61,7 @@ export function DistanceMeasurement({
 
   // Update label position every frame based on camera, and animate pulse if highlighted
   // Uses pre-allocated vectors to avoid GC pressure from frame-by-frame allocations
+  // Priority -1 runs this before drei's Html projects the label, so it never lags a frame.
   useFrame((state) => {
     if (labelRef.current) {
       _cameraDir.copy(camera.position).sub(midpoint).normalize();
@@ -71,7 +72,9 @@ export function DistanceMeasurement({
       const scale = 1 + PULSE_AMPLITUDE * Math.sin(state.clock.elapsedTime * PULSE_SPEED);
       pulseRef.current.scale.setScalar(scale);
     }
-  });
+    // Keep frames coming while the pulse animates (demand rendering).
+    if (isHighlighted) state.invalidate();
+  }, -1);
 
   return (
     <group>

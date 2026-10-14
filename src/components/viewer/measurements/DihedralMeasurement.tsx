@@ -115,7 +115,8 @@ export function DihedralMeasurement({
     };
   }, [atom1, atom2, atom3, atom4]);
 
-  // Update label position every frame based on camera
+  // Update label position every frame based on camera. Priority -1 runs this
+  // before drei's Html projects the label, so it never lags a frame behind.
   useFrame((state) => {
     if (labelRef.current) {
       const cameraDir = camera.position.clone().sub(sectorCenter).normalize();
@@ -125,7 +126,9 @@ export function DihedralMeasurement({
       const scale = 1 + 0.3 * Math.sin(state.clock.elapsedTime * 4);
       pulseRef.current.scale.setScalar(scale);
     }
-  });
+    // Keep frames coming while the pulse animates (demand rendering).
+    if (isHighlighted) state.invalidate();
+  }, -1);
 
   const lineWidth = isHighlighted ? 4 : 2;
 

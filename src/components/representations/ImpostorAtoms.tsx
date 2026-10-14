@@ -171,7 +171,7 @@ export function ImpostorAtoms({
   const pickingSceneRef = useRef<THREE.Scene | null>(null);
   const gpuPickerRef = useRef<GPUPickingManager | null>(null);
 
-  const { gl, camera, size } = useThree();
+  const { gl, camera, size, invalidate } = useThree();
 
   const { setHoveredAtom, selectAtom, measurementMode, hoveredAtomIndex, activeStructureId } =
     useMoleculeStore(useShallow(state => ({
@@ -313,6 +313,9 @@ export function ImpostorAtoms({
       });
       pickingMeshRef.current.instanceMatrix.needsUpdate = true;
     }
+
+    // Buffers changed outside React's props, so request a frame (demand rendering).
+    invalidate();
   }, [
     atomsData,
     selectedIndices,
@@ -324,6 +327,7 @@ export function ImpostorAtoms({
     indexArray,
     dummy,
     shouldUseGPUPicking,
+    invalidate,
   ]);
 
   // Set up instance attributes on geometry
@@ -344,7 +348,8 @@ export function ImpostorAtoms({
       'instanceHovered',
       new THREE.InstancedBufferAttribute(hoveredArray, 1)
     );
-  }, [colorArray, radiusArray, selectedArray, hoveredArray]);
+    invalidate();
+  }, [colorArray, radiusArray, selectedArray, hoveredArray, invalidate]);
 
   // Set up picking mesh attributes
   useEffect(() => {

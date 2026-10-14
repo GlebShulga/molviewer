@@ -58,7 +58,7 @@ interface SceneControllerProps {
 }
 
 function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneControllerProps) {
-  const { camera, gl, scene } = useThree();
+  const { camera, gl, scene, invalidate } = useThree();
   const setControlsReady = useMoleculeStore(state => state.setControlsReady);
   const setError = useMoleculeStore(state => state.setError);
 
@@ -78,6 +78,7 @@ function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneCont
     };
     const handleContextRestored = () => {
       setError(null);
+      invalidate();
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
     canvas.addEventListener('webglcontextrestored', handleContextRestored);
@@ -85,14 +86,22 @@ function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneCont
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       canvas.removeEventListener('webglcontextrestored', handleContextRestored);
     };
-  }, [gl, setError]);
+  }, [gl, setError, invalidate]);
 
   // Set Three.js scene background color
   useEffect(() => {
     if (backgroundColor) {
       scene.background = new THREE.Color(backgroundColor);
+      invalidate();
     }
-  }, [scene, backgroundColor]);
+  }, [scene, backgroundColor, invalidate]);
+
+  // Under demand rendering, auto-rotate keeps itself going (each controls
+  // update fires 'change', which requests the next frame) but needs a first
+  // frame to start from.
+  useEffect(() => {
+    if (autoRotate) invalidate();
+  }, [autoRotate, invalidate]);
 
   // Set controls ready on mount, clear on unmount
   useEffect(() => {
@@ -130,6 +139,11 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
   ) {
     const controlsRef = useRef<OrbitControlsImpl>(null);
     const recordingRef = useRef(false);
+    // The canvas renders on demand. Imperative camera and export changes below
+    // happen outside React, so they request frames through these (set in onCreated).
+    const invalidateRef = useRef<RootState["invalidate"] | null>(null);
+    const setFrameloopRef = useRef<RootState["setFrameloop"] | null>(null);
+    const invalidate = () => invalidateRef.current?.();
 
     // Get quality preset based on atom count
     const qualityPreset = useMemo(() => getQualityPreset(atomCount), [atomCount]);
@@ -169,6 +183,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         }
 
         controls.update();
+        invalidate();
       },
       getCameraSnapshot: (): CameraSnapshot | null => {
         const controls = controlsRef.current;
@@ -190,6 +205,8 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         camera.updateProjectionMatrix();
         camera.lookAt(controls.target);
         controls.update();
+        // A zoom-only change doesn't make OrbitControls fire 'change'.
+        invalidate();
       },
       recordTurntable: async (options) => {
         const controls = controlsRef.current;
@@ -214,6 +231,9 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         controls.enableDamping = false;
         controls.update();
         controls.enabled = false;
+        // setAngle moves the camera directly and disabled controls fire no
+        // 'change', so render every frame while recording.
+        setFrameloopRef.current?.("always");
 
         const startPosition = camera.position.clone();
         const target = controls.target.clone();
@@ -246,6 +266,8 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           controls.enableDamping = prev.enableDamping;
           controls.autoRotate = prev.autoRotate;
           controls.update();
+          setFrameloopRef.current?.("demand");
+          invalidate();
           recordingRef.current = false;
         }
       },
@@ -296,6 +318,8 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           gl.setSize(originalSize.x, originalSize.y);
           scene.background = originalBackground;
           gl.render(scene, camera);
+          // That render skipped the composer (AO, SMAA); redraw the screen with it.
+          invalidate();
         }
       },
     }));
@@ -308,6 +332,10 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         // antialias stays on: exportImage renders with gl.render directly, past
         // the composer's SMAA, so canvas MSAA is all a PNG export gets.
         gl={{ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }}
+        // Draw only when something changes. Camera input redraws through
+        // OrbitControls' 'change' events, prop changes through R3F; imperative
+        // changes call invalidate().
+        frameloop="demand"
         onCreated={(state: RootState) => {
           // Set refs immediately when Canvas context is created
           // This fires synchronously and is more reliable than useEffect for initial setup
@@ -315,6 +343,8 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           viewerRefs.scene = state.scene;
           viewerRefs.camera = state.camera;
           viewerRefs.ready = true;
+          invalidateRef.current = state.invalidate;
+          setFrameloopRef.current = state.setFrameloop;
         }}
       >
         <PerspectiveCamera makeDefault position={[...cameraPosition]} fov={cameraFov} />

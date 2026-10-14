@@ -32,7 +32,7 @@ export function SelectableAtom({
 }: SelectableAtomProps) {
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
   const [hovered, setHovered] = useState(false);
-  const { gl } = useThree();
+  const { gl, invalidate } = useThree();
 
   const { setHoveredAtom, selectAtom, measurementMode, showContextMenu, activeStructureId } = useMoleculeStore(useShallow(state => ({
     setHoveredAtom: state.setHoveredAtom,
@@ -59,7 +59,9 @@ export function SelectableAtom({
       materialRef.current.emissive = EMISSIVE_NONE;
       materialRef.current.emissiveIntensity = 0;
     }
-  }, [selected, hovered]);
+    // Set on the material directly, so React won't trigger a frame (demand rendering).
+    invalidate();
+  }, [selected, hovered, invalidate]);
 
   const handlePointerOver = useCallback((event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
