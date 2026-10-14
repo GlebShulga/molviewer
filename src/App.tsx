@@ -512,7 +512,7 @@ function AppContent() {
               >
                 <Suspense
                   fallback={
-                    <div className={styles.loadingOverlay}>
+                    <div className={`${styles.loadingOverlay} ${styles.viewerLoading}`}>
                       <div className={styles.spinner}></div>
                       <span>Loading viewer...</span>
                     </div>

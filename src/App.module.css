@@ -130,6 +130,12 @@
   z-index: 100;
 }
 
+/* While the 3D viewer chunk downloads the structure is already loaded, so
+   stay under the toolbar (z-index 50): its buttons work without the viewer. */
+.viewerLoading {
+  z-index: 10;
+}
+
 .spinner {
   width: 40px;
   height: 40px;
