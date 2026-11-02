@@ -85,7 +85,8 @@ export const page: ContentPage = {
     {
       heading: 'Try it yourself',
       html:
-        `<p>Open <a href="/pdb/1CRN">crambin</a> in MolViewer and hover over any atom: the tooltip shows the atom name, residue, chain, occupancy and B-factor straight from the file. Switch to <a href="/pdb/1CRN?repr=cartoon&amp;color=secondaryStructure">cartoon with secondary-structure colors</a> to see the HELIX and SHEET records drawn as ribbons and arrows, or open <a href="/pdb/4HHB">hemoglobin</a> and find the heme groups in ball-and-stick.</p>`,
+        `<p>Open <a href="/pdb/1CRN">crambin</a> in MolViewer and hover over any atom: the tooltip shows the atom name, residue, chain, occupancy and B-factor straight from the file. Switch to <a href="/pdb/1CRN?repr=cartoon&amp;color=secondaryStructure">cartoon with secondary-structure colors</a> to see the HELIX and SHEET records drawn as ribbons and arrows, or open <a href="/pdb/4HHB">hemoglobin</a> and find the heme groups in ball-and-stick.</p>` +
+        `<p>The same works for a file of your own: open your <code>.pdb</code> file in the <a href="/pdb-viewer">PDB file viewer</a> and hover any atom to read its line.</p>`,
     },
   ],
   faq: [
@@ -105,7 +106,7 @@ export const page: ContentPage = {
   cta: { label: 'Open crambin (1CRN) in the viewer', href: '/pdb/1CRN?repr=cartoon&color=secondaryStructure' },
   related: [
     { label: 'Alpha helices and beta sheets', href: '/learn/alpha-helices-and-beta-sheets' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'mmCIF / CIF file viewer', href: '/mmcif-viewer' },
     { label: 'Hemoglobin and oxygen transport', href: '/collections/hemoglobin-oxygen-transport' },
     { label: 'pLDDT explained', href: '/learn/plddt-explained' },

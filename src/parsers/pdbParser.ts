@@ -305,6 +305,10 @@ export function parsePDB(
   const connectRecords: number[][] = [];
   const ssRanges: SecondaryStructureRange[] = [];
   let moleculeName = "Molecule";
+  // COMPND is either a "MOL_ID: 1; MOLECULE: ...; CHAIN: A; ..." specification
+  // or, from docking and modelling tools, a single free-text line.
+  let compndMolecule: string | undefined;
+  let compndText: string | undefined;
 
   // First pass: parse HELIX/SHEET records and metadata
   for (const line of lines) {
@@ -313,10 +317,10 @@ export function parsePDB(
     if (recordType === "HEADER") {
       moleculeName = line.substring(62, 66).trim() || line.substring(10, 50).trim() || moleculeName;
     } else if (recordType === "COMPND") {
-      const compndName = line.substring(10).trim();
-      if (compndName && !moleculeName.match(/^[A-Z0-9]{4}$/)) {
-        moleculeName = compndName.replace(/^MOLECULE:\s*/i, "").replace(/;$/, "").trim() || moleculeName;
-      }
+      const text = line.substring(10).trim();
+      const molecule = text.match(/^MOLECULE:\s*(.*?);?$/i);
+      if (molecule) compndMolecule ??= molecule[1].trim();
+      else if (text && !/^[A-Z_]+:/i.test(text)) compndText ??= text;
     } else if (recordType === "HELIX") {
       const range = parseHelixRecord(line);
       if (range) ssRanges.push(range);
@@ -324,6 +328,10 @@ export function parsePDB(
       const range = parseSheetRecord(line);
       if (range) ssRanges.push(range);
     }
+  }
+  // A PDB ID from HEADER wins over the compound name.
+  if (!/^[A-Z0-9]{4}$/.test(moleculeName)) {
+    moleculeName = compndMolecule || compndText || moleculeName;
   }
 
   // Second pass: parse ATOM/HETATM and CONECT records

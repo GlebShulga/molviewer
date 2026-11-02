@@ -16,7 +16,7 @@ export interface NavLink {
 }
 
 export const TOOL_LINKS: NavLink[] = [
-  { label: 'Online PDB viewer', href: '/pdb-viewer' },
+  { label: 'PDB file viewer', href: '/pdb-viewer' },
   { label: 'AlphaFold viewer', href: '/alphafold-viewer' },
   { label: 'mmCIF viewer', href: '/mmcif-viewer' },
   { label: 'SDF / MOL viewer', href: '/sdf-viewer' },

@@ -52,7 +52,7 @@ export const page: ContentPage = {
       heading: 'How secondary structure is assigned',
       html:
         `<p>Secondary structure is not measured directly in an experiment. It is calculated from the atomic coordinates, most often with the DSSP algorithm (Kabsch and Sander, 1983), which finds the backbone hydrogen-bond patterns described above. The results are stored in the structure file, as HELIX and SHEET records in the PDB format or <code>_struct_conf</code> and <code>_struct_sheet_range</code> in mmCIF. See <a href="/learn/how-to-read-a-pdb-file">how to read a PDB file</a> for what those records contain.</p>` +
-        `<p>MolViewer reads these records to draw its cartoon. If a file has none, it estimates helices and strands from the φ and ψ angles of each residue. That is a simpler method than DSSP, so short or irregular elements may differ slightly from the official assignment.</p>`,
+        `<p>When you <a href="/pdb-viewer">view a PDB file online</a> in MolViewer, it reads these records to draw its cartoon. If a file has none, it estimates helices and strands from the φ and ψ angles of each residue. That is a simpler method than DSSP, so short or irregular elements may differ slightly from the official assignment.</p>`,
     },
     {
       heading: 'See it for yourself',
@@ -86,7 +86,7 @@ export const page: ContentPage = {
     { label: 'How to read a PDB file', href: '/learn/how-to-read-a-pdb-file' },
     { label: 'Enzymes', href: '/collections/enzymes' },
     { label: 'Membrane proteins', href: '/collections/membrane-proteins' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'Free PyMOL alternative', href: '/pymol-online-alternative' },
   ],
 };

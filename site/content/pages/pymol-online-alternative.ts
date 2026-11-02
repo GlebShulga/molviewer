@@ -67,7 +67,7 @@ export const page: ContentPage = {
   cta: { label: 'Open ubiquitin (1UBQ) as a cartoon', href: '/pdb/1UBQ?repr=cartoon&color=secondaryStructure' },
   related: [
     { label: 'Compare web molecule viewers', href: '/compare' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'AlphaFold structure viewer', href: '/alphafold-viewer' },
     { label: 'Alpha helices and beta sheets', href: '/learn/alpha-helices-and-beta-sheets' },
     { label: 'About MolViewer', href: '/about' },

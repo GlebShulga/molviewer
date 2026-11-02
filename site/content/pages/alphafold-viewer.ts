@@ -54,7 +54,7 @@ export const page: ContentPage = {
     { label: 'pLDDT explained', href: '/learn/plddt-explained' },
     { label: 'How to view an AlphaFold prediction', href: '/learn/how-to-view-an-alphafold-prediction' },
     { label: 'AlphaFold highlights', href: '/collections/alphafold-highlights' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'mmCIF / CIF file viewer', href: '/mmcif-viewer' },
   ],
 };

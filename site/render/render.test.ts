@@ -108,10 +108,11 @@ describe('renderPdbLanding (3DNI fixtures)', () => {
     const { fetchImpl } = fixtureFetch();
     const { status, meta } = renderPdbLanding('3DNI', await fetchPdbDetails('3DNI', { fetchImpl }), ORIGIN);
     expect(status).toBe(200);
-    expect(meta.title).toBe('3DNI – DNase I crystal structure (2.0 Å) · 3D viewer | MolViewer');
+    expect(meta.title).toBe('3DNI in 3D: DNase I | MolViewer');
     expect(meta.description.length).toBeLessThanOrEqual(165);
     expect(meta.canonicalUrl).toBe(`${ORIGIN}/pdb/3DNI`);
-    expect(meta.pageInfoHtml).toContain('<h1>3DNI: DNase I</h1>');
+    expect(meta.pageInfoHtml).toContain('<h1>3DNI: DNase I in 3D</h1>');
+    expect(meta.pageInfoHtml).toContain('<a href="/pdb-viewer">online PDB file viewer</a>');
     expect(meta.pageInfoHtml).toContain('id="secondary-structure"');
     expect(meta.pageInfoHtml).toMatch(/α-helix<\/td><td>\d+-\d+<\/td>/);
     expect(meta.pageInfoHtml).toContain('href="/pdb/');
@@ -119,6 +120,34 @@ describe('renderPdbLanding (3DNI fixtures)', () => {
     expect(JSON.stringify(meta.jsonLd)).toContain('"@type":"Dataset"');
     expectCompleteDatasets(meta.jsonLd);
     expect(meta.extraHead).toContain('application/json+oembed');
+  });
+
+  it('keeps "in 3D" right after the ID for longer names', async () => {
+    const { fetchImpl } = fixtureFetch();
+    const { meta } = renderPdbLanding('4HHB', await fetchPdbDetails('4HHB', { fetchImpl }), ORIGIN);
+    expect(meta.title).toBe('4HHB in 3D: Human deoxyhaemoglobin | MolViewer');
+    expect(meta.pageInfoHtml).toContain('<h1>4HHB: Human deoxyhaemoglobin in 3D</h1>');
+  });
+
+  async function details3dni(patch: { title?: string; entities?: [] }) {
+    const { fetchImpl } = fixtureFetch();
+    const result = await fetchPdbDetails('3DNI', { fetchImpl });
+    if (result.status !== 'ok') throw new Error('3DNI fixture did not load');
+    return { ...result, data: { ...result.data, ...patch } };
+  }
+
+  it('keeps "in 3D" first for a name at the 48-character limit', async () => {
+    const longName = 'Glutamate receptor ionotropic NMDA 2A ectodomain';
+    expect(longName).toHaveLength(48);
+    const { meta } = renderPdbLanding('3DNI', await details3dni({ title: longName }), ORIGIN);
+    expect(meta.title).toBe(`3DNI in 3D: ${longName} | MolViewer`);
+    expect(meta.pageInfoHtml).toContain(`<h1>3DNI: ${longName} in 3D</h1>`);
+  });
+
+  it('does not repeat the ID when the entry has no usable name', async () => {
+    const { meta } = renderPdbLanding('3DNI', await details3dni({ title: undefined, entities: [] }), ORIGIN);
+    expect(meta.title).toBe('3DNI in 3D | MolViewer');
+    expect(meta.pageInfoHtml).toContain('<h1>PDB entry 3DNI in 3D</h1>');
   });
 
   it('404s unknown entries without a canonical', async () => {
@@ -133,7 +162,10 @@ describe('renderPdbLanding (3DNI fixtures)', () => {
     const { fetchImpl } = fixtureFetch({ 'rcsb-core-3DNI.json': { status: 503 } });
     const { status, meta } = renderPdbLanding('3DNI', await fetchPdbDetails('3DNI', { fetchImpl }), ORIGIN);
     expect(status).toBe(200);
+    expect(meta.title).toBe('3DNI in 3D | MolViewer');
     expect(meta.canonicalUrl).toBe(`${ORIGIN}/pdb/3DNI`);
+    expect(meta.pageInfoHtml).toContain('<h1>PDB entry 3DNI in 3D</h1>');
+    expect(meta.pageInfoHtml).toContain('<a href="/pdb-viewer">online PDB file viewer</a>');
   });
 });
 

@@ -57,7 +57,7 @@ export const page: ContentPage = {
   related: [
     { label: 'SDF and MOL file viewer', href: '/sdf-viewer' },
     { label: 'Small molecule index', href: '/compounds' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'Free PyMOL alternative', href: '/pymol-online-alternative' },
   ],
 };

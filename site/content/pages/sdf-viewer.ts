@@ -56,7 +56,7 @@ export const page: ContentPage = {
   related: [
     { label: 'Small molecule index', href: '/compounds' },
     { label: 'XYZ file viewer', href: '/xyz-viewer' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'Enzymes and their ligands', href: '/collections/enzymes' },
     { label: 'Compare web molecule viewers', href: '/compare' },
   ],

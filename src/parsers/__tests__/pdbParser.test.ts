@@ -18,6 +18,39 @@ END`;
     expect(molecule.bonds).toHaveLength(1);
   });
 
+  describe('molecule name', () => {
+    const atom = 'ATOM      1  N   ALA A   1      11.104   6.134  -6.504  1.00  0.00           N';
+    const nameOf = (...lines: string[]) => parsePDB([...lines, atom].join('\n')).name;
+
+    it('takes the MOLECULE line of a COMPND specification, not the last line', () => {
+      expect(nameOf(
+        'COMPND    MOL_ID: 1;',
+        'COMPND   2 MOLECULE: HEMOGLOBIN (DEOXY) (ALPHA CHAIN);',
+        'COMPND   3 CHAIN: A;',
+        'COMPND   4 ENGINEERED: YES',
+      )).toBe('HEMOGLOBIN (DEOXY) (ALPHA CHAIN)');
+    });
+
+    it('prefers COMPND over a HEADER classification, and a HEADER ID over both', () => {
+      expect(nameOf('HEADER    PLANT PROTEIN', 'COMPND    MOL_ID: 1;', 'COMPND   2 MOLECULE: CRAMBIN;', 'COMPND   3 CHAIN: A'))
+        .toBe('CRAMBIN');
+      expect(nameOf(
+        'HEADER    PLANT PROTEIN                           30-APR-81   1CRN',
+        'COMPND    MOL_ID: 1;',
+        'COMPND   2 MOLECULE: CRAMBIN;',
+      )).toBe('1CRN');
+    });
+
+    it('keeps the free-text COMPND line docking tools write', () => {
+      expect(nameOf('COMPND    ligand_pose_1')).toBe('ligand_pose_1');
+    });
+
+    it('falls back to "Molecule"', () => {
+      expect(nameOf('COMPND    MOL_ID: 1;', 'COMPND   2 CHAIN: A;')).toBe('Molecule');
+      expect(nameOf()).toBe('Molecule');
+    });
+  });
+
   it('infers bonds when no CONECT records exist', () => {
     const pdb = `HEADER    WATER
 HETATM    1  O   HOH A   1       0.000   0.000   0.000  1.00  0.00           O

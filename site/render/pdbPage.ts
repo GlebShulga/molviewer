@@ -329,14 +329,15 @@ function fallbackPage(id: string, origin: string): LandingRender {
   return {
     status: 200,
     meta: {
-      title: `${id} 3D structure · free 3D viewer | MolViewer`,
+      title: `${id} in 3D | MolViewer`,
       description: `View PDB structure ${id} in 3D in your browser, free with no install. Explore helices and sheets, chains, ligands and measure distances.`,
       canonicalUrl,
       ogImageUrl: ogImageUrl(origin, 'pdb', id),
       pageInfoHtml: `<div class="page-info-inner">
-<h1>PDB entry ${escapeHtml(id)}</h1>
+<h1>PDB entry ${escapeHtml(id)} in 3D</h1>
 <p class="lead">View Protein Data Bank entry ${escapeHtml(id)} interactively in 3D. Rotate, zoom, measure distances and angles, and explore secondary structure directly in your browser.</p>
 <p><a href="https://www.rcsb.org/structure/${escapeHtml(id)}" rel="noopener">${escapeHtml(id)} on RCSB PDB</a></p>
+<p>Have your own <code>.pdb</code> file? Open it in the <a href="/pdb-viewer">online PDB file viewer</a>.</p>
 </div>
 ${renderFooter(FEATURED_COLLECTIONS)}`,
     },
@@ -351,9 +352,13 @@ export function renderPdbLanding(id: string, result: PdbResult, origin: string):
   const canonicalUrl = `${origin}/pdb/${d.id}`;
   const name = shortName(d);
   const noun = methodNoun(d.method);
-  const res = d.resolution ? ` (${formatResolution(d.resolution)} Å)` : '';
-  let title = `${d.id} – ${name} ${noun}${res} · 3D viewer | MolViewer`;
-  if (title.length > 75) title = `${d.id} – ${name} ${noun}${res} | MolViewer`;
+  // "3D" right after the ID, so a searcher who also sees the RCSB entry can
+  // tell this page is a viewer. Names over 36 characters push the title past
+  // 60 and Google cuts its end, never the "in 3D". Without a real name,
+  // shortName() returns "PDB entry <id>", which would repeat the ID.
+  const named = name !== `PDB entry ${d.id}`;
+  const title = named ? `${d.id} in 3D: ${name} | MolViewer` : `${d.id} in 3D | MolViewer`;
+  const heading = named ? `${d.id}: ${name}` : name;
 
   const ss = d.secondaryStructure;
   const hasSs = !!ss && ss.chains.some((c) => c.helices.length || c.strands.length);
@@ -387,7 +392,7 @@ export function renderPdbLanding(id: string, result: PdbResult, origin: string):
 </p>`;
 
   const pageInfoHtml = `<div class="page-info-inner">
-<h1>${escapeHtml(d.id)}: ${escapeHtml(name)}</h1>
+<h1>${escapeHtml(heading)} in 3D</h1>
 <p class="lead">${lead}</p>
 ${renderFacts(factList)}
 ${viewLinks}
@@ -397,7 +402,7 @@ ${renderLigands(d)}
 ${renderCitation(d)}
 ${renderRelated(d)}
 <h2>About this viewer</h2>
-<p>MolViewer shows ${escapeHtml(d.id)} directly in your browser with nothing to install. Switch between cartoon, ball-and-stick, spacefill and surface views, color by chain, secondary structure or B-factor, measure distances, angles and dihedrals, and share or embed the view.</p>
+<p>MolViewer shows ${escapeHtml(d.id)} directly in your browser with nothing to install. Switch between cartoon, ball-and-stick, spacefill and surface views, color by chain, secondary structure or B-factor, measure distances, angles and dihedrals, and share or embed the view. Have your own <code>.pdb</code> file? Open it in the <a href="/pdb-viewer">online PDB file viewer</a>.</p>
 </div>
 ${renderFooter(FEATURED_COLLECTIONS)}`;
 

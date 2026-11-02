@@ -358,8 +358,9 @@
   font-size: 0.875rem;
 }
 
-/* A rule above the footer only where content sits above it. On the home page
-   #page-info holds nothing else, and its own border-top is that rule. */
+/* A rule above the footer only where a page's own content sits above it. The
+   home page's #page-info holds just a short intro (.home-intro) before the
+   footer, and the section's own border-top is the only rule it needs. */
 .page-info-inner + .site-footer,
 .static-page main + .site-footer {
   margin-top: 24px;
@@ -451,13 +452,24 @@
   border: 0;
 }
 
-/* On the home page #page-info holds nothing but the footer, which lines up
-   with the app header's brand. Landing pages (/pdb/…, /af/…, /compound/…,
+/* On the home page #page-info holds a short intro and the footer, both lined
+   up with the app header's brand. Landing pages (/pdb/…, /af/…, /compound/…,
    /s/…) keep their centered column, footer included. */
-.page-info .site-footer {
+.page-info .site-footer,
+.home-intro {
   max-width: 1120px;
   margin-inline: 0;
   padding-inline: 24px;
+}
+
+.home-intro {
+  padding-top: 32px;
+}
+
+.page-info .home-intro p {
+  max-width: 72ch;
+  margin-bottom: 0;
+  color: var(--text-secondary);
 }
 
 .page-info .page-info-inner + .site-footer {
@@ -483,8 +495,13 @@
     padding-top: 24px;
   }
 
-  .page-info .site-footer {
+  .page-info .site-footer,
+  .home-intro {
     padding-inline: 16px;
+  }
+
+  .home-intro {
+    padding-top: 24px;
   }
 
   /* Phones: one collapsible group per row (public/footer.js closes them). */

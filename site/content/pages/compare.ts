@@ -63,7 +63,7 @@ export const page: ContentPage = {
   cta: { label: 'Try MolViewer with hemoglobin', href: '/pdb/4HHB?repr=cartoon&color=chain' },
   related: [
     { label: 'Free PyMOL alternative', href: '/pymol-online-alternative' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'AlphaFold structure viewer', href: '/alphafold-viewer' },
     { label: 'SDF and MOL file viewer', href: '/sdf-viewer' },
     { label: 'About MolViewer', href: '/about' },

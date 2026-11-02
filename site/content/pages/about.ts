@@ -45,7 +45,7 @@ export const page: ContentPage = {
   related: [
     { label: 'Privacy policy', href: '/privacy' },
     { label: 'Compare web molecule viewers', href: '/compare' },
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'AlphaFold structure viewer', href: '/alphafold-viewer' },
     { label: 'How to read a PDB file', href: '/learn/how-to-read-a-pdb-file' },
   ],

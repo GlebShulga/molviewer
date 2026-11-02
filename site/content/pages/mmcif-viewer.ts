@@ -54,7 +54,7 @@ export const page: ContentPage = {
   ],
   cta: { label: 'Open the SARS-CoV-2 spike (6VXX) from mmCIF', href: '/pdb/6VXX?repr=cartoon&color=chain' },
   related: [
-    { label: 'Online PDB viewer', href: '/pdb-viewer' },
+    { label: 'PDB file viewer', href: '/pdb-viewer' },
     { label: 'How to read a PDB file', href: '/learn/how-to-read-a-pdb-file' },
     { label: 'AlphaFold structure viewer', href: '/alphafold-viewer' },
     { label: 'SARS-CoV-2 structures', href: '/collections/sars-cov-2' },
