@@ -10,6 +10,7 @@
 import { SHELL_MARKER } from '../routing';
 import { escapeHtml, jsonForScript } from './html';
 import { LANDING_DATA_ELEMENT_ID, type LandingData } from '../landingData';
+import type { OgImage } from '../ogImages';
 
 /**
  * The #page-info content sits between these comments. The content contains
@@ -26,8 +27,8 @@ export interface ShellMeta {
   description: string;
   /** Absolute canonical URL, or null to drop the canonical link. */
   canonicalUrl: string | null;
-  /** Absolute OG/Twitter image URL; defaults to the site image. */
-  ogImageUrl?: string;
+  /** OG/Twitter image (absolute URL, type and size); defaults to the site image. */
+  ogImage?: OgImage;
   /** Robots directive; defaults to "index, follow". */
   robots?: string;
   /** Replaces the default WebApplication JSON-LD. */
@@ -75,10 +76,16 @@ export function applyShellMeta(html: string, meta: ShellMeta): string {
   out = setMetaContent(out, 'name', 'twitter:title', meta.title);
   out = setMetaContent(out, 'name', 'twitter:description', meta.description);
   out = setMetaContent(out, 'name', 'twitter:image:alt', meta.title);
-  if (meta.ogImageUrl) {
-    out = setMetaContent(out, 'property', 'og:image', meta.ogImageUrl);
-    out = setMetaContent(out, 'property', 'og:image:secure_url', meta.ogImageUrl);
-    out = setMetaContent(out, 'name', 'twitter:image', meta.ogImageUrl);
+  if (meta.ogImage) {
+    const img = meta.ogImage;
+    out = setMetaContent(out, 'property', 'og:image', img.url);
+    out = setMetaContent(out, 'property', 'og:image:secure_url', img.url);
+    out = setMetaContent(out, 'property', 'og:image:type', img.type);
+    out = setMetaContent(out, 'property', 'og:image:width', String(img.width));
+    out = setMetaContent(out, 'property', 'og:image:height', String(img.height));
+    out = setMetaContent(out, 'name', 'twitter:image', img.url);
+    // X crops summary_large_image to 2:1, which would cut a square picture in half.
+    if (img.width === img.height) out = setMetaContent(out, 'name', 'twitter:card', 'summary');
   }
 
   if (meta.jsonLd) {

@@ -8,7 +8,7 @@ import { clean, escapeHtml } from './html';
 import { formatDate, formatResolution } from './format';
 import { collectionHref, collectionsContaining, FEATURED_COLLECTIONS } from '../collections';
 import { renderFooter } from '../nav';
-import { ogImageUrl } from '../ogImages';
+import { ogImage, siteOgImage } from '../ogImages';
 import { oembedLink, type LandingRender } from './pdbPage';
 
 function name(d: AfDetails): string {
@@ -97,7 +97,7 @@ function notFoundPage(id: string, origin: string): LandingRender {
       description: `AlphaFold DB has no prediction for the UniProt accession ${id}. Check the accession or try another protein.`,
       canonicalUrl: null,
       robots: 'noindex, follow',
-      ogImageUrl: `${origin}/og-image.png`,
+      ogImage: siteOgImage(origin),
       pageInfoHtml: `<div class="page-info-inner">
 <h1>No AlphaFold model for ${escapeHtml(id)}</h1>
 <p class="lead">AlphaFold DB has no prediction for the UniProt accession <code>${escapeHtml(id)}</code>. The accession may be mistyped, obsolete, or a protein AlphaFold DB doesn't cover. Try another accession in the sidebar, or browse <a href="/collections/alphafold-highlights">AlphaFold highlights</a>.</p>
@@ -114,7 +114,7 @@ function fallbackPage(id: string, origin: string): LandingRender {
       title: `${id} AlphaFold structure · 3D viewer | MolViewer`,
       description: `View the AlphaFold prediction for UniProt ${id} in 3D in your browser, free with no install. Color by pLDDT confidence and measure distances.`,
       canonicalUrl: `${origin}/af/${id}`,
-      ogImageUrl: ogImageUrl(origin, 'af', id),
+      ogImage: ogImage(origin, { kind: 'af', id }),
       pageInfoHtml: `<div class="page-info-inner">
 <h1>AlphaFold prediction ${escapeHtml(id)}</h1>
 <p class="lead">View the AlphaFold structure prediction for UniProt entry ${escapeHtml(id)} interactively in 3D.</p>
@@ -196,7 +196,7 @@ ${renderFooter(FEATURED_COLLECTIONS)}`;
       title,
       description,
       canonicalUrl,
-      ogImageUrl: ogImageUrl(origin, 'af', d.id),
+      ogImage: ogImage(origin, { kind: 'af', id: d.id }),
       jsonLd: [
         {
           '@context': 'https://schema.org',

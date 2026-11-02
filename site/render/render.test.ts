@@ -8,6 +8,7 @@ import { renderAfLanding } from './afPage';
 import { renderShareLanding, UNAVAILABLE } from './sharePage';
 import { methodNoun } from './format';
 import { pdbCardSpec } from '../build/ogCards';
+import { compoundImageUrl, ogImage, siteOgImage } from '../ogImages';
 import { fetchPdbDetails } from '../upstream/pdb';
 import { fetchAfDetails } from '../upstream/af';
 import { fixtureFetch } from '../upstream/__fixtures__/fixtureFetch';
@@ -58,7 +59,7 @@ describe('applyShellMeta', () => {
       title: 'T & <x>',
       description: 'D "quoted"',
       canonicalUrl: `${ORIGIN}/pdb/1CRN`,
-      ogImageUrl: `${ORIGIN}/og/pdb/1CRN.png`,
+      ogImage: ogImage(ORIGIN, { kind: 'pdb', id: '1CRN' }),
       jsonLd: { '@type': 'WebPage', name: '</script><b>' },
       pageInfoHtml: '<p>Landing</p>',
       landingData: { kind: 'pdb', id: '1CRN', title: 'Crambin', facts: [], links: [] },
@@ -68,6 +69,8 @@ describe('applyShellMeta', () => {
     expect(html).toContain('<meta name="description" content="D &quot;quoted&quot;"');
     expect(html).toContain(`<link rel="canonical" href="${ORIGIN}/pdb/1CRN"`);
     expect(html).toContain(`<meta property="og:image" content="${ORIGIN}/og/pdb/1CRN.png">`);
+    expect(html).toContain('<meta property="og:image:width" content="1200">');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(html).toContain(`<meta name="twitter:title" content="T &amp; &lt;x&gt;">`);
     // JSON-LD can't close its <script> early.
     expect(html).not.toContain('</script><b>');
@@ -90,6 +93,34 @@ describe('applyShellMeta', () => {
     expect(html).not.toContain('id="page-info"');
     expect(html).toContain('<meta name="robots" content="noindex, follow">');
     expect(html).toContain('<script type="module"');
+  });
+
+  it('writes the image type and size, and uses the small Twitter card for square images', () => {
+    const html = applyShellMeta(SHELL, {
+      title: 't',
+      description: 'd',
+      canonicalUrl: null,
+      ogImage: ogImage(ORIGIN, { kind: 'pdb', id: '1ABC' }),
+    });
+    expect(html).toContain(`<meta property="og:image" content="${ORIGIN}/api/og/pdb/1ABC.png">`);
+    expect(html).toContain(`<meta name="twitter:image" content="${ORIGIN}/api/og/pdb/1ABC.png">`);
+    expect(html).toContain('<meta property="og:image:type" content="image/jpeg">');
+    expect(html).toContain('<meta property="og:image:width" content="500">');
+    expect(html).toContain('<meta property="og:image:height" content="500">');
+    expect(html).toContain('<meta name="twitter:card" content="summary">');
+  });
+});
+
+describe('ogImage', () => {
+  it('picks the card, the RCSB proxy, PubChem or the site image', () => {
+    expect(ogImage(ORIGIN, { kind: 'pdb', id: '4HHB' })).toEqual({ url: `${ORIGIN}/og/pdb/4HHB.png`, type: 'image/png', width: 1200, height: 630 });
+    expect(ogImage(ORIGIN, { kind: 'pdb', id: '1ABC' })).toEqual({ url: `${ORIGIN}/api/og/pdb/1ABC.png`, type: 'image/jpeg', width: 500, height: 500 });
+    expect(ogImage(ORIGIN, { kind: 'af', id: 'P69905' }).url).toBe(`${ORIGIN}/og/af/P69905.png`);
+    expect(ogImage(ORIGIN, { kind: 'af', id: 'Q9ZZZ8' })).toEqual(siteOgImage(ORIGIN));
+    expect(ogImage(ORIGIN, { kind: 'compound', slug: 'caffeine' })).toEqual({ url: `${ORIGIN}/og/compound/caffeine.png`, type: 'image/png', width: 1200, height: 630 });
+    expect(ogImage(ORIGIN, { kind: 'cid', cid: 9999999 })).toEqual({ url: compoundImageUrl(9999999), type: 'image/png', width: 300, height: 300 });
+    // A curated compound reached by CID still gets its card.
+    expect(ogImage(ORIGIN, { kind: 'cid', cid: 2519 }).url).toBe(`${ORIGIN}/og/compound/caffeine.png`);
   });
 });
 
@@ -177,7 +208,7 @@ describe('renderAfLanding', () => {
     expect(meta.title).toMatch(/^P69905 – Hemoglobin subunit alpha/);
     expect(meta.pageInfoHtml).toContain('id="confidence"');
     expect(meta.pageInfoHtml).toContain('href="/pdb/');
-    expect(meta.ogImageUrl).toBe(`${ORIGIN}/og/af/P69905.png`);
+    expect(meta.ogImage?.url).toBe(`${ORIGIN}/og/af/P69905.png`);
     expectCompleteDatasets(meta.jsonLd);
   });
 
@@ -214,6 +245,33 @@ describe('renderShareLanding', () => {
     const { status, meta } = renderShareLanding('abcdefgh1234', null, ORIGIN);
     expect(status).toBe(404);
     expect(meta.robots).toBe('noindex, follow');
+  });
+
+  it('shows the picture of a lone structure, without giving compounds a canonical', () => {
+    const share = (source: object) => renderShareLanding('abcdefgh1234', { structures: [{ name: 'x', source }] }, ORIGIN).meta;
+    const compound = share({ type: 'pubchem', cid: 2519, slug: 'caffeine' });
+    expect(compound.ogImage?.url).toBe(`${ORIGIN}/og/compound/caffeine.png`);
+    expect(compound.canonicalUrl).toBeNull();
+    expect(compound.robots).toBe('noindex, follow');
+    expect(share({ type: 'pubchem', cid: 123456789 }).ogImage?.url).toBe(compoundImageUrl(123456789));
+    expect(share({ type: 'rcsb', id: '1ABC' }).ogImage?.type).toBe('image/jpeg');
+    expect(share({ type: 'inline' }).ogImage).toEqual(siteOgImage(ORIGIN));
+  });
+
+  it('treats lower-case stored IDs like the catalog entry they name', () => {
+    const { meta } = renderShareLanding('abcdefgh1234', { structures: [{ name: '4hhb', source: { type: 'rcsb', id: '4hhb' } }] }, ORIGIN);
+    expect(meta.ogImage?.url).toBe(`${ORIGIN}/og/pdb/4HHB.png`);
+    expect(meta.canonicalUrl).toBe(`${ORIGIN}/pdb/4HHB`);
+  });
+});
+
+describe('PDB pages for entries without a card', () => {
+  it('use the RCSB image, also when RCSB data is unavailable', () => {
+    const fallback = renderPdbLanding('1ABC', { status: 'error', message: 'timeout' }, ORIGIN);
+    expect(fallback.status).toBe(200);
+    expect(fallback.meta.ogImage).toEqual({ url: `${ORIGIN}/api/og/pdb/1ABC.png`, type: 'image/jpeg', width: 500, height: 500 });
+    const missing = renderPdbLanding('1ABC', { status: 'not-found' }, ORIGIN);
+    expect(missing.meta.ogImage).toEqual(siteOgImage(ORIGIN));
   });
 });
 

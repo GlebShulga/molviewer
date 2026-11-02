@@ -309,6 +309,14 @@ describe('useUrlSync + useInitialUrlLoad', () => {
     await waitFor(() => expect(currentUrl()).toBe('/pdb/1CRN'));
   });
 
+  it('a Copy Link ?view= restores the camera and then drops out of the address', async () => {
+    openAt('/pdb/1CRN?repr=cartoon&view=10,20,30,1,2,3,1.5');
+    mountApp();
+    await resolveAll();
+    await waitFor(() => expect(currentUrl()).toBe('/pdb/1CRN?repr=cartoon'));
+    expect(useMoleculeStore.getState().pendingCameraSnapshot).toEqual({ position: [10, 20, 30], target: [1, 2, 3], zoom: 1.5 });
+  });
+
   it('Add mode keeps the first structure; removing it moves on; removing the last goes home', async () => {
     openAt('/');
     mountApp();

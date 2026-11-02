@@ -6,6 +6,7 @@
 import { escapeHtml, jsonForScript } from './html';
 import { SITE_NAME, SITE_ORIGIN, TOOL_LINKS, renderFooter } from '../nav';
 import { FEATURED_COLLECTIONS } from '../collections';
+import { siteOgImage, type OgImage } from '../ogImages';
 
 export interface Crumb {
   label: string;
@@ -24,7 +25,8 @@ export interface StaticDocument {
   jsonLd?: object[];
   breadcrumbs?: Crumb[];
   robots?: string;
-  ogImageUrl?: string;
+  /** Defaults to the site image. */
+  ogImage?: OgImage;
   footerCollections?: { slug: string; title: string }[];
 }
 
@@ -57,7 +59,7 @@ export function renderBreadcrumbs(crumbs: Crumb[]): string {
 
 export function renderStaticDocument(doc: StaticDocument): string {
   const canonical = `${SITE_ORIGIN}${doc.path}`;
-  const ogImage = doc.ogImageUrl ?? `${SITE_ORIGIN}/og-image.png`;
+  const ogImage = doc.ogImage ?? siteOgImage(SITE_ORIGIN);
   const jsonLd = [...(doc.jsonLd ?? [])];
   if (doc.breadcrumbs?.length) jsonLd.push(breadcrumbJsonLd(doc.breadcrumbs));
   const t = escapeHtml(doc.title);
@@ -91,11 +93,14 @@ export function renderStaticDocument(doc: StaticDocument): string {
 <meta property="og:url" content="${escapeHtml(canonical)}">
 <meta property="og:title" content="${t}">
 <meta property="og:description" content="${d}">
-<meta property="og:image" content="${escapeHtml(ogImage)}">
-<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="${escapeHtml(ogImage.url)}">
+<meta property="og:image:type" content="${ogImage.type}">
+<meta property="og:image:width" content="${ogImage.width}">
+<meta property="og:image:height" content="${ogImage.height}">
+<meta name="twitter:card" content="${ogImage.width === ogImage.height ? 'summary' : 'summary_large_image'}">
 <meta name="twitter:title" content="${t}">
 <meta name="twitter:description" content="${d}">
-<meta name="twitter:image" content="${escapeHtml(ogImage)}">
+<meta name="twitter:image" content="${escapeHtml(ogImage.url)}">
 <link rel="stylesheet" href="${escapeHtml(doc.cssHref)}">
 ${jsonLd.map((j) => `<script type="application/ld+json">${jsonForScript(j)}</script>`).join('\n')}
 </head>

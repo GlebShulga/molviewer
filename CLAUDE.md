@@ -38,6 +38,8 @@ MolViewer is a molecular visualization application built with:
 - `functions/_middleware.ts` 404s unknown paths (index.html carries a `mv-spa-shell` marker that real pages remove) and sets the CSP header (`site/csp.ts`). There is no CSP `<meta>` tag.
 - The address bar follows the loaded scene (`src/hooks/useUrlSync.ts`); the startup load is `src/hooks/useInitialUrlLoad.ts`. Structures are loaded by `src/utils/structureLoader.ts`.
 - Curated data (`data/*.json`) is validated by `scripts/validate-ids.ts` and `scripts/validate-compounds.ts`.
+- **Social images**: `site/ogImages.ts` picks each page's image and its type/size (square images switch `twitter:card` to `summary`). Cards for curated entries show a molecule picture drawn by `site/moleculeArt.ts` from `data/og-art/*.json`, which `pnpm og:art` fetches and is committed (the build never calls upstream). Run it after adding catalog entries; the validators warn about entries without art. Other PDB IDs use RCSB's image via `functions/api/og/[source]/[id].png.ts`.
+- Copy Link adds `?view=` (camera) for a single-structure scene; `useInitialUrlLoad` applies it and the address sync drops it.
 - Product events: `src/utils/track.ts` -> `functions/api/event.ts` (Workers Analytics Engine).
 
 ## ChatGPT / Claude App (MCP)

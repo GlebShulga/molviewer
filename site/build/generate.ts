@@ -18,6 +18,10 @@ import type { AfSeed, Compound, PdbSeed } from '../dataTypes';
 import pdbData from '../../data/popularPdbs.json';
 import afData from '../../data/alphafold.json';
 import compoundData from '../../data/compounds.json';
+import pdbArt from '../../data/og-art/pdb.json';
+import afArt from '../../data/og-art/af.json';
+import compoundArt from '../../data/og-art/compound.json';
+import type { BallStickArt, BeadArt, OgArtFile } from '../moleculeArt';
 import { applyShellMeta } from '../render/shell';
 import {
   renderCollectionPage,
@@ -30,12 +34,16 @@ import {
 import { renderCompoundPage } from './compoundPage';
 import { renderSitemaps } from './sitemap';
 import { findBrokenLinks } from './linkCheck';
-import { afCardSpec, pdbCardSpec, renderOgCards, type CardSpec } from './ogCards';
+import { afCardSpec, compoundCardSpec, pdbCardSpec, renderOgCards, renderSquareFallback, type CardSpec } from './ogCards';
 import { shortName } from '../render/pdbPage';
 
 const PDBS = (pdbData as { pdbs: PdbSeed[] }).pdbs;
 const AFS = (afData as { entries: AfSeed[] }).entries;
 const COMPOUNDS = (compoundData as { compounds: Compound[] }).compounds;
+// Molecule pictures for the cards (scripts/build-og-art.ts). Missing entries get a text-only card.
+const PDB_ART = (pdbArt as OgArtFile<BeadArt>).entries;
+const AF_ART = (afArt as OgArtFile<BeadArt>).entries;
+const COMPOUND_ART = (compoundArt as OgArtFile<BallStickArt>).entries;
 
 const RELATED_COMPOUNDS = 12;
 
@@ -65,7 +73,7 @@ export interface GenerateResult {
   ogCached: number;
 }
 
-/** Card content for every curated PDB and AlphaFold entry. */
+/** Card content for every curated PDB, AlphaFold and compound entry. */
 function cardSpecs(): CardSpec[] {
   const labelById = new Map<string, string>();
   const collectionsById = new Map<string, string[]>();
@@ -78,9 +86,15 @@ function cardSpecs(): CardSpec[] {
   const defaultTags = ['Helices and sheets', 'Chains and ligands', 'Measure distances'];
   return [
     ...PDBS.map((p) =>
-      pdbCardSpec(p, labelById.get(p.id) ?? shortName({ id: p.id, title: p.title, entities: [] }), collectionsById.get(p.id) ?? defaultTags)
+      pdbCardSpec(
+        p,
+        labelById.get(p.id) ?? shortName({ id: p.id, title: p.title, entities: [] }),
+        collectionsById.get(p.id) ?? defaultTags,
+        PDB_ART[p.id]
+      )
     ),
-    ...AFS.map(afCardSpec),
+    ...AFS.map((a) => afCardSpec(a, AF_ART[a.id])),
+    ...COMPOUNDS.map((c) => compoundCardSpec(c, COMPOUND_ART[c.slug])),
   ];
 }
 
@@ -134,6 +148,7 @@ export async function generateSite(outDir: string, publicDir: string, cacheDir: 
   for (const [name, xml] of sitemaps) writeFileSync(join(outDir, name), xml);
 
   const og = await renderOgCards(cardSpecs(), outDir, join(cacheDir, 'og'));
+  await renderSquareFallback(outDir);
 
   return {
     pages: staticPages.length,

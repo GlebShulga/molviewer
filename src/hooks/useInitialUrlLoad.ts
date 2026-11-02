@@ -128,6 +128,8 @@ export function useInitialUrlLoad(): void {
         if (structId) {
           if (viewParams.repr) store().setStructureRepresentation(structId, viewParams.repr);
           if (viewParams.color) store().setStructureColorScheme(structId, viewParams.color);
+          // ?view= from Copy Link: applied by App once the viewer is ready, like a share's camera.
+          if (viewParams.camera) store().setPendingCameraSnapshot(viewParams.camera);
         }
         if (warning) store().setError(warning);
         if (params.embed) {

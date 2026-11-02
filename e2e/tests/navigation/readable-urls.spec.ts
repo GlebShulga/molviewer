@@ -63,6 +63,41 @@ test.describe('Readable URLs', () => {
     expect(new URL(copied).pathname).toBe('/pdb/1CRN');
   });
 
+  test('[URL-04b] Copy Link keeps the camera, and the copied link restores it', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('/pdb/1CRN', { waitUntil: 'domcontentloaded' });
+    await waitForStructure(page);
+    // Rotate a little so the camera is not the default one.
+    const canvas = page.locator('canvas').first();
+    const box = (await canvas.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 8 });
+    await page.mouse.up();
+    await page.locator('button[aria-label="Copy Link"]').first().click({ force: true });
+    await page.waitForTimeout(300);
+    const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+    expect(copied.pathname).toBe('/pdb/1CRN');
+    expect(copied.searchParams.get('view')).toMatch(/^-?[\d.]+(,-?[\d.]+){5,6}$/);
+
+    await page.goto(copied.pathname + copied.search, { waitUntil: 'domcontentloaded' });
+    await waitForStructure(page);
+    // The camera was applied (the pending snapshot is consumed) where the link said.
+    await page.waitForFunction(() => {
+      const store = (window as unknown as { __mol3d_store?: { getState: () => { pendingCameraSnapshot: unknown } } }).__mol3d_store;
+      return store?.getState().pendingCameraSnapshot === null;
+    });
+    const position = await page.evaluate(() => {
+      const camera = (window as unknown as { __mol3d_camera?: { position: { x: number; y: number; z: number } } }).__mol3d_camera!;
+      return [camera.position.x, camera.position.y, camera.position.z];
+    });
+    const expected = copied.searchParams.get('view')!.split(',').slice(0, 3).map(Number);
+    position.forEach((v, i) => expect(v).toBeCloseTo(expected[i], 1));
+    // ?view= leaves the address; the copied representation and colors stay.
+    await expect.poll(() => new URL(page.url()).searchParams.has('view')).toBe(false);
+    expect(new URL(page.url()).pathname).toBe('/pdb/1CRN');
+  });
+
   test('[URL-05] unparseable ?pdb= leaves the address alone', async ({ page }) => {
     await page.goto('/?pdb=abc', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1000);

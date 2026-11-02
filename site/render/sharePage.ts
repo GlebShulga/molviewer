@@ -9,7 +9,7 @@ import type { ShellMeta } from './shell';
 import { escapeHtml } from './html';
 import { renderFooter } from '../nav';
 import { FEATURED_COLLECTIONS } from '../collections';
-import { ogImageUrl } from '../ogImages';
+import { ogImage, siteOgImage } from '../ogImages';
 import { sourceRoute, structurePath, type SourceLike, type StructureRoute } from '../routes';
 
 /**
@@ -83,10 +83,9 @@ export function renderShareLanding(
     })
     .join('');
 
-  const ogImage =
-    singleRoute?.kind === 'pdb' || singleRoute?.kind === 'af'
-      ? ogImageUrl(origin, singleRoute.kind, singleRoute.id)
-      : `${origin}/og-image.png`;
+  // Any lone structure gets its picture, a compound too, although only PDB and
+  // AlphaFold shares get a canonical (singleRoute above).
+  const image = single?.route ? ogImage(origin, single.route) : siteOgImage(origin);
 
   return {
     status: 200,
@@ -95,7 +94,7 @@ export function renderShareLanding(
       description,
       canonicalUrl: singlePath ? `${origin}${singlePath}` : null,
       robots: singlePath ? 'index, follow' : 'noindex, follow',
-      ogImageUrl: ogImage,
+      ogImage: image,
       pageInfoHtml: `<div class="page-info-inner">
 <h1>Shared 3D view</h1>
 <p class="lead">This link restores a MolViewer scene: structures, camera, representations, measurements and labels. It contains:</p>

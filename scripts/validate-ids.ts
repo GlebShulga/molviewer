@@ -33,6 +33,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpError, fetchJson, mapLimit } from './lib/http';
+import { missingOgArt } from './lib/ogArtCoverage';
 
 // ---------- types ----------
 
@@ -395,6 +396,13 @@ async function main() {
     new Set(af.entries.map((e) => e.id))
   );
   for (const d of dangling) error(`dangling collection item -> ${d}`);
+
+  for (const noArt of await Promise.all([
+    missingOgArt('pdb.json', pdb.entries.map((e) => e.id)),
+    missingOgArt('af.json', af.entries.map((e) => e.id)),
+  ])) {
+    if (noArt) warn(noArt);
+  }
 
   if (!CHECK) {
     await writeJson(PDB_PATH, { _comment: pdb.file._comment ?? PDB_COMMENT, pdbs: pdb.entries });

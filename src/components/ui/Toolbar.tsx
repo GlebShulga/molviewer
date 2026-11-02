@@ -20,6 +20,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
 import { buildShareUrl, sourceToPath } from '../../utils/urlParams';
+import { viewerHandle } from '../../utils/viewerHandle';
+import { track } from '../../utils/track';
 import styles from './Toolbar.module.css';
 
 export type MeasurementMode = 'none' | 'distance' | 'angle' | 'dihedral';
@@ -35,6 +37,8 @@ export interface ToolbarProps {
 interface ToolbarButton {
   icon: React.ReactNode;
   label: string;
+  /** Tooltip, when it says more than the label. */
+  title?: string;
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
@@ -55,10 +59,11 @@ export function Toolbar({
 }: ToolbarProps) {
   // Use new hook for active structure access
   const activeStructure = useActiveStructure();
-  const { setRepresentation, autoRotate, setAutoRotate } = useMoleculeStore(useShallow(state => ({
+  const { setRepresentation, autoRotate, setAutoRotate, structureCount } = useMoleculeStore(useShallow(state => ({
     setRepresentation: state.setRepresentation,
     autoRotate: state.autoRotate,
     setAutoRotate: state.setAutoRotate,
+    structureCount: state.structureOrder.length,
   })));
   // Copy Link shares the active structure's readable address (/pdb/ID, /af/ID, ...).
   const linkSource = activeStructure?.source && sourceToPath(activeStructure.source) ? activeStructure.source : null;
@@ -68,14 +73,19 @@ export function Toolbar({
   const handleCopyLink = useCallback(() => {
     const repr = activeStructure?.representation;
     const color = activeStructure?.colorScheme;
-    const url = buildShareUrl({ source: linkSource, repr, color });
+    // The camera only when the link reopens the same scene: with several
+    // structures (overlay or side by side), a fresh load of this one alone
+    // has different world coordinates. Share Link covers whole scenes.
+    const camera = linkSource && structureCount === 1 ? viewerHandle.get()?.getCameraSnapshot() ?? null : null;
+    const url = buildShareUrl({ source: linkSource, repr, color, camera });
     navigator.clipboard.writeText(url).then(() => {
+      track('link_copied', { value: camera ? 'view' : 'plain' });
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     }).catch(() => {
       // Clipboard API can fail in iframes or older browsers — ignore silently
     });
-  }, [activeStructure, linkSource]);
+  }, [activeStructure, linkSource, structureCount]);
 
   // Get undo/redo state from temporal store
   const { pastStates, futureStates, undo, redo } = useStore(temporalStore);
@@ -149,11 +159,12 @@ export function Toolbar({
     {
       icon: linkCopied ? <Check size={18} /> : <Link size={18} />,
       label: linkCopied ? 'Link Copied!' : 'Copy Link',
+      title: linkCopied ? 'Link Copied!' : structureCount === 1 ? 'Copy link to this structure and view' : 'Copy link to this structure',
       onClick: handleCopyLink,
       active: linkCopied,
       disabled: !hasMolecule || !linkSource,
     },
-  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport, linkCopied, handleCopyLink, linkSource]);
+  ], [onHomeView, setAutoRotate, autoRotate, hasMolecule, onExport, linkCopied, handleCopyLink, linkSource, structureCount]);
 
   const undoRedoButtons = useMemo<ToolbarButton[]>(() => [
     {
@@ -186,7 +197,7 @@ export function Toolbar({
           className={clsx(styles.toolbarButton, button.active && styles.active)}
           onClick={button.onClick}
           disabled={button.disabled}
-          title={button.label}
+          title={button.title ?? button.label}
           aria-label={button.label}
           aria-pressed={button.active}
         >

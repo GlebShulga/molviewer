@@ -16,6 +16,16 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
+      # Social cards take minutes to render cold (site/build/ogCards.ts); reuse
+      # the ones whose content did not change. Each card's file name hashes its
+      # content, ogCards.ts and the renderer versions, so a restored older cache
+      # can't hand back stale cards; the build prunes the ones it didn't use.
+      # The key follows the same inputs, so a changed set gets saved again.
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/molviewer-site
+          key: og-cards-${{ hashFiles('data/**/*.json', 'site/build/ogCards.ts', 'site/moleculeArt.ts', 'src/colors/domains/*.ts', 'pnpm-lock.yaml') }}
+          restore-keys: og-cards-
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build

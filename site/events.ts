@@ -13,6 +13,8 @@ export const EVENT_NAMES = [
   'export_video',
   'export_model',
   'share_created',
+  // Toolbar Copy Link; value: 'view' (with the camera) or 'plain'.
+  'link_copied',
   'embed_view',
   'representation_changed',
   'measurement_added',

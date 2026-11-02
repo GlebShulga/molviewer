@@ -33,6 +33,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchJson, fetchText, mapLimit, HttpError } from './lib/http';
+import { missingOgArt } from './lib/ogArtCoverage';
 
 const DATA_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../data/compounds.json');
 const SLUGS_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../data/compoundSlugs.json');
@@ -392,6 +393,9 @@ async function main() {
   });
 
   kept.sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+
+  const noArt = await missingOgArt('compound.json', kept.map((c) => c.slug));
+  if (noArt) warnings.push(noArt);
 
   // 5. Report.
   for (const w of warnings) console.warn(`warning: ${w}`);

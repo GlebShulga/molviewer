@@ -93,8 +93,10 @@ export interface SourceLike {
  */
 export function sourceRoute(source: SourceLike | null | undefined): StructureRoute | null {
   if (!source || typeof source !== 'object') return null;
-  if (source.type === 'rcsb' && typeof source.id === 'string') return { kind: 'pdb', id: source.id };
-  if (source.type === 'alphafold' && typeof source.id === 'string') return { kind: 'af', id: source.id };
+  // Upper case, like parseStructureRoute: stored shares may hold '4hhb', which
+  // must still match /pdb/4HHB and the curated catalog.
+  if (source.type === 'rcsb' && typeof source.id === 'string') return { kind: 'pdb', id: source.id.toUpperCase() };
+  if (source.type === 'alphafold' && typeof source.id === 'string') return { kind: 'af', id: source.id.toUpperCase() };
   if (source.type === 'pubchem') {
     if (typeof source.slug === 'string' && source.slug) return { kind: 'compound', slug: source.slug };
     if (typeof source.cid === 'number' && source.cid > 0) return { kind: 'cid', cid: source.cid };

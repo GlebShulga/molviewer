@@ -7,6 +7,8 @@
  */
 import { embedSize, embedSnippet, embedTarget } from '../site/embed';
 import { embedTargetExists } from '../site/embedExists';
+import { ogImage, siteOgImage } from '../site/ogImages';
+import { parseStructureRoute } from '../site/routes';
 
 const DEFAULT_WIDTH = 800;
 const DEFAULT_HEIGHT = 600;
@@ -42,6 +44,9 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
   const width = Math.min(DEFAULT_WIDTH, embedSize(reqUrl.searchParams.get('maxwidth'), DEFAULT_WIDTH));
   const height = Math.min(Math.round(width * 0.6), embedSize(reqUrl.searchParams.get('maxheight'), DEFAULT_HEIGHT));
 
+  const route = parseStructureRoute(target.pagePath);
+  const thumb = route ? ogImage(reqUrl.origin, route) : siteOgImage(reqUrl.origin);
+
   return json(200, {
     version: '1.0',
     type: 'rich',
@@ -51,8 +56,8 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
     width,
     height,
     html: embedSnippet(reqUrl.origin, target, { width, height }),
-    thumbnail_url: `${reqUrl.origin}/og-image.png`,
-    thumbnail_width: 1200,
-    thumbnail_height: 630,
+    thumbnail_url: thumb.url,
+    thumbnail_width: thumb.width,
+    thumbnail_height: thumb.height,
   });
 };

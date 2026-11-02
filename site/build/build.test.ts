@@ -7,6 +7,16 @@ import slugsByCid from '../../data/compoundSlugs.json';
 import compoundData from '../../data/compounds.json';
 import type { Compound } from '../dataTypes';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
+import { renderCompoundPage } from './compoundPage';
+import { cardTree, compoundCardSpec, renderSquareFallback } from './ogCards';
+import { renderStaticDocument } from '../render/layout';
+import { SQUARE_FALLBACK } from '../ogImages';
+import { mkdtempSync, readFileSync as readFile, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import sharp from 'sharp';
+import compoundArt from '../../data/og-art/compound.json';
+import type { BallStickArt, OgArtFile } from '../moleculeArt';
 
 const COMPOUNDS = (compoundData as { compounds: Compound[] }).compounds;
 
@@ -87,5 +97,48 @@ describe('compound slug map', () => {
   it('matches data/compounds.json exactly', () => {
     const expected = Object.fromEntries(COMPOUNDS.map((c) => [String(c.cid), c.slug]));
     expect(slugsByCid).toEqual(expected);
+  });
+});
+
+describe('compound social cards', () => {
+  const caffeine = COMPOUNDS.find((c) => c.slug === 'caffeine')!;
+  const art = (compoundArt as OgArtFile<BallStickArt>).entries.caffeine;
+
+  it('compound pages point at their pre-rendered card', () => {
+    expect(renderCompoundPage(caffeine, []).ogImage).toEqual({
+      url: 'https://molviewer.bio/og/compound/caffeine.png',
+      type: 'image/png',
+      width: 1200,
+      height: 630,
+    });
+  });
+
+  it('puts the picture next to the text, or falls back to the text-only card', () => {
+    const withArt = JSON.stringify(cardTree(compoundCardSpec(caffeine, art)));
+    expect(withArt).toContain('"src":"data:image/svg+xml;base64,');
+    expect(withArt).toContain('molviewer.bio/compound/caffeine');
+    const textOnly = JSON.stringify(cardTree(compoundCardSpec(caffeine)));
+    expect(textOnly).not.toContain('data:image/svg+xml');
+    expect(textOnly).toContain('Caffeine');
+  });
+});
+
+describe('social image fallbacks', () => {
+  it('renders the square fallback as the 500x500 JPEG that non-curated PDB pages announce', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'og-'));
+    try {
+      await renderSquareFallback(dir);
+      const meta = await sharp(readFile(join(dir, SQUARE_FALLBACK.path))).metadata();
+      expect([meta.format, meta.width, meta.height]).toEqual(['jpeg', SQUARE_FALLBACK.width, SQUARE_FALLBACK.height]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('static pages write the image type and size', () => {
+    const html = renderStaticDocument({ path: '/x', title: 't', description: 'd', mainHtml: '', cssHref: '/a.css' });
+    expect(html).toContain('<meta property="og:image" content="https://molviewer.bio/og-image.png">');
+    expect(html).toContain('<meta property="og:image:width" content="1200">');
+    expect(html).toContain('<meta name="twitter:card" content="summary_large_image">');
   });
 });

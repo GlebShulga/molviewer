@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { getElementColor } from '../../colors/domains/elements';
+import { shade } from '../../../site/moleculeArt';
 
 // Caffeine (C8H10N4O2) — fused purine ring system with 3 methyl groups
 // Approximate positions in Angstroms
@@ -112,18 +113,6 @@ const VIEW_BOX = (() => {
     .map((v) => v.toFixed(2))
     .join(' ');
 })();
-
-/** Mixes a #rrggbb color towards white (t > 0) or black (t < 0). */
-function shade(hex: string, t: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const target = t > 0 ? 255 : 0;
-  const k = Math.abs(t);
-  const channel = (c: number) => Math.round(c + (target - c) * k);
-  const r = channel((n >> 16) & 255);
-  const g = channel((n >> 8) & 255);
-  const b = channel(n & 255);
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
 
 /** Static caffeine drawing behind the welcome text (no WebGL on first visit). */
 export function WelcomeMoleculeArt({ className }: { className?: string }) {

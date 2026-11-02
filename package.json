@@ -42,6 +42,7 @@
     "pages:dev": "wrangler pages dev --proxy http://localhost:3000",
     "test:run": "vitest run",
     "pages:preview": "wrangler pages dev dist",
+    "og:art": "tsx scripts/build-og-art.ts",
     "validate:data": "tsx scripts/validate-ids.ts --check && tsx scripts/validate-compounds.ts --check"
   },
   "dependencies": {
@@ -85,6 +86,7 @@
     "jsdom": "^24.0.0",
     "prettier": "^3.2.0",
     "satori": "^0.33.5",
+    "sharp": "^0.34.5",
     "terser": "^5.27.0",
     "tsx": "^4.23.15",
     "typescript": "^5.7.2",

@@ -10,7 +10,9 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // build-og-art.ts reuses the app's parsers, whose imports reach React and Vite code.
+    "jsx": "react-jsx"
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../src/vite-env.d.ts"]
 }

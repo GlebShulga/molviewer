@@ -13,6 +13,7 @@ import { isGetOrHead, shellResponse } from '../../../site/render/respond';
 import { escapeHtml } from '../../../site/render/html';
 import { renderFooter } from '../../../site/nav';
 import { FEATURED_COLLECTIONS } from '../../../site/collections';
+import { ogImage } from '../../../site/ogImages';
 
 export const onRequest: PagesFunction = async ({ request, params, next }) => {
   const raw = String(params.cid ?? '');
@@ -51,6 +52,7 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
     description: `Interactive 3D model of ${name}${formula} from PubChem. Rotate it and measure bond lengths and angles, free in your browser.`,
     canonicalUrl: null,
     robots: 'noindex, follow',
+    ogImage: ogImage(new URL(request.url).origin, { kind: 'cid', cid }),
     pageInfoHtml: `<div class="page-info-inner"><h1>${escapeHtml(name)} in 3D</h1><p class="lead">PubChem compound CID ${cid}${escapeHtml(formula)}. <a href="https://pubchem.ncbi.nlm.nih.gov/compound/${cid}" rel="noopener">View on PubChem</a>.</p><p><a class="more" href="/compounds">Browse curated small molecules</a></p></div>${renderFooter(FEATURED_COLLECTIONS)}`,
   });
 };

@@ -1,4 +1,5 @@
 import type { RepresentationType, ColorScheme, StructureSource } from '../types';
+import type { CameraSnapshot } from '../types/session';
 import { UNIPROT_RE } from '../../site/identifiers';
 import { parseRoute, sourceRoute, structurePath, type StructureRoute } from '../../site/routes';
 
@@ -42,6 +43,36 @@ export function parsePathnameParams(pathname: string): UrlMoleculeParams | null 
 export interface UrlViewParams {
   repr?: RepresentationType;
   color?: ColorScheme;
+  /** Camera from `?view=px,py,pz,tx,ty,tz[,zoom]` (Copy Link). */
+  camera?: CameraSnapshot;
+}
+
+/** Coordinates beyond this (in Å) are junk, not a real view. */
+const MAX_VIEW_COORD = 1e5;
+const MAX_VIEW_ZOOM = 100;
+
+/** `view` value for a camera: 2 decimals, zoom left out when it is 1. */
+export function formatViewParam(camera: CameraSnapshot): string {
+  const values = [...camera.position, ...camera.target];
+  if (camera.zoom !== 1) values.push(camera.zoom);
+  return values.map((v) => String(Number(v.toFixed(2)))).join(',');
+}
+
+/** Parse a `view` value: 6 or 7 finite numbers within sane bounds, else null. */
+export function parseViewParam(value: string | null): CameraSnapshot | null {
+  if (!value) return null;
+  const parts = value.split(',');
+  if (parts.length !== 6 && parts.length !== 7) return null;
+  const n = parts.map((p) => (p.trim() === '' ? NaN : Number(p)));
+  if (!n.every((v) => Number.isFinite(v))) return null;
+  if (n.slice(0, 6).some((v) => Math.abs(v) > MAX_VIEW_COORD)) return null;
+  const zoom = parts.length === 7 ? n[6] : 1;
+  if (zoom <= 0 || zoom > MAX_VIEW_ZOOM) return null;
+  const position: [number, number, number] = [n[0], n[1], n[2]];
+  const target: [number, number, number] = [n[3], n[4], n[5]];
+  // A camera sitting on its target has no direction to look in.
+  if (position.every((v, i) => v === target[i])) return null;
+  return { position, target, zoom };
 }
 
 const VALID_REPRESENTATIONS: RepresentationType[] = [
@@ -92,7 +123,7 @@ export function getInitialUrlLoad(location: { pathname: string; search: string }
 }
 
 /**
- * Parse view state params (repr, color) from URL.
+ * Parse view state params (repr, color, view) from URL.
  */
 export function parseViewParams(search: string): UrlViewParams {
   const params = new URLSearchParams(search);
@@ -107,6 +138,9 @@ export function parseViewParams(search: string): UrlViewParams {
   if (color && VALID_COLOR_SCHEMES.includes(color as ColorScheme)) {
     result.color = color as ColorScheme;
   }
+
+  const camera = parseViewParam(params.get('view'));
+  if (camera) result.camera = camera;
 
   return result;
 }
@@ -130,6 +164,8 @@ export function buildShareUrl(params: {
   source?: StructureSource | null;
   repr?: RepresentationType;
   color?: ColorScheme;
+  /** Only meaningful for an addressable source (ignored for local files). */
+  camera?: CameraSnapshot | null;
 }): string {
   const path = sourceToPath(params.source) ?? '/';
   const url = new URL(path, window.location.origin);
@@ -140,6 +176,10 @@ export function buildShareUrl(params: {
   if (params.color) {
     url.searchParams.set('color', params.color);
   }
+  if (params.camera && path !== '/') {
+    url.searchParams.set('view', formatViewParam(params.camera));
+  }
 
-  return url.toString();
+  // Keep the commas in ?view= readable (URLSearchParams writes %2C); no other parameter has one.
+  return url.toString().replace(/%2C/g, ',');
 }

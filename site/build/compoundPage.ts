@@ -11,7 +11,7 @@ import { escapeHtml } from '../render/html';
 import { renderFooter, SITE_ORIGIN } from '../nav';
 import { FEATURED_COLLECTIONS } from '../collections';
 import { oembedLink } from '../render/pdbPage';
-import { compoundImageUrl } from '../ogImages';
+import { ogImage } from '../ogImages';
 
 /** "C8H10N4O2" -> "C<sub>8</sub>H<sub>10</sub>N<sub>4</sub>O<sub>2</sub>" */
 export function formulaHtml(formula: string): string {
@@ -86,7 +86,7 @@ ${renderFooter(FEATURED_COLLECTIONS)}`;
     title,
     description,
     canonicalUrl,
-    ogImageUrl: compoundImageUrl(c.cid),
+    ogImage: ogImage(SITE_ORIGIN, { kind: 'compound', slug: c.slug }),
     jsonLd: [
       {
         '@context': 'https://schema.org',

@@ -11,7 +11,7 @@ import { toSentenceCase } from './sentenceCase';
 import { formatDate, formatMethod, formatRange, formatResolution, listJoin, methodNoun, pluralize } from './format';
 import { collectionHref, collectionsContaining, FEATURED_COLLECTIONS } from '../collections';
 import { renderFooter } from '../nav';
-import { ogImageUrl } from '../ogImages';
+import { ogImage, siteOgImage } from '../ogImages';
 
 export interface LandingRender {
   status: 200 | 404;
@@ -312,7 +312,7 @@ function notFoundPage(id: string, origin: string): LandingRender {
       description: `There is no PDB entry with the ID ${id}. Check the ID or browse popular structures.`,
       canonicalUrl: null,
       robots: 'noindex, follow',
-      ogImageUrl: `${origin}/og-image.png`,
+      ogImage: siteOgImage(origin),
       pageInfoHtml: `<div class="page-info-inner">
 <h1>PDB entry ${escapeHtml(id)} not found</h1>
 <p class="lead">The Protein Data Bank has no entry with the ID <code>${escapeHtml(id)}</code>. It may be mistyped, or the entry may have been removed or superseded. You can enter another PDB ID in the sidebar, or start from a collection:</p>
@@ -332,7 +332,7 @@ function fallbackPage(id: string, origin: string): LandingRender {
       title: `${id} in 3D | MolViewer`,
       description: `View PDB structure ${id} in 3D in your browser, free with no install. Explore helices and sheets, chains, ligands and measure distances.`,
       canonicalUrl,
-      ogImageUrl: ogImageUrl(origin, 'pdb', id),
+      ogImage: ogImage(origin, { kind: 'pdb', id }),
       pageInfoHtml: `<div class="page-info-inner">
 <h1>PDB entry ${escapeHtml(id)} in 3D</h1>
 <p class="lead">View Protein Data Bank entry ${escapeHtml(id)} interactively in 3D. Rotate, zoom, measure distances and angles, and explore secondary structure directly in your browser.</p>
@@ -427,7 +427,7 @@ ${renderFooter(FEATURED_COLLECTIONS)}`;
       title,
       description,
       canonicalUrl,
-      ogImageUrl: ogImageUrl(origin, 'pdb', d.id),
+      ogImage: ogImage(origin, { kind: 'pdb', id: d.id }),
       jsonLd: [
         {
           '@context': 'https://schema.org',

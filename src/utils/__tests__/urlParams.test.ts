@@ -6,6 +6,7 @@ import {
   getInitialUrlLoad,
   sourceToPath,
   buildShareUrl,
+  parseViewParam,
 } from '../urlParams';
 
 describe('parseMoleculeParams', () => {
@@ -92,6 +93,36 @@ describe('parseViewParams', () => {
   it('returns empty object when no params', () => {
     expect(parseViewParams('')).toEqual({});
   });
+
+  it('parses the camera from view', () => {
+    expect(parseViewParams('?view=1,2,3,0,0,0')).toEqual({ camera: { position: [1, 2, 3], target: [0, 0, 0], zoom: 1 } });
+    expect(parseViewParams('?repr=cartoon&view=-1.5,2,30.25,0.5,-0.5,0,1.5')).toEqual({
+      repr: 'cartoon',
+      camera: { position: [-1.5, 2, 30.25], target: [0.5, -0.5, 0], zoom: 1.5 },
+    });
+  });
+});
+
+describe('parseViewParam', () => {
+  it('rejects junk, non-finite and out-of-range values', () => {
+    for (const bad of [
+      '',
+      '1,2,3',
+      '1,2,3,4,5,6,7,8',
+      '1,2,3,4,5,x',
+      '1,2,3,4,5,',
+      'NaN,0,0,0,0,0',
+      'Infinity,0,0,0,0,0',
+      '1e9,0,0,0,0,0',
+      '1,2,3,4,5,6,0',
+      '1,2,3,4,5,6,-1',
+      '1,2,3,4,5,6,1000',
+      '1,2,3,1,2,3', // camera on its target
+    ]) {
+      expect(parseViewParam(bad), bad).toBeNull();
+    }
+    expect(parseViewParam(null)).toBeNull();
+  });
 });
 
 describe('parsePathnameParams', () => {
@@ -161,6 +192,19 @@ describe('buildShareUrl', () => {
     expect(buildShareUrl({ source: { type: 'pubchem', cid: 2519, slug: 'caffeine' } })).toBe(
       'https://molviewer.bio/compound/caffeine'
     );
+  });
+
+  it('adds the camera as a readable view parameter (2 decimals, zoom only when not 1)', () => {
+    const camera = { position: [10.123, -20.456, 30] as [number, number, number], target: [0.004, 1, -2.5] as [number, number, number], zoom: 1 };
+    const url = buildShareUrl({ source: { type: 'rcsb', id: '1CRN' }, repr: 'cartoon', camera });
+    expect(url).toBe('https://molviewer.bio/pdb/1CRN?repr=cartoon&view=10.12,-20.46,30,0,1,-2.5');
+    expect(parseViewParams(new URL(url).search).camera).toEqual({ position: [10.12, -20.46, 30], target: [0, 1, -2.5], zoom: 1 });
+    expect(buildShareUrl({ source: { type: 'rcsb', id: '1CRN' }, camera: { ...camera, zoom: 2 } })).toMatch(/view=[^&]*,2$/);
+  });
+
+  it('leaves the camera out without an addressable source', () => {
+    const camera = { position: [1, 2, 3] as [number, number, number], target: [0, 0, 0] as [number, number, number], zoom: 1 };
+    expect(buildShareUrl({ source: { type: 'inline', format: 'pdb', data: '' }, camera })).toBe('https://molviewer.bio/');
   });
 
   it('includes repr and color', () => {
