@@ -466,10 +466,15 @@
   padding-top: 32px;
 }
 
+/* The intro's lines end where the footer's third column does: three of its
+   four columns plus two 32px gaps. */
 .page-info .home-intro p {
-  max-width: 72ch;
-  margin-bottom: 0;
+  max-width: calc((100% - 3 * 32px) / 4 * 3 + 2 * 32px);
   color: var(--text-secondary);
+}
+
+.page-info .home-intro p:last-child {
+  margin-bottom: 0;
 }
 
 .page-info .page-info-inner + .site-footer {
@@ -481,6 +486,11 @@
 @media (max-width: 1024px) {
   .site-footer nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Two footer columns leave no third to line up with. */
+  .page-info .home-intro p {
+    max-width: 72ch;
   }
 }
 
