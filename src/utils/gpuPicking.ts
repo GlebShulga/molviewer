@@ -95,8 +95,6 @@ export const pickingFragmentShader = /* glsl */ `
 `;
 
 export interface GPUPickingManagerOptions {
-  /** Resolution scale for picking buffer (0.25 = 1/4 resolution) */
-  resolutionScale?: number;
   /** Throttle interval in ms for picking updates */
   throttleMs?: number;
 }
@@ -123,7 +121,6 @@ export class GPUPickingManager {
   private camera: THREE.Camera;
   private pickingTarget: THREE.WebGLRenderTarget;
   private pixelBuffer: Uint8Array;
-  private resolutionScale: number;
   private throttleMs: number;
   private lastPickTime: number = -Infinity;
   private cachedResult: number | null = null;
@@ -138,15 +135,11 @@ export class GPUPickingManager {
   ) {
     this.renderer = renderer;
     this.camera = camera;
-    this.resolutionScale = options.resolutionScale ?? 0.25;
     this.throttleMs = options.throttleMs ?? 16; // ~60fps
 
-    // Create picking render target at reduced resolution
-    const size = renderer.getSize(new THREE.Vector2());
-    const width = Math.max(1, Math.floor(size.x * this.resolutionScale));
-    const height = Math.max(1, Math.floor(size.y * this.resolutionScale));
-
-    this.pickingTarget = new THREE.WebGLRenderTarget(width, height, {
+    // One pixel: the camera's view offset narrows each pick to the pixel under
+    // the point, at full resolution, so the render costs next to nothing
+    this.pickingTarget = new THREE.WebGLRenderTarget(1, 1, {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
@@ -156,15 +149,6 @@ export class GPUPickingManager {
     });
 
     this.pixelBuffer = new Uint8Array(4);
-  }
-
-  /**
-   * Resize the picking buffer when canvas size changes.
-   */
-  resize(width: number, height: number): void {
-    const scaledWidth = Math.max(1, Math.floor(width * this.resolutionScale));
-    const scaledHeight = Math.max(1, Math.floor(height * this.resolutionScale));
-    this.pickingTarget.setSize(scaledWidth, scaledHeight);
   }
 
   /**
@@ -195,43 +179,37 @@ export class GPUPickingManager {
     this.lastNdcX = ndcX;
     this.lastNdcY = ndcY;
 
-    // Convert to picking buffer coordinates (origin bottom-left, as NDC)
-    const x = Math.floor(((ndcX + 1) / 2) * this.pickingTarget.width);
-    const y = Math.floor(((ndcY + 1) / 2) * this.pickingTarget.height);
-
-    // Clamp to buffer bounds
-    if (
-      x < 0 ||
-      x >= this.pickingTarget.width ||
-      y < 0 ||
-      y >= this.pickingTarget.height
-    ) {
+    // Off the canvas: nothing to pick
+    if (Math.abs(ndcX) > 1 || Math.abs(ndcY) > 1) {
       this.cachedResult = null;
       return null;
     }
 
-    // Save current renderer state
+    // The canvas pixel the point falls in (CSS pixels, origin top-left)
+    const x = ((ndcX + 1) / 2) * canvas.x;
+    const y = ((1 - ndcY) / 2) * canvas.y;
+
+    // Save current renderer and camera state
     const currentRenderTarget = this.renderer.getRenderTarget();
     const currentClearColor = this.renderer.getClearColor(new THREE.Color());
     const currentClearAlpha = this.renderer.getClearAlpha();
+    const camera = this.camera as THREE.PerspectiveCamera | THREE.OrthographicCamera;
+    const view = camera.view?.enabled ? { ...camera.view } : null;
+    // A perspective camera's setViewOffset also sets its aspect
+    const aspect = (camera as THREE.PerspectiveCamera).isPerspectiveCamera ? (camera as THREE.PerspectiveCamera).aspect : null;
 
-    // Render picking scene
+    // Render just that pixel of the picking scene
+    camera.setViewOffset(canvas.x, canvas.y, x - 0.5, y - 0.5, 1, 1);
     this.renderer.setRenderTarget(this.pickingTarget);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.clear();
-    this.renderer.render(pickingScene, this.camera);
+    this.renderer.render(pickingScene, camera);
+    this.renderer.readRenderTargetPixels(this.pickingTarget, 0, 0, 1, 1, this.pixelBuffer);
 
-    // Read single pixel
-    this.renderer.readRenderTargetPixels(
-      this.pickingTarget,
-      x,
-      y,
-      1,
-      1,
-      this.pixelBuffer
-    );
-
-    // Restore renderer state
+    // Restore renderer and camera state
+    if (aspect !== null) (camera as THREE.PerspectiveCamera).aspect = aspect;
+    if (view) camera.setViewOffset(view.fullWidth, view.fullHeight, view.offsetX, view.offsetY, view.width, view.height);
+    else camera.clearViewOffset();
     this.renderer.setRenderTarget(currentRenderTarget);
     this.renderer.setClearColor(currentClearColor, currentClearAlpha);
 

@@ -48,6 +48,15 @@ describe('GPUPickingManager.pickNdc', () => {
     expect(renderer.renders).toBe(2);
   });
 
+  it('renders just the pixel under the point and restores the camera', () => {
+    const renderer = fakeRenderer([5, 0, 0, 255]);
+    const camera = new THREE.PerspectiveCamera();
+    const projection = camera.projectionMatrix.clone();
+    new GPUPickingManager(renderer as unknown as THREE.WebGLRenderer, camera).pickNdc(0.5, 0.5, new THREE.Scene());
+    expect(camera.view?.enabled ?? false).toBe(false);
+    expect(camera.projectionMatrix.equals(projection)).toBe(true);
+  });
+
   it('finds nothing outside the canvas', () => {
     const renderer = fakeRenderer([5, 0, 0, 255]);
     expect(picker(renderer).pickNdc(1.5, 0, new THREE.Scene())).toBeNull();

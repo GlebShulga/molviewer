@@ -123,8 +123,9 @@ const frontmost = (atoms: ImpostorAtomPosition[], p: Point) => {
   return best;
 };
 
-// GPU picking (from 5,000 atoms) reads a 1/4-resolution buffer, where one
-// pixel covers 4x4 here: a point counts only if its neighbours 3 px away agree.
+// GPU picking (from 5,000 atoms) reads the drawn pixel, a flat disc facing the
+// camera, while these helpers model spheres; the two differ by a pixel or so
+// near an edge: a point counts only if its neighbours 3 px away agree.
 // The CPU raycast below that tests the spheres themselves: `margin` 0.
 const around = (p: Point, margin = 3): Point[] => [
   p,
@@ -333,10 +334,43 @@ test('GPU picking (6,000 atoms): no pick during an orbit drag, hover again after
   await page.mouse.move(before.x + 40, before.y, { steps: 5 });
   await hover().toEqual({ structureId: null, atomIndex: null });
   await page.mouse.up();
-  await page.waitForTimeout(1500); // Let the damping settle
 
-  // The camera turned: the atom under the pointer now
-  const after = (await viewer.canvas.getImpostorAtomScreenPositions())!.nearest;
-  await page.mouse.move(after.x, after.y);
-  await hover().toEqual({ structureId: ids[0], atomIndex: after.instance });
+  // A plain move over the structure hovers one of its atoms again. Which one
+  // isn't checked here (the tests above do): the camera is still turning, as
+  // the damping decays per rendered frame and software GL draws few of them.
+  await page.mouse.move(before.x, before.y);
+  await expect.poll(async () => {
+    const s = await storeState(page);
+    return s.hoveredStructureId === ids[0] && s.hoveredAtomIndex !== null;
+  }).toBe(true);
+});
+
+/**
+ * The background just past an atom's edge picks nothing: the pick reads the
+ * pixel under the pointer, and a ray that misses the atom's sphere is no hit.
+ */
+test('GPU picking (6,000 atoms): the background just outside an atom picks nothing', async ({ page }) => {
+  test.slow();
+  const { viewer, ids } = await spacefillStructures(page, 1500, 'overlay', [{}]);
+  // 2 px leave no room for a camera still framing (slow under load): wait
+  // until the atoms stop moving
+  let last: Point | null = null;
+  await expect.poll(async () => {
+    const now = (await viewer.canvas.getImpostorAtomScreenPositions())!.nearest;
+    const settled = !!last && distance(now, last) < 0.2;
+    last = now;
+    return settled;
+  }, { intervals: [300], timeout: 20000 }).toBe(true);
+  const { all } = (await viewer.canvas.getImpostorAtomScreenPositions())!;
+  // The atom reaching furthest right: only background beyond its edge on its row
+  const atom = all.reduce((a, b) => (b.x + b.radiusPx > a.x + a.radiusPx ? b : a));
+  const hover = () => expect.poll(async () => {
+    const s = await storeState(page);
+    return { structureId: s.hoveredStructureId, atomIndex: s.hoveredAtomIndex };
+  });
+
+  await page.mouse.move(Math.round(atom.x + atom.radiusPx / 2), Math.round(atom.y));
+  await hover().toEqual({ structureId: ids[0], atomIndex: atom.instance });
+  await page.mouse.move(Math.round(atom.x + atom.radiusPx + 2), Math.round(atom.y));
+  await hover().toEqual({ structureId: null, atomIndex: null });
 });
