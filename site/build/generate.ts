@@ -104,14 +104,21 @@ export async function generateSite(outDir: string, publicDir: string, cacheDir: 
   if (!cssHref) throw new Error('site generator: CSS bundle link not found in dist/index.html');
 
   const ctx = { cssHref, featured: FEATURED_COLLECTIONS };
-  const pdbRevised = new Map(PDBS.map((p) => [p.id, p.revised]));
+  // PDB IDs are 4 characters and UniProt accessions 6 or 10, so the two never collide.
+  const revisedById = new Map<string, string>();
+  for (const e of [...PDBS, ...AFS]) if (e.revised) revisedById.set(e.id, e.revised);
 
   const content = contentPages.map((p) => (SCREENSHOTS[p.path] ? { ...p, screenshot: SCREENSHOTS[p.path] } : p));
+  const collectionPages = COLLECTIONS.map((c) => renderCollectionPage(c, COLLECTIONS, ctx, revisedById));
+  const collectionsIndex: GeneratedPage = {
+    ...renderCollectionsIndex(COLLECTIONS, ctx),
+    lastmod: collectionPages.map((p) => p.lastmod).filter((d): d is string => !!d).sort().pop(),
+  };
   const staticPages: GeneratedPage[] = [
     ...content.map((p) => renderContentPage(p, ctx)),
     renderLearnIndex(content, ctx),
-    renderCollectionsIndex(COLLECTIONS, ctx),
-    ...COLLECTIONS.map((c) => renderCollectionPage(c, COLLECTIONS, ctx, pdbRevised)),
+    collectionsIndex,
+    ...collectionPages,
     renderCompoundsIndex(COMPOUNDS, ctx),
   ];
 

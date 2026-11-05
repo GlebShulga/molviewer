@@ -5,9 +5,10 @@ import { renderSitemaps } from './sitemap';
 import { embedSize, embedSnippet, embedTarget } from '../embed';
 import slugsByCid from '../../data/compoundSlugs.json';
 import compoundData from '../../data/compounds.json';
-import type { Compound } from '../dataTypes';
+import type { Collection, Compound } from '../dataTypes';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
 import { renderCompoundPage } from './compoundPage';
+import { renderCollectionPage } from './staticPages';
 import { cardTree, compoundCardSpec, renderSquareFallback } from './ogCards';
 import { renderStaticDocument } from '../render/layout';
 import { SQUARE_FALLBACK } from '../ogImages';
@@ -54,6 +55,27 @@ describe('renderSitemaps', () => {
     expect([...out.keys()].sort()).toEqual(['sitemap-compounds.xml', 'sitemap-pdb.xml', 'sitemap.xml']);
     expect(out.get('sitemap.xml')).toContain('<loc>https://molviewer.bio/sitemap-pdb.xml</loc><lastmod>2024-05-22</lastmod>');
     expect(out.get('sitemap-compounds.xml')).toContain('<url><loc>https://molviewer.bio/compound/caffeine</loc></url>');
+  });
+});
+
+describe('collection lastmod', () => {
+  const ctx = { cssHref: '/assets/index.css', featured: FEATURED_COLLECTIONS };
+  const revised = new Map([['4HHB', '2024-05-22'], ['P69905', '2025-08-01'], ['P04637', '2025-07-03']]);
+  const afOnly: Collection = {
+    slug: 'af-only', title: 'AF only', intro: 'x',
+    items: [{ type: 'af', id: 'P69905', label: 'a' }, { type: 'af', id: 'P04637', label: 'b' }],
+  };
+  const mixed: Collection = {
+    slug: 'mixed', title: 'Mixed', intro: 'x',
+    items: [{ type: 'pdb', id: '4HHB', label: 'a' }, { type: 'af', id: 'P04637', label: 'b' }],
+  };
+
+  it('uses AlphaFold model dates, not only PDB revisions', () => {
+    expect(renderCollectionPage(afOnly, [afOnly, mixed], ctx, revised).lastmod).toBe('2025-08-01');
+  });
+
+  it('takes the latest date across PDB and AlphaFold items', () => {
+    expect(renderCollectionPage(mixed, [afOnly, mixed], ctx, revised).lastmod).toBe('2025-07-03');
   });
 });
 
