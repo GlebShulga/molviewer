@@ -16,7 +16,8 @@ import { THEME_COLORS } from '../config';
 import { PLDDT_BANDS } from '../colors';
 import { loadStructureFromSource } from '../utils/structureLoader';
 import { calculateColorSchemeContext } from '../utils/atomColor';
-import { isTouchLimited, TOUCH_ATOM_STYLE_LIMIT_LABEL } from '../utils/representationAvailability';
+import { atomStyleLimitLabel, isStyleLimited } from '../utils/representationAvailability';
+import { isTouchScreen } from '../utils/touch';
 import { track } from '../utils/track';
 import type { ColorScheme, RepresentationType, StructureSource } from '../types';
 import { openInMolViewerUrl, type WidgetLoad, type WidgetPayload, type WidgetView } from '../../site/appContract';
@@ -111,9 +112,10 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
         if (controller.signal.aborted) return;
         const id = store().addStructure(molecule, name, toSource(payload.load));
         if (id) {
-          // Ball & Stick and Stick stop at 1,000 atoms on touch screens, as in the app.
+          // Ball & Stick and Stick stop at 1,000 atoms on touch screens and 100,000
+          // on desktops, as in the app.
           // The atom count is known only now, so the dropdown is corrected here.
-          const repr = isTouchLimited(initial.repr, molecule) ? 'cartoon' : initial.repr;
+          const repr = isStyleLimited(initial.repr, molecule) ? 'cartoon' : initial.repr;
           store().setStructureRepresentation(id, repr);
           store().setStructureColorScheme(id, initial.color);
           setView(appliedView(id, initial));
@@ -137,7 +139,7 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
       // A safety net: the dropdown disables limited styles, and a new style from
       // the host arrives as a new payload. Checked before setView, so the
       // dropdown never shows a style that wasn't applied.
-      if (next.repr && isTouchLimited(next.repr, structure.molecule)) next = { ...next, repr: view.repr };
+      if (next.repr && isStyleLimited(next.repr, structure.molecule)) next = { ...next, repr: view.repr };
       const merged = { ...view, ...next };
       const store = useMoleculeStore.getState();
       if (next.repr) store.setStructureRepresentation(structure.id, next.repr);
@@ -166,8 +168,8 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
 
   const colorContext = useMemo(() => (structure ? calculateColorSchemeContext(structure.molecule) : null), [structure]);
   const molecule = structure?.molecule;
-  const touchLimited = useMemo(
-    () => new Set(molecule ? STYLES.map((s) => s.value).filter((rep) => isTouchLimited(rep, molecule)) : []),
+  const styleLimited = useMemo(
+    () => new Set(molecule ? STYLES.map((s) => s.value).filter((rep) => isStyleLimited(rep, molecule)) : []),
     [molecule]
   );
   const isAlphaFold = payload?.load.kind === 'alphafold';
@@ -254,10 +256,10 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
               <option
                 key={s.value}
                 value={s.value}
-                disabled={(s.value === 'cartoon' && !colorContext?.hasBackboneData) || touchLimited.has(s.value)}
+                disabled={(s.value === 'cartoon' && !colorContext?.hasBackboneData) || styleLimited.has(s.value)}
               >
                 {/* An <option> has no other place for the reason (no tooltips on touch screens) */}
-                {touchLimited.has(s.value) ? `${s.label} (over ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms)` : s.label}
+                {styleLimited.has(s.value) ? `${s.label} (over ${atomStyleLimitLabel(isTouchScreen())} atoms)` : s.label}
               </option>
             ))}
           </select>

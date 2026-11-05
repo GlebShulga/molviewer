@@ -2,7 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore, temporalStore } from '../store/moleculeStore';
 import { selectActiveStructure, selectSelectedAtomIndices } from '../store/selectors';
-import { isTouchLimited, touchLimitNote } from '../utils/representationAvailability';
+import { isStyleLimited, styleLimitNote } from '../utils/representationAvailability';
 import { showToast } from '../utils/toast';
 
 export interface KeyboardShortcut {
@@ -59,10 +59,10 @@ export function useKeyboardShortcuts(
 
       // Representation shortcuts (only when molecule loaded)
       if (hasMolecule) {
-        // Keys 1 and 2 follow the buttons' touch-screen limit (an iPad with a keyboard)
+        // Keys 1 and 2 follow the buttons' atom-count limit (desktops, and an iPad with a keyboard)
         const setAtomStyle = (rep: 'ball-and-stick' | 'stick') => {
           const molecule = selectActiveStructure(useMoleculeStore.getState())?.molecule;
-          if (molecule && isTouchLimited(rep, molecule)) showToast(touchLimitNote(rep));
+          if (molecule && isStyleLimited(rep, molecule)) showToast(styleLimitNote(rep));
           else setRepresentation(rep);
         };
         switch (key) {

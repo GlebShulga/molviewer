@@ -1,6 +1,7 @@
 import type { ColorScheme, Molecule, RepresentationType } from '../types';
 import { hasBackboneData } from './backboneExtraction';
 import { isTouchScreen } from './touch';
+import { DESKTOP_ATOM_STYLE_LIMIT } from '../../site/appContract';
 
 /**
  * Whether a style can be picked, and if not, why: a short predicate shown
@@ -38,30 +39,43 @@ export const SURFACE_MAX_ATOMS = 100_000;
  * Ball & Stick and Stick on a touch screen stop at this many atoms. Measured on
  * a production build (Pixel 5 emulation, CPU throttled 4x): 660 atoms rotate at
  * about 30 fps, 2.5k at 9 fps, 4.8k freeze for 7-10 s and 58k for 22-30 s.
- * Spacefill stays fast through impostors, and desktops cope with every style.
+ * Desktops stop much later (DESKTOP_ATOM_STYLE_LIMIT), and Spacefill stays
+ * fast everywhere through impostors.
  */
 export const TOUCH_ATOM_STYLE_LIMIT = 1000;
+export { DESKTOP_ATOM_STYLE_LIMIT };
+
+/** Where Ball & Stick and Stick stop on this kind of device. */
+export function atomStyleLimit(touch: boolean): number {
+  return touch ? TOUCH_ATOM_STYLE_LIMIT : DESKTOP_ATOM_STYLE_LIMIT;
+}
+
 /** The limit as people read it ("1,000"), for every text that names it. */
-export const TOUCH_ATOM_STYLE_LIMIT_LABEL = TOUCH_ATOM_STYLE_LIMIT.toLocaleString('en-US');
-const TOUCH_LIMIT_REASON = `over ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms on a touch screen; use Cartoon or Spacefill`;
+export function atomStyleLimitLabel(touch: boolean): string {
+  return atomStyleLimit(touch).toLocaleString('en-US');
+}
+
+function limitReason(touch: boolean): string {
+  return `over ${atomStyleLimitLabel(touch)} atoms${touch ? ' on a touch screen' : ''}; use Cartoon or Spacefill`;
+}
 
 const HIDDEN: Availability = { available: false, reason: 'the structure is hidden' };
 const OK: Availability = { available: true };
 
-function overTouchLimit(rep: RepresentationType, facts: Omit<StructureFacts, 'visible'>): boolean {
+function overAtomStyleLimit(rep: RepresentationType, facts: Omit<StructureFacts, 'visible'>): boolean {
   return (rep === 'ball-and-stick' || rep === 'stick')
-    && facts.touch && facts.hasBackbone && facts.atomCount > TOUCH_ATOM_STYLE_LIMIT;
+    && facts.hasBackbone && facts.atomCount > atomStyleLimit(facts.touch);
 }
 
 /**
  * One rule for the toolbar and the sheet. Only real limits: the one atom-count
- * cap is Ball & Stick and Stick on a touch screen (TOUCH_ATOM_STYLE_LIMIT), and
- * only with a backbone, so Cartoon is there instead. Spacefill has none
- * (impostor rendering handles large structures).
+ * cap is Ball & Stick and Stick (atomStyleLimit: 1,000 atoms on a touch screen,
+ * 100,000 on a desktop), and only with a backbone, so Cartoon is there
+ * instead. Spacefill has none (impostor rendering handles large structures).
  */
 export function representationAvailability(rep: RepresentationType, facts: StructureFacts): Availability {
   if (!facts.visible) return HIDDEN;
-  if (overTouchLimit(rep, facts)) return { available: false, reason: TOUCH_LIMIT_REASON };
+  if (overAtomStyleLimit(rep, facts)) return { available: false, reason: limitReason(facts.touch) };
   if (rep === 'cartoon' && !facts.hasBackbone) {
     return { available: false, reason: 'needs a protein or nucleic-acid backbone' };
   }
@@ -73,24 +87,25 @@ export function representationAvailability(rep: RepresentationType, facts: Struc
 }
 
 /**
- * Whether the touch-screen limit blocks this style for this molecule on this
+ * Whether the atom-count limit blocks this style for this molecule on this
  * device, for the paths that set a style without the buttons (links, sessions,
  * keys, the widget).
  */
-export function isTouchLimited(rep: RepresentationType, molecule: Molecule): boolean {
+export function isStyleLimited(rep: RepresentationType, molecule: Molecule): boolean {
   // The cheap checks first: the backbone check can walk every atom
-  if (!overTouchLimit(rep, { touch: isTouchScreen(), atomCount: molecule.atoms.length, hasBackbone: true })) return false;
+  if (!overAtomStyleLimit(rep, { touch: isTouchScreen(), atomCount: molecule.atoms.length, hasBackbone: true })) return false;
   return hasBackboneData(molecule);
 }
 
 /** Why a link or session opened in Cartoon instead of the style it asked for. */
-export function touchFallbackMessage(requested: RepresentationType): string {
-  return `Showing Cartoon: ${REPRESENTATION_LABELS[requested]} is limited to ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms on touch screens`;
+export function styleFallbackMessage(requested: RepresentationType): string {
+  const touch = isTouchScreen();
+  return `Showing Cartoon: ${REPRESENTATION_LABELS[requested]} is limited to ${atomStyleLimitLabel(touch)} atoms${touch ? ' on touch screens' : ''}`;
 }
 
 /** The reason the buttons show, for the keyboard shortcuts. */
-export function touchLimitNote(rep: RepresentationType): string {
-  return `${REPRESENTATION_LABELS[rep]}: ${TOUCH_LIMIT_REASON}`;
+export function styleLimitNote(rep: RepresentationType): string {
+  return `${REPRESENTATION_LABELS[rep]}: ${limitReason(isTouchScreen())}`;
 }
 
 export interface ColorFacts {

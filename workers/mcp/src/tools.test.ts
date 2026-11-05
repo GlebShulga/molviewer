@@ -321,6 +321,40 @@ describe('show_structure', () => {
     expect(r.text).toContain('AlphaFold models');
   });
 
+  describe('Ball & Stick and Stick over 100,000 atoms, which the viewer shows as Cartoon', () => {
+    /** 4HHB's entry with another size: `atoms` across `models` deposited models. */
+    const withSize = (atoms: number, models = 1) => {
+      const body = readFileSync(new URL('../../../site/upstream/__fixtures__/rcsb-core-4HHB.json', import.meta.url), 'utf8')
+        .replace(/"deposited_atom_count": *\d+/, `"deposited_atom_count": ${atoms}`)
+        .replace(/"deposited_model_count": *\d+/, `"deposited_model_count": ${models}`);
+      return upstream({ 'rcsb-core-4HHB.json': { status: 200, body } });
+    };
+
+    it('reports a ribosome-sized entry as cartoon, with a note, and sends cartoon to the widget', async () => {
+      for (const style of ['ball-and-stick', 'stick'] as const) {
+        const r = await showStructure({ kind: 'pdb', id: '4HHB', style }, withSize(237_685));
+        expect(r.text).toContain('as cartoon, colored by');
+        expect(r.text).toContain('is limited to 100,000 atoms, so this entry is shown as cartoon');
+        expect(r.structuredContent).toMatchObject({ shown: { style: 'cartoon' } });
+        expect(readWidgetPayload(r.meta)?.view.repr).toBe('cartoon');
+      }
+    });
+
+    it('keeps the style up to the limit, counting one model of a multi-model entry', async () => {
+      const atLimit = await showStructure({ kind: 'pdb', id: '4HHB', style: 'stick' }, withSize(100_000));
+      expect(atLimit.structuredContent).toMatchObject({ shown: { style: 'stick' } });
+      // 10 models of 12,000 atoms: the viewer shows one
+      const ensemble = await showStructure({ kind: 'pdb', id: '4HHB', style: 'ball-and-stick' }, withSize(120_000, 10));
+      expect(ensemble.structuredContent).toMatchObject({ shown: { style: 'ball-and-stick' } });
+    });
+
+    it('leaves Spacefill alone at any size', async () => {
+      const r = await showStructure({ kind: 'pdb', id: '4HHB', style: 'spacefill' }, withSize(237_685));
+      expect(r.structuredContent).toMatchObject({ shown: { style: 'spacefill' } });
+      expect(r.text).not.toContain('is limited to');
+    });
+  });
+
   describe('Cartoon with element (CPK) colors, which the viewer never shows', () => {
     /** 3DNI's entry with other polymer counts: a DNA-only entry or a protein-DNA complex. */
     const withPolymers = (protein: number, nucleic: number) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { useMoleculeStore, temporalStore, withRepresentation, touchSafeStructure } from '../moleculeStore';
+import { useMoleculeStore, temporalStore, withRepresentation, styleSafeStructure } from '../moleculeStore';
 import { serializeShareableSession } from '../../utils/shareSession';
 import { useToastStore } from '../../utils/toast';
 import type { Atom, Molecule, Structure } from '../../types';
@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('withRepresentation and touchSafeStructure', () => {
+describe('withRepresentation and styleSafeStructure', () => {
   it('switches the polymer components to Cartoon and leaves the ligand alone', () => {
     const id = ballAndStickProtein();
     const before = store().structures.get(id)!;
@@ -48,7 +48,7 @@ describe('withRepresentation and touchSafeStructure', () => {
     const ligand = repOf(before, 'ligand');
 
     stubTouch(true);
-    const { structure, fellBackFrom } = touchSafeStructure(before);
+    const { structure, fellBackFrom } = styleSafeStructure(before);
     expect(fellBackFrom).toBe('ball-and-stick');
     expect(structure.representation).toBe('cartoon');
     expect(repOf(structure, 'protein')).toBe('cartoon');
@@ -61,7 +61,7 @@ describe('withRepresentation and touchSafeStructure', () => {
     expect(repOf(withRepresentation(mixed, 'cartoon'), 'protein')).toBe('cartoon');
 
     stubTouch(true);
-    const { structure, fellBackFrom } = touchSafeStructure(mixed);
+    const { structure, fellBackFrom } = styleSafeStructure(mixed);
     expect(fellBackFrom).toBe('ball-and-stick');
     expect(repOf(structure, 'protein')).toBe('cartoon');
   });
@@ -73,7 +73,7 @@ describe('withRepresentation and touchSafeStructure', () => {
     expect(repOf(surface, 'protein')).toBe('ball-and-stick');
 
     stubTouch(true);
-    const result = touchSafeStructure(surface);
+    const result = styleSafeStructure(surface);
     expect(result.fellBackFrom).toBeUndefined();
     expect(result.structure).toBe(surface);
   });
@@ -81,7 +81,7 @@ describe('withRepresentation and touchSafeStructure', () => {
   it('changes nothing on a desktop', () => {
     const id = ballAndStickProtein();
     const structure = store().structures.get(id)!;
-    expect(touchSafeStructure(structure).structure).toBe(structure);
+    expect(styleSafeStructure(structure).structure).toBe(structure);
   });
 });
 

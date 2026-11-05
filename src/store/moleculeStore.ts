@@ -23,7 +23,7 @@ import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { track } from '../utils/track';
 import { showToast } from '../utils/toast';
-import { isTouchLimited, touchFallbackMessage } from '../utils/representationAvailability';
+import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
 import { AROMATIC_DETECTION_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
@@ -153,23 +153,23 @@ export function withValidColor(structure: Structure): Structure {
 }
 
 /**
- * Cartoon instead of a style the touch-screen limit blocks here
- * (isTouchLimited), for structures that arrive without the buttons: shared and
+ * Cartoon instead of a style the atom-count limit blocks on this device
+ * (isStyleLimited), for structures that arrive without the buttons: shared and
  * saved sessions. `fellBackFrom` is the blocked style, for the toast.
  */
-export function touchSafeStructure(structure: Structure): { structure: Structure; fellBackFrom?: RepresentationType } {
+export function styleSafeStructure(structure: Structure): { structure: Structure; fellBackFrom?: RepresentationType } {
   // Only the surface is drawn: whatever the polymer components hold is unseen
   if (isSurfaceRepresentation(structure.representation)) return { structure };
   const styles = [
     structure.representation,
     ...structure.componentSettings.filter((cs) => POLYMER_COMPONENTS.has(cs.type)).map((cs) => cs.representation),
   ];
-  const fellBackFrom = styles.find((rep) => isTouchLimited(rep, structure.molecule));
+  const fellBackFrom = styles.find((rep) => isStyleLimited(rep, structure.molecule));
   return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
 }
 
 /**
- * A session's structures as they can be shown here: through touchSafeStructure,
+ * A session's structures as they can be shown here: through styleSafeStructure,
  * with one toast if any fell back, and withValidColor, for sessions saved with
  * Cartoon + CPK.
  */
@@ -177,11 +177,11 @@ function sessionStructures(structures: Map<string, Structure>): Map<string, Stru
   let fellBackFrom: RepresentationType | undefined;
   const result = new Map<string, Structure>();
   for (const [id, structure] of structures) {
-    const safe = touchSafeStructure(structure);
+    const safe = styleSafeStructure(structure);
     fellBackFrom ??= safe.fellBackFrom;
     result.set(id, withValidColor(safe.structure));
   }
-  if (fellBackFrom) showToast(touchFallbackMessage(fellBackFrom));
+  if (fellBackFrom) showToast(styleFallbackMessage(fellBackFrom));
   return result;
 }
 

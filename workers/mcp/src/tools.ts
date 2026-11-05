@@ -11,6 +11,7 @@ import type { PdbDetails, UpstreamOptions } from '../../../site/upstream/types';
 import { PDB_ID_RE, UNIPROT_RE } from '../../../site/identifiers';
 import { slugForCid } from '../../../site/compoundSlugs';
 import {
+  DESKTOP_ATOM_STYLE_LIMIT,
   WIDGET_META_KEY,
   defaultView,
   toViewerColor,
@@ -465,6 +466,19 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     color = 'bfactor';
     notes.push('Confidence (pLDDT) coloring is for AlphaFold models; this entry is colored by B-factor instead.');
   }
+  const pdb = args.kind === 'pdb' ? (r.details as PdbDetails | undefined) : undefined;
+  // Ball & Stick and Stick stop at DESKTOP_ATOM_STYLE_LIMIT atoms with a
+  // backbone, where the viewer shows Cartoon on every device (phones stop
+  // earlier, which the server can't know). The viewer reads the first model;
+  // the deposited count covers them all.
+  if ((style === 'ball-and-stick' || style === 'stick') && pdb?.atomCount && (pdb.polymerEntityCount ?? 1) > 0) {
+    const atoms = pdb.atomCount / Math.max(1, pdb.modelCount ?? 1);
+    if (atoms > DESKTOP_ATOM_STYLE_LIMIT) {
+      const name = style === 'stick' ? 'Stick' : 'Ball and stick';
+      notes.push(`${name} is limited to ${DESKTOP_ATOM_STYLE_LIMIT.toLocaleString('en-US')} atoms, so this entry is shown as cartoon.`);
+      style = 'cartoon';
+    }
+  }
   // The viewer never shows CPK on Cartoon (withValidColor in the app's store):
   // each polymer gets its smart default, and ligands keep element colors. The
   // payload still asks for CPK, so the widget applies that rule; only what the
@@ -472,7 +486,6 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
   let shownColor = color;
   let colorWords = COLOR_WORDS[color];
   if (style === 'cartoon' && color === 'cpk') {
-    const pdb = args.kind === 'pdb' ? (r.details as PdbDetails | undefined) : undefined;
     // AlphaFold models, and entries without details, are taken as proteins
     const protein = !pdb || (pdb.proteinEntityCount ?? 1) > 0;
     const nucleic = (pdb?.nucleicAcidEntityCount ?? 0) > 0;

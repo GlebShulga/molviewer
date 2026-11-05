@@ -71,6 +71,16 @@ export function toViewerColor(color: AppColor): ViewerColorScheme {
   return color === 'confidence' ? 'bfactor' : color;
 }
 
+/**
+ * Ball & Stick and Stick stop at this many atoms on a desktop (a structure with
+ * a backbone shows Cartoon instead); touch screens stop much earlier
+ * (src/utils/representationAvailability.ts). Here because the server reports
+ * the style the widget will show. Measured on production (Chrome, Intel Iris Xe
+ * laptop, 2026-11-05): 59k atoms freeze 5-12 s and rotate at 27 fps, 99k
+ * freeze 10-11 s at 22 fps, 238k freeze 48-56 s at 9 fps.
+ */
+export const DESKTOP_ATOM_STYLE_LIMIT = 100_000;
+
 /** Default view when the model doesn't ask for one. */
 export function defaultView(kind: AppKind): { style: AppStyle; color: AppColor } {
   switch (kind) {
