@@ -6,6 +6,7 @@ import type { Atom, Molecule } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { selectHoveredAtomIndex } from '../../store/selectors';
 import { detectSymmetryFromAssembly, type DetectedSymmetry } from '../../utils/symmetryDetection';
+import { IMPOSTOR_BILLBOARD_SCALE } from '../../config/rendering';
 
 /**
  * Instanced assembly renderer for symmetric molecular structures.
@@ -59,7 +60,7 @@ const InstancedImpostorMaterial = shaderMaterial(
       vec4 mvPosition = modelViewMatrix * worldPos;
       vSphereCenter = mvPosition.xyz;
 
-      mvPosition.xy += position.xy * instanceRadius * 2.0;
+      mvPosition.xy += position.xy * instanceRadius * ${IMPOSTOR_BILLBOARD_SCALE};
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -76,7 +77,7 @@ const InstancedImpostorMaterial = shaderMaterial(
     varying vec2 vUv;
 
     void main() {
-      vec2 coord = (vUv - 0.5) * 4.0;
+      vec2 coord = (vUv - 0.5) * ${IMPOSTOR_BILLBOARD_SCALE};
       float distSq = dot(coord, coord);
       if (distSq > 1.0) discard;
 

@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
+import { IMPOSTOR_BILLBOARD_SCALE } from '../../config/rendering';
 import {
   GPUPickingManager,
   pickingVertexShader,
@@ -48,8 +49,8 @@ const SphereImpostorMaterial = shaderMaterial(
       vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
       vSphereCenter = mvPosition.xyz;
 
-      // Expand billboard in view space (1.5x to ensure sphere fits)
-      mvPosition.xy += position.xy * instanceRadius * 2.0;
+      // Expand the billboard in view space to the sphere's bounding square
+      mvPosition.xy += position.xy * instanceRadius * ${IMPOSTOR_BILLBOARD_SCALE};
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -67,8 +68,8 @@ const SphereImpostorMaterial = shaderMaterial(
     varying vec2 vUv;
 
     void main() {
-      // Map UV to normalized device coords on billboard (-1 to 1)
-      vec2 coord = (vUv - 0.5) * 4.0;
+      // The offset from the centre, in radii (-1 to 1 across the billboard)
+      vec2 coord = (vUv - 0.5) * ${IMPOSTOR_BILLBOARD_SCALE};
 
       // Early discard for corners outside sphere projection
       float distSq = dot(coord, coord);

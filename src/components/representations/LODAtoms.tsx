@@ -7,6 +7,7 @@ import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
 import { MoleculeOctree, LOD_THRESHOLDS, type ClusterData } from '../../utils/octree';
+import { IMPOSTOR_BILLBOARD_SCALE } from '../../config/rendering';
 
 /**
  * LOD-aware atom renderer using octree-based spatial clustering.
@@ -51,7 +52,7 @@ const LODImpostorMaterial = shaderMaterial(
 
       vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
       vSphereCenter = mvPosition.xyz;
-      mvPosition.xy += position.xy * instanceRadius * 2.0;
+      mvPosition.xy += position.xy * instanceRadius * ${IMPOSTOR_BILLBOARD_SCALE};
       gl_Position = projectionMatrix * mvPosition;
     }
   `,
@@ -68,7 +69,7 @@ const LODImpostorMaterial = shaderMaterial(
     varying vec2 vUv;
 
     void main() {
-      vec2 coord = (vUv - 0.5) * 4.0;
+      vec2 coord = (vUv - 0.5) * ${IMPOSTOR_BILLBOARD_SCALE};
       float distSq = dot(coord, coord);
       if (distSq > 1.0) discard;
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { IMPOSTOR_BILLBOARD_SCALE } from '../config/rendering';
 
 /**
  * GPU-based picking for high-performance atom selection.
@@ -50,8 +51,8 @@ export const pickingVertexShader = /* glsl */ `
     vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
     vSphereCenter = mvPosition.xyz;
 
-    // Expand billboard in view space
-    mvPosition.xy += position.xy * instanceRadius * 2.0;
+    // Expand the billboard in view space to the sphere's bounding square
+    mvPosition.xy += position.xy * instanceRadius * ${IMPOSTOR_BILLBOARD_SCALE};
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -65,8 +66,8 @@ export const pickingFragmentShader = /* glsl */ `
   varying float vRadius;
 
   void main() {
-    // Map UV to normalized device coords on billboard (-1 to 1)
-    vec2 coord = (vUv - 0.5) * 4.0;
+    // The offset from the centre, in radii (-1 to 1 across the billboard)
+    vec2 coord = (vUv - 0.5) * ${IMPOSTOR_BILLBOARD_SCALE};
 
     // Early discard for corners outside sphere projection
     float distSq = dot(coord, coord);

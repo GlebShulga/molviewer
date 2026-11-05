@@ -119,6 +119,17 @@ export const SCALES = {
   spacefill: 1.0,
 } as const;
 
+/**
+ * Sphere impostors (ImpostorAtoms, its GPU picking shader, LODAtoms,
+ * InstancedAssembly) draw each atom on a 1x1 plane. The vertex shader scales
+ * the plane by this times the radius, and the fragment shader scales the UV
+ * offset by the same, so `coord` is the offset in radii and the disc it keeps
+ * (|coord| <= 1) is the atom's full radius. With 2.0 the billboard is the
+ * sphere's bounding square. A GLSL float literal: GLSL ES has no implicit
+ * int-to-float conversion, so `2` would not compile.
+ */
+export const IMPOSTOR_BILLBOARD_SCALE = '2.0';
+
 export const ORBIT_CONTROLS = {
   enableDamping: true,
   dampingFactor: 0.05,
