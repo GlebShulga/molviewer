@@ -5,6 +5,7 @@ import {
   representationAvailability,
   touchFallbackMessage,
   TOUCH_ATOM_STYLE_LIMIT,
+  TOUCH_ATOM_STYLE_LIMIT_LABEL,
 } from '../representationAvailability';
 import type { Atom, Molecule } from '../../types';
 
@@ -72,6 +73,13 @@ describe('isTouchLimited', () => {
 
   it('names the requested style in the fallback message', () => {
     expect(touchFallbackMessage('stick')).toBe('Showing Cartoon: Stick is limited to 1,000 atoms on touch screens');
+  });
+
+  it('names the limit from TOUCH_ATOM_STYLE_LIMIT in every text', () => {
+    expect(TOUCH_ATOM_STYLE_LIMIT_LABEL).toBe(TOUCH_ATOM_STYLE_LIMIT.toLocaleString('en-US'));
+    expect(touchFallbackMessage('ball-and-stick')).toContain(`limited to ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms`);
+    const facts = { ...protein, atomCount: TOUCH_ATOM_STYLE_LIMIT + 1, touch: true };
+    expect(representationAvailability('stick', facts).reason).toContain(`over ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms`);
   });
 });
 

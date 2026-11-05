@@ -16,7 +16,7 @@ import { THEME_COLORS } from '../config';
 import { PLDDT_BANDS } from '../colors';
 import { loadStructureFromSource } from '../utils/structureLoader';
 import { calculateColorSchemeContext } from '../utils/atomColor';
-import { isTouchLimited } from '../utils/representationAvailability';
+import { isTouchLimited, TOUCH_ATOM_STYLE_LIMIT_LABEL } from '../utils/representationAvailability';
 import { track } from '../utils/track';
 import type { ColorScheme, RepresentationType, StructureSource } from '../types';
 import { openInMolViewerUrl, type WidgetLoad, type WidgetPayload, type WidgetView } from '../../site/appContract';
@@ -257,7 +257,7 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
                 disabled={(s.value === 'cartoon' && !colorContext?.hasBackboneData) || touchLimited.has(s.value)}
               >
                 {/* An <option> has no other place for the reason (no tooltips on touch screens) */}
-                {touchLimited.has(s.value) ? `${s.label} (over 1,000 atoms)` : s.label}
+                {touchLimited.has(s.value) ? `${s.label} (over ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms)` : s.label}
               </option>
             ))}
           </select>

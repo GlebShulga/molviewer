@@ -41,7 +41,9 @@ export const SURFACE_MAX_ATOMS = 100_000;
  * Spacefill stays fast through impostors, and desktops cope with every style.
  */
 export const TOUCH_ATOM_STYLE_LIMIT = 1000;
-const TOUCH_LIMIT_REASON = 'over 1,000 atoms on a touch screen; use Cartoon or Spacefill';
+/** The limit as people read it ("1,000"), for every text that names it. */
+export const TOUCH_ATOM_STYLE_LIMIT_LABEL = TOUCH_ATOM_STYLE_LIMIT.toLocaleString('en-US');
+const TOUCH_LIMIT_REASON = `over ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms on a touch screen; use Cartoon or Spacefill`;
 
 const HIDDEN: Availability = { available: false, reason: 'the structure is hidden' };
 const OK: Availability = { available: true };
@@ -83,7 +85,7 @@ export function isTouchLimited(rep: RepresentationType, molecule: Molecule): boo
 
 /** Why a link or session opened in Cartoon instead of the style it asked for. */
 export function touchFallbackMessage(requested: RepresentationType): string {
-  return `Showing Cartoon: ${REPRESENTATION_LABELS[requested]} is limited to 1,000 atoms on touch screens`;
+  return `Showing Cartoon: ${REPRESENTATION_LABELS[requested]} is limited to ${TOUCH_ATOM_STYLE_LIMIT_LABEL} atoms on touch screens`;
 }
 
 /** The reason the buttons show, for the keyboard shortcuts. */
