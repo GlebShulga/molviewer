@@ -1,32 +1,21 @@
+/* Placed by the viewer's status row (.statusRow in App.module.css). */
 .link {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--border-color);
   background-color: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
   color: var(--text-primary);
   font-size: 0.875rem;
-  z-index: 20;
+  white-space: nowrap;
 }
 
 .link:hover {
   border-color: var(--accent-color);
   text-decoration: none;
-}
-
-/* On phones the toolbar sits at the bottom: keep clear of it. */
-@media (max-width: 768px) {
-  .link {
-    left: 50%;
-    bottom: auto;
-    top: 12px;
-    transform: translateX(-50%);
-  }
 }
 
 @media (pointer: coarse) {

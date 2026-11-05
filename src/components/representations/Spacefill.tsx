@@ -4,10 +4,10 @@ import type { Molecule, Atom } from "../../types";
 import { getVdwRadius } from "../../constants";
 import { type ColorScheme } from "../../store/moleculeStore";
 import { useRepresentationSetup } from "../../hooks";
-import { SCALES, getQualityPreset } from "../../config";
+import { SCALES } from "../../config";
 import { getAtomColor } from "../../utils";
 import { SelectableAtom } from "./SelectableAtom";
-import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
+import { ImpostorAtoms, IMPOSTOR_THRESHOLD, type AtomData } from "./ImpostorAtoms";
 
 export interface SpacefillProps {
   molecule: Molecule;
@@ -49,12 +49,10 @@ export function Spacefill({
     })).filter(({ atom }) => atom !== undefined);
   }, [molecule.atoms, atomIndices]);
 
-  // Determine if we should use impostors based on molecule size
-  const qualityPreset = useMemo(
-    () => getQualityPreset(molecule.atoms.length),
-    [molecule.atoms.length]
-  );
-  const useImpostors = qualityPreset.useImpostors;
+  // Impostors from 2000 atoms, earlier than the quality presets switch (5000):
+  // one mesh per atom made Spacefill freeze phones at 2.5-5k atoms, and AO is
+  // already off from 2000, so the spheres look the same.
+  const useImpostors = molecule.atoms.length >= IMPOSTOR_THRESHOLD;
 
   // Atom data for SelectableAtom (tuple positions)
   const atomsData = useMemo<AtomRenderData[]>(() => {

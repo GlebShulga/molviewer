@@ -568,3 +568,17 @@
     border-top: 0;
   }
 }
+
+/* Touch: links inside running text sit 8px apart; a taller line and some
+   vertical padding give each a bigger target. */
+@media (pointer: coarse) {
+  .page-info p,
+  .page-info li {
+    line-height: 1.8;
+  }
+
+  .page-info p a,
+  .page-info li a {
+    padding-block: 6px;
+  }
+}

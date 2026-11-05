@@ -1,8 +1,5 @@
+/* --ss-helix, --ss-sheet, --ss-coil are set inline from the 3D palette (SequenceViewer.tsx) */
 .sequenceViewer {
-  --ss-helix: #ff69b4;
-  --ss-sheet: #ffd700;
-  --ss-coil: #808080;
-
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -189,4 +186,41 @@
   width: 8px;
   height: 8px;
   border-radius: 2px;
+  /* Coil is white: an outline keeps it visible on the light theme */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 35%, transparent);
+}
+
+/* Touch: residue cells big enough to hit with a finger */
+@media (pointer: coarse) {
+  .sequence {
+    gap: 2px;
+  }
+
+  .residue {
+    width: 28px;
+    min-height: 32px;
+    justify-content: center;
+  }
+}
+
+/* Phones (the bottom sheet, BOTTOM_SHEET_MAX_WIDTH in App.tsx): no second
+   vertical scroller inside the scrolling sheet, which would grab the wrong
+   swipes. The chain is one row that scrolls sideways; vertical swipes stay
+   with the sheet. */
+@media (max-width: 600px) {
+  .sequenceContainer {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+  }
+
+  .sequence {
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+
+  .sequence > * {
+    flex-shrink: 0;
+  }
 }

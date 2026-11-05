@@ -41,7 +41,9 @@ test.describe('Surface Representation', () => {
       test.skip(!repSectionVisible, 'Representation section hidden (smart defaults active)');
 
       const title = await moleculeViewer.controlPanel.surfaceButton.getAttribute('title');
-      expect(title).toBe('Surface not useful for small molecules');
+      expect(title).toBe('Surface: needs at least 100 atoms');
+      // Also as visible text under the buttons: touch screens have no tooltips
+      await expect(moleculeViewer.controlPanel.representationSection.getByText('Surface: needs at least 100 atoms')).toBeVisible();
     });
   });
 

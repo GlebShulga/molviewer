@@ -22,6 +22,8 @@ import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { track } from '../utils/track';
+import { showToast } from '../utils/toast';
+import { isTouchLimited, touchFallbackMessage } from '../utils/representationAvailability';
 import { AROMATIC_DETECTION_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
@@ -89,6 +91,58 @@ import {
 
 /** Components that follow the structure's Style choice (the rest keep their smart defaults). */
 const POLYMER_COMPONENTS = new Set<MoleculeComponentType>(['protein', 'dna', 'rna']);
+
+const isSurfaceRepresentation = (rep: RepresentationType) => rep === 'surface-vdw' || rep === 'surface-sas';
+
+/**
+ * The structure in a new style. Multi-component structures (protein + ligands,
+ * ...) are drawn from componentSettings, so the style must reach the polymer
+ * components too: otherwise picking Stick for 4HHB changes nothing. Ligands,
+ * ions and water keep their own styles; Cartoon restores the polymers' smart
+ * default. Surfaces are drawn from `representation` alone, so componentSettings
+ * stay as they were and switching back from a surface restores them.
+ * Applies even when `rep` is already the structure's style, so it also repairs
+ * polymer components that disagree with it.
+ */
+export function withRepresentation(structure: Structure, rep: RepresentationType): Structure {
+  const componentSettings = isSurfaceRepresentation(rep)
+    ? structure.componentSettings
+    : structure.componentSettings.map((cs) =>
+        POLYMER_COMPONENTS.has(cs.type)
+          ? { ...cs, representation: rep === 'cartoon' ? SMART_DEFAULTS[cs.type].representation : rep }
+          : cs
+      );
+  return { ...structure, representation: rep, componentSettings };
+}
+
+/**
+ * Cartoon instead of a style the touch-screen limit blocks here
+ * (isTouchLimited), for structures that arrive without the buttons: shared and
+ * saved sessions. `fellBackFrom` is the blocked style, for the toast.
+ */
+export function touchSafeStructure(structure: Structure): { structure: Structure; fellBackFrom?: RepresentationType } {
+  // Only the surface is drawn: whatever the polymer components hold is unseen
+  if (isSurfaceRepresentation(structure.representation)) return { structure };
+  const styles = [
+    structure.representation,
+    ...structure.componentSettings.filter((cs) => POLYMER_COMPONENTS.has(cs.type)).map((cs) => cs.representation),
+  ];
+  const fellBackFrom = styles.find((rep) => isTouchLimited(rep, structure.molecule));
+  return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
+}
+
+/** Every structure through touchSafeStructure, with one toast if any fell back. */
+function touchSafeStructures(structures: Map<string, Structure>): Map<string, Structure> {
+  let fellBackFrom: RepresentationType | undefined;
+  const result = new Map<string, Structure>();
+  for (const [id, structure] of structures) {
+    const safe = touchSafeStructure(structure);
+    fellBackFrom ??= safe.fellBackFrom;
+    result.set(id, safe.structure);
+  }
+  if (fellBackFrom) showToast(touchFallbackMessage(fellBackFrom));
+  return result;
+}
 
 // Re-export types for backward compatibility
 export type {
@@ -565,23 +619,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     const structure = structures.get(id);
     if (!structure || structure.representation === rep) return; // Early exit if unchanged
 
-    // Multi-component structures (protein + ligands, ...) are drawn from
-    // componentSettings, so the new style must reach the polymer components too:
-    // otherwise picking Stick for 4HHB changes nothing. Ligands, ions and water
-    // keep their own styles; Cartoon restores the polymers' smart default.
-    // Surfaces are drawn from `representation` alone, so componentSettings stay
-    // as they were and switching back from a surface restores them.
-    const isSurface = rep === 'surface-vdw' || rep === 'surface-sas';
-    const newComponentSettings = isSurface
-      ? structure.componentSettings
-      : structure.componentSettings.map((cs) =>
-          POLYMER_COMPONENTS.has(cs.type)
-            ? { ...cs, representation: rep === 'cartoon' ? SMART_DEFAULTS[cs.type].representation : rep }
-            : cs
-        );
-
     const newStructures = new Map(structures);
-    newStructures.set(id, { ...structure, representation: rep, componentSettings: newComponentSettings });
+    newStructures.set(id, withRepresentation(structure, rep));
     set({ structures: newStructures });
   },
 
@@ -949,7 +988,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       clearSelectorCaches();
       set({
         ...initialState,
-        structures: data.structures,
+        structures: touchSafeStructures(data.structures),
         structureOrder: data.structureOrder,
         activeStructureId: data.activeStructureId,
         layoutMode: data.layoutMode,
@@ -1038,7 +1077,8 @@ export const useMoleculeStore = create<MoleculeState>()(
 
       set({
         ...initialState,
-        structures: newStructures,
+        // After representation and componentSettings are restored above
+        structures: touchSafeStructures(newStructures),
         structureOrder: newOrder,
         activeStructureId: newOrder[0] ?? null,
         layoutMode: payload.layoutMode,

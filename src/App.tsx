@@ -24,17 +24,24 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { WebGLFallback } from './components/ui/WebGLFallback';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
-import { OnboardingProvider, useOnboardingContext, WelcomeScreen } from './components/onboarding';
+import { OnboardingProvider, useOnboardingContext, WelcomeScreen, EXAMPLES } from './components/onboarding';
 import { THEME_COLORS } from './config';
 import { isWebGL2Supported } from './utils/webglDetection';
 import { useInitialUrlLoad, loadStructureFromParams } from './hooks/useInitialUrlLoad';
 import { useUrlSync } from './hooks/useUrlSync';
 import { getWatermarkText } from './utils/watermark';
+import { buildExportFilename, shareOrDownload } from './utils/exportImage';
+import { showToast } from './utils/toast';
+import { Toast } from './components/ui/Toast';
 import { track } from './utils/track';
 import { parsePathnameParams } from './utils/urlParams';
 import { LandingInfo } from './components/ui/LandingInfo';
 import { GestureHint } from './components/ui/GestureHint';
 import { PageInfoLink } from './components/ui/PageInfoLink';
+import { MeasurementHint } from './components/viewer/MeasurementHint';
+import { StructureTitle } from './components/viewer/StructureTitle';
+import { ColorLegend } from './components/viewer/ColorLegend';
+import { useLandingShown } from './hooks/useLandingShown';
 import { Sun, Moon, Menu, X, Github } from 'lucide-react';
 import styles from './App.module.css';
 import './styles/globals.css';
@@ -69,6 +76,7 @@ function ThemeToggle() {
       className={styles.themeToggle}
       onClick={toggleTheme}
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
       {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
     </button>
@@ -91,44 +99,74 @@ function OnboardingSpotlight({ setSidebarOpen }: { setSidebarOpen: (open: boolea
   );
 }
 
-function EmptyOrWelcome() {
+export function EmptyOrWelcome({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const onboarding = useOnboardingContext();
 
-  // The example links under "Get started" load into the viewer; useUrlSync then
-  // puts the structure's path in the address bar, as for a sidebar load.
+  // The example links (welcome screen and empty state) load into the viewer;
+  // useUrlSync then puts the structure's path in the address bar, as for a
+  // sidebar load. `via` tags the load event, and only the welcome screen's
+  // examples end onboarding: the empty state shows after it is over.
   const { completeWithExample } = onboarding;
-  const loadExample = useCallback(async (path: string) => {
+  const loadExample = useCallback(async (path: string, via: string, completeOnboarding: boolean) => {
     const params = parsePathnameParams(path);
     if (!params) return;
     const store = useMoleculeStore.getState();
     store.setLoading(true);
     try {
-      const { warning } = await loadStructureFromParams(params, new AbortController().signal, 'welcome_example');
+      const { warning } = await loadStructureFromParams(params, new AbortController().signal, via);
       if (warning) store.setError(warning);
-      completeWithExample();
+      if (completeOnboarding) completeWithExample();
     } catch (err) {
       store.setError(err instanceof Error ? err.message : 'Failed to load molecule');
     } finally {
       store.setLoading(false);
     }
   }, [completeWithExample]);
+  const loadWelcomeExample = useCallback(
+    (path: string) => loadExample(path, 'welcome_example', true),
+    [loadExample]
+  );
 
   if (onboarding.phase === 'welcome' || onboarding.phase === 'loading') {
     return (
       <WelcomeScreen
         onStart={onboarding.startTour}
         isLoading={onboarding.phase === 'loading'}
-        onExample={loadExample}
+        onExample={loadWelcomeExample}
         onIntent={preloadViewer}
       />
     );
   }
 
+  // Real links, as on the welcome screen: a plain click loads in place
+  const handleExample = (e: React.MouseEvent<HTMLAnchorElement>, path: string) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    void loadExample(path, 'empty_example', false);
+  };
+  const intentHandlers = { onPointerEnter: preloadViewer, onFocus: preloadViewer, onTouchStart: preloadViewer };
+
   return (
     <div className={styles.emptyState}>
       <div className={styles.emptyIcon}>&#x2B21;</div>
-      <p>Upload a molecule file to get started</p>
-      <p className={styles.emptyHint}>Supported formats: PDB, SDF, MOL, XYZ</p>
+      <p>Load a molecule to get started</p>
+      {/* The sidebar is always visible on wide screens; on narrow ones it is a drawer or sheet */}
+      <button type="button" className={styles.emptyPrimary} onClick={onOpenSidebar} {...intentHandlers}>
+        Load a structure
+      </button>
+      <p className={styles.emptyExamples}>
+        or open an example:{' '}
+        {EXAMPLES.map((example, i) => (
+          // The separator trails its link, so a wrapped line never starts with it
+          <span key={example.path} className={styles.emptyExample}>
+            <a href={example.path} onClick={(e) => handleExample(e, example.path)} {...intentHandlers}>
+              {example.label}
+            </a>
+            {i < EXAMPLES.length - 1 && <span className={styles.emptySeparator}>·</span>}
+          </span>
+        ))}
+      </p>
+      <p className={styles.emptyHint}>Supported formats: PDB, CIF, SDF, MOL, XYZ</p>
     </div>
   );
 }
@@ -201,6 +239,7 @@ function AppContent() {
 
   // Check if we have any structures loaded
   const hasStructures = structureOrder.length > 0;
+  const landingShown = useLandingShown() !== null;
 
   // The welcome screen carries its own heading, so the header tagline would be
   // a second slogan on the same screen. It comes back as soon as the screen is
@@ -252,15 +291,24 @@ function AppContent() {
   const pendingCameraSnapshot = useMoleculeStore(state => state.pendingCameraSnapshot);
   const setPendingCameraSnapshot = useMoleculeStore(state => state.setPendingCameraSnapshot);
 
-  // Track when structures change - set flag for pending home view
+  // Track when structures change - set flag for pending home view.
+  // On phones the sheet covers the viewer, so a load from it (sample, Fetch,
+  // file, session) closes it to show the result. Removing a structure keeps it
+  // open, and so does tour step 1, which points into the sheet. structureOrder
+  // is in the undo history, so redoing an add also closes it; that's fine.
   useEffect(() => {
     if (structureOrderKey !== prevStructureOrderKeyRef.current) {
       if (structureOrder.length > 0) {
         setPendingHomeView(true);
       }
+      const previousIds = prevStructureOrderKeyRef.current.split(',');
+      const added = structureOrder.some(id => !previousIds.includes(id));
+      if (added && sidebarOpen && !isTouringSidebar && window.innerWidth <= BOTTOM_SHEET_MAX_WIDTH) {
+        setSidebarOpen(false);
+      }
       prevStructureOrderKeyRef.current = structureOrderKey;
     }
-  }, [structureOrderKey, structureOrder.length]);
+  }, [structureOrderKey, structureOrder, sidebarOpen, isTouringSidebar]);
 
   // Execute home view when all conditions are met.
   // If a session-load enqueued a camera snapshot, that takes precedence over
@@ -282,8 +330,14 @@ function AppContent() {
     viewerRef.current?.applyCameraSnapshot(snapshot);
   }, [pendingCameraSnapshot, controlsReady, boundingBoxData, setPendingCameraSnapshot]);
 
-  // Close sidebar when clicking overlay or pressing Escape
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  // Close sidebar when clicking overlay or pressing Escape. Closing it during
+  // the tour step that points into it ends the tour, as Skip would.
+  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+  const { skipTour } = onboarding;
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    if (isTouringSidebar) skipTour();
+  }, [isTouringSidebar, skipTour]);
 
   // On phones the sidebar is a bottom sheet: swiping down from its top closes it.
   const sheetTouchStartY = useRef<number | null>(null);
@@ -320,19 +374,70 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [sidebarOpen, closeSidebar]);
 
+  // The open drawer/sheet is a modal dialog: focus moves into it, and back to
+  // the menu button when it closes (unless focus already went elsewhere). Not
+  // during tour step 1, which focuses its own tooltip.
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const wasSidebarOpenRef = useRef(false);
+  useEffect(() => {
+    const wasOpen = wasSidebarOpenRef.current;
+    wasSidebarOpenRef.current = sidebarOpen;
+    if (isTouringSidebar || wasOpen === sidebarOpen) return;
+    if (sidebarOpen) {
+      sidebarCloseButtonRef.current?.focus({ preventScroll: true });
+    } else if (sidebarRef.current?.contains(document.activeElement) || document.activeElement === document.body) {
+      menuButtonRef.current?.focus({ preventScroll: true });
+    }
+  }, [sidebarOpen, isTouringSidebar]);
+
+  // iOS ignores overscroll-behavior on the sheet in some cases: lock the page
+  // itself while the sheet is open, so a drag at its end can't scroll it.
+  useEffect(() => {
+    if (!sidebarOpen || window.innerWidth > BOTTOM_SHEET_MAX_WIDTH) return;
+    const { documentElement: html, body } = document;
+    const previous = [html.style.overflow, body.style.overflow];
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = previous[0];
+      body.style.overflow = previous[1];
+    };
+  }, [sidebarOpen]);
+
+  // The structure chip over the viewer: open the sheet (wide screens: the
+  // sidebar is already there) at Molecule Info. Scrolls the sidebar itself,
+  // never the page; the rects move together while the sheet slides in.
+  const showMoleculeInfo = useCallback(() => {
+    setSidebarOpen(true);
+    requestAnimationFrame(() => {
+      const sidebar = sidebarRef.current;
+      const target = document.getElementById('molecule-info');
+      if (!sidebar || !target) return;
+      const offset = target.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
+      sidebar.scrollTo({ top: sidebar.scrollTop + offset - 16, behavior: 'smooth' });
+    });
+  }, []);
+
   const handleExport = useCallback((options?: { scale: number; background: string | null; filename: string }) => {
     if (options) {
       setExportSettings(options);
     }
     const settings = options || exportSettings;
-    viewerRef.current?.exportImage({
+    const blob = viewerRef.current?.exportImage({
       scale: settings.scale,
       background: settings.background,
-      filename: settings.filename || molecule?.name || 'molecule',
       watermark: getWatermarkText(),
     });
+    if (!blob) return;
     track('export_png', { scale: settings.scale });
-  }, [exportSettings, molecule?.name]);
+    // Still inside the tap: a phone gets the share sheet, the rest a download
+    const filename = buildExportFilename(settings.filename || molecule?.name, 'png');
+    shareOrDownload(blob, filename).then((result) => {
+      if (result === 'downloaded') showToast('Image saved');
+    }, () => setError('Could not save the image'));
+  }, [exportSettings, molecule?.name, setError]);
 
   const handleHomeView = useCallback(() => {
     viewerRef.current?.homeView();
@@ -393,6 +498,7 @@ function AppContent() {
       <div aria-live="polite" className="srOnly">{statusMessage}</div>
       <header className={styles.appHeader}>
         <button
+          ref={menuButtonRef}
           className={styles.menuButton}
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
@@ -423,11 +529,17 @@ function AppContent() {
         />
 
         <aside
+          ref={sidebarRef}
           className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${isTouringSidebar ? styles.tourActive : ''}`}
           onTouchStart={handleSheetTouchStart}
           onTouchEnd={handleSheetTouchEnd}
+          // Open only below 768px, where it is a drawer or sheet over the viewer
+          role={sidebarOpen ? 'dialog' : undefined}
+          aria-modal={sidebarOpen || undefined}
+          aria-label={sidebarOpen ? 'Menu' : undefined}
         >
           <button
+            ref={sidebarCloseButtonRef}
             className={styles.sidebarCloseButton}
             onClick={closeSidebar}
             aria-label="Close menu"
@@ -471,28 +583,39 @@ function AppContent() {
             </div>
           )}
 
-          {error && (
-            <div className={styles.errorMessage} role="alert">
-              <span className={styles.errorIcon}>!</span>
-              <span>{error}</span>
-              <button
-                className={styles.errorClose}
-                onClick={() => setError(null)}
-                aria-label="Dismiss error"
-              >
-                &times;
-              </button>
-            </div>
-          )}
+          {/* Next to the toolbar, also without a structure (a failed first load).
+              The toast goes nearest the toolbar, where Export and Copy Link are. */}
+          <div className={styles.toolbarStack}>
+            <Toast />
+            {error && (
+              <div className={styles.errorMessage} role="alert">
+                <span className={styles.errorIcon}>!</span>
+                <span>{error}</span>
+                <button
+                  className={styles.errorClose}
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss error"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+            {hasStructures && <MeasurementHint />}
+            {hasStructures && <AtomTooltip docked />}
+          </div>
 
           {!hasStructures && !isLoading && !error && (
-            <EmptyOrWelcome />
+            <EmptyOrWelcome onOpenSidebar={openSidebar} />
           )}
 
           {hasStructures && (
             <>
               <GestureHint />
-              <PageInfoLink />
+              <div className={styles.statusRow}>
+                {/* The pill already names the structure: never both */}
+                <div className={styles.statusLeft}>{landingShown ? <PageInfoLink /> : <StructureTitle onOpenDetails={showMoleculeInfo} />}</div>
+                <div className={styles.statusRight}><ColorLegend /></div>
+              </div>
               <Toolbar
                 measurementMode={measurementMode}
                 onMeasurementModeChange={handleMeasurementModeChange}
@@ -533,7 +656,8 @@ function AppContent() {
         </main>
       </div>
 
-      <AtomTooltip />
+      {/* On phones and touch screens the docked card in the toolbar-side stack shows instead */}
+      <AtomTooltip allowDocking />
       <ContextMenu />
       <ShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <OnboardingSpotlight setSidebarOpen={setSidebarOpen} />

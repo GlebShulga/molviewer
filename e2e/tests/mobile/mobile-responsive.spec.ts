@@ -257,7 +257,7 @@ test.describe('Mobile/Touch Responsiveness', () => {
           const rect = el.getBoundingClientRect();
           return { width: rect.width, height: rect.height };
         });
-      }, '[class*="toolbar"] button');
+      }, '[data-testid="toolbar"] button');
 
       for (const box of sizes) {
         // Touch targets should be at least 44x44px

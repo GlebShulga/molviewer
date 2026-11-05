@@ -207,3 +207,16 @@
   outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
+
+/* Touch: 16px text stops iOS from zooming in on focus; 44px targets */
+@media (pointer: coarse) {
+  .pdbInput {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .pdbFetchBtn,
+  .sampleButton {
+    min-height: 44px;
+  }
+}

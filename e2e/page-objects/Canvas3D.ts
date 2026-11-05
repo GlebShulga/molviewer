@@ -179,6 +179,62 @@ export class Canvas3DPage {
   }
 
   /**
+   * Screen positions of the atoms drawn as impostors (Spacefill from 2000 atoms,
+   * Ball & Stick from 5000): one instanced mesh of billboards, no sphere meshes,
+   * so getAtomScreenPosition finds nothing there. `nearest` is the on-screen atom
+   * closest to the camera, which nothing covers. Null when there are no
+   * impostors on screen, with no fallback click.
+   */
+  async getImpostorAtomScreenPositions(): Promise<{
+    nearest: { x: number; y: number };
+    all: { x: number; y: number }[];
+  } | null> {
+    return this.page.evaluate(() => {
+      interface Vec { set(x: number, y: number, z: number): Vec; applyMatrix4(m: unknown): Vec; project(c: unknown): Vec; x: number; y: number; z: number }
+      interface ImpostorMesh {
+        isInstancedMesh?: boolean;
+        userData?: { exportAs?: string };
+        count: number;
+        instanceMatrix: { array: ArrayLike<number> };
+        matrixWorld: unknown;
+        position: { clone(): Vec };
+      }
+      const win = window as unknown as { __mol3d_scene?: { traverse(cb: (o: unknown) => void): void }; __mol3d_camera?: unknown };
+      const canvas = document.querySelector('canvas');
+      if (!win.__mol3d_scene || !win.__mol3d_camera || !canvas) return null;
+
+      let mesh: ImpostorMesh | null = null;
+      win.__mol3d_scene.traverse((o) => {
+        const m = o as ImpostorMesh;
+        if (m.isInstancedMesh && m.userData?.exportAs === 'spheres') mesh = m;
+      });
+      const found = mesh as ImpostorMesh | null;
+      if (!found || found.count === 0) return null;
+
+      // No THREE global in the page: a Vector3 cloned from the mesh does the math
+      const v = found.position.clone();
+      const rect = canvas.getBoundingClientRect();
+      const array = found.instanceMatrix.array;
+      const all: { x: number; y: number }[] = [];
+      let nearest = { x: 0, y: 0 };
+      let nearestZ = Infinity;
+      for (let i = 0; i < found.count; i++) {
+        // An instance's translation is elements 12-14 of its 4x4 matrix
+        v.set(array[i * 16 + 12], array[i * 16 + 13], array[i * 16 + 14]).applyMatrix4(found.matrixWorld).project(win.__mol3d_camera);
+        const point = { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((-v.y + 1) / 2) * rect.height };
+        all.push(point);
+        // Framing can leave the closest corner off screen: only atoms well inside count
+        const onScreen = Math.abs(v.x) < 0.8 && Math.abs(v.y) < 0.8;
+        if (onScreen && v.z < nearestZ) {
+          nearestZ = v.z;
+          nearest = point;
+        }
+      }
+      return nearestZ === Infinity ? null : { nearest, all };
+    });
+  }
+
+  /**
    * Hover on a specific atom by index.
    * @returns true if exact atom position found, false if used fallback (canvas center)
    */

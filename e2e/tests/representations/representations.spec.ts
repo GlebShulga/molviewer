@@ -100,7 +100,7 @@ test.describe('Representations', () => {
       await page.waitForTimeout(300);  // Wait for active structure to switch
 
       // Wait for Molecule Info to show 327 atoms (confirms 1CRN is selected)
-      await expect(page.getByText('Atoms: 327')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByTestId('metadata-atoms')).toHaveText('327', { timeout: 5000 });
 
       // Cartoon should now be available for the protein
       const isAvailable = await moleculeViewer.controlPanel.isRepresentationAvailable('cartoon');

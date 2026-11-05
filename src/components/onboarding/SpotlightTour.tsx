@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { TOUR_STEPS } from './tourSteps';
 import styles from './SpotlightTour.module.css';
 
@@ -23,8 +23,22 @@ const MOBILE_BREAKPOINT = 768;
 const TARGET_POLL_INTERVAL = 100;
 const TARGET_POLL_MAX_ATTEMPTS = 30; // 3 seconds
 
+/**
+ * The first element matching the selector that has a size. A step can list
+ * several targets of which CSS hides all but one (the View group on wide
+ * screens, the "More" button on phones).
+ */
+function findVisibleTarget(selector: string): Element | null {
+  for (const el of document.querySelectorAll(selector)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return el;
+  }
+  return null;
+}
+
 export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: SpotlightTourProps) {
   const [rect, setRect] = useState<TargetRect | null>(null);
+  const [tooltipHeight, setTooltipHeight] = useState(160);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
   const stepIndex = step - 1;
@@ -64,30 +78,42 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
 
     let attempts = 0;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
-    let resizeObserver: ResizeObserver | null = null;
+    let frame = 0;
+    let lastKey = '';
 
     function updateRect() {
-      const el = document.querySelector(currentStep.target);
+      // Looked up every time: a remounted target would leave a detached
+      // element behind, whose rect is all zeros.
+      const el = findVisibleTarget(currentStep.target);
       if (!el) return false;
 
       const r = el.getBoundingClientRect();
-      setRect({
-        top: r.top - PADDING,
-        left: r.left - PADDING,
-        width: r.width + PADDING * 2,
-        height: r.height + PADDING * 2,
-      });
+      const key = [r.top, r.left, r.width, r.height].map(Math.round).join(',');
+      if (key !== lastKey) {
+        lastKey = key;
+        setRect({
+          top: r.top - PADDING,
+          left: r.left - PADDING,
+          width: r.width + PADDING * 2,
+          height: r.height + PADDING * 2,
+        });
+      }
       return true;
     }
 
+    // Measure every frame: the phone sheet slides in with a transform and the
+    // toolbar scrolls sideways, and neither fires a resize. This reads layout
+    // only, so the 3D canvas does not repaint.
+    function track() {
+      updateRect();
+      frame = requestAnimationFrame(track);
+    }
+
     function startObserving() {
-      const el = document.querySelector(currentStep.target);
-      if (!el) return;
-
-      resizeObserver = new ResizeObserver(() => updateRect());
-      resizeObserver.observe(el);
-
-      window.addEventListener('resize', updateRect);
+      if (currentStep.scrollIntoView) {
+        findVisibleTarget(currentStep.target)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      }
+      frame = requestAnimationFrame(track);
     }
 
     // Poll until target appears
@@ -109,8 +135,7 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
 
     return () => {
       if (pollTimer) clearInterval(pollTimer);
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', updateRect);
+      cancelAnimationFrame(frame);
     };
   }, [stepIndex, currentStep, onNext]);
 
@@ -148,6 +173,13 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onSkip]);
 
+  // Measure the tooltip, so the clamp below uses its real height (it varies
+  // with the step's text)
+  useLayoutEffect(() => {
+    const height = tooltipRef.current?.offsetHeight;
+    if (height && height !== tooltipHeight) setTooltipHeight(height);
+  }, [step, rect, tooltipHeight]);
+
   // Calculate tooltip position with viewport clamping
   const getTooltipStyle = useCallback((): React.CSSProperties => {
     if (!rect) return { opacity: 0 };
@@ -160,7 +192,6 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const tooltipWidth = isMobile ? 260 : 300;
-    const tooltipEstHeight = 160; // approximate tooltip height
     const margin = 12; // min distance from viewport edge
 
     switch (placement) {
@@ -170,7 +201,8 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
         style.transform = 'translateX(-50%)';
         break;
       case 'top':
-        style.bottom = vh - rect.top + TOOLTIP_GAP;
+        // As `top`, not `bottom`, so the vertical clamp below applies
+        style.top = rect.top - TOOLTIP_GAP - tooltipHeight;
         style.left = rect.left + rect.width / 2;
         style.transform = 'translateX(-50%)';
         break;
@@ -189,8 +221,8 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
     // Clamp tooltip within viewport
     if (style.top !== undefined && typeof style.top === 'number') {
       // If tooltip would overflow below viewport, pull it up
-      if (style.top + tooltipEstHeight > vh - margin) {
-        style.top = vh - tooltipEstHeight - margin;
+      if (style.top + tooltipHeight > vh - margin) {
+        style.top = vh - tooltipHeight - margin;
       }
       // Don't let it go above viewport
       if (style.top < margin) {
@@ -213,14 +245,30 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
     }
 
     return style;
-  }, [rect, isMobile, currentStep]);
+  }, [rect, isMobile, currentStep, tooltipHeight]);
+
+  // A tap on the dimmed page ends the tour: phones have no Esc, so this is the
+  // way out if the tooltip is ever out of reach. The spotlight lets taps
+  // through to the blocker, so taps inside it are ignored, as before.
+  const handleBlockerClick = useCallback((e: React.MouseEvent) => {
+    if (
+      rect &&
+      e.clientX >= rect.left &&
+      e.clientX <= rect.left + rect.width &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.top + rect.height
+    ) {
+      return;
+    }
+    onSkip();
+  }, [rect, onSkip]);
 
   if (!currentStep || !rect) return null;
 
   return (
     <>
       {/* Click blocker */}
-      <div className={styles.blocker} aria-hidden="true" />
+      <div className={styles.blocker} onClick={handleBlockerClick} aria-hidden="true" />
 
       {/* Spotlight hole */}
       <div
@@ -266,7 +314,9 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
           </div>
         </div>
         <h3 className={styles.tooltipTitle}>{currentStep.title}</h3>
-        <p className={styles.tooltipDescription}>{currentStep.description}</p>
+        <p className={styles.tooltipDescription}>
+          {(isMobile && currentStep.mobileDescription) || currentStep.description}
+        </p>
         <div className={styles.tooltipActions}>
           <button className={styles.skipButton} onClick={onSkip}>
             Skip

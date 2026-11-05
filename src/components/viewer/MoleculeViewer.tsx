@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, MAX_DPR, getQualityPreset } from "../../config";
 import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
-import { drawWatermark } from "../../utils/exportImage";
+import { dataUrlToBlob, drawWatermark } from "../../utils/exportImage";
 import { logError } from "../../utils/errorReporter";
 import { recordTurntable as recordTurntableFrames, type RecordTurntableOptions } from "../../utils/exportVideo";
 import type { ModelFormat, ExportModelOptions, ExportModelResult } from "../../utils/exportModel";
@@ -17,7 +17,8 @@ export type { CameraSnapshot };
 
 export interface MoleculeViewerHandle {
   homeView: () => void;
-  exportImage: (options?: { scale?: number; background?: string | null; filename?: string; watermark?: string }) => void;
+  /** Renders the view as a PNG; the caller saves or shares it. Null without a WebGL context. */
+  exportImage: (options?: { scale?: number; background?: string | null; watermark?: string }) => Blob | null;
   getCameraSnapshot: () => CameraSnapshot | null;
   applyCameraSnapshot: (snapshot: CameraSnapshot) => void;
   /**
@@ -284,10 +285,10 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         if (!gl || !scene || !camera) {
           console.error("WebGL context not available for export");
           logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
-          return;
+          return null;
         }
 
-        const { scale = 2, background = null, filename = "molecule", watermark } = options;
+        const { scale = 2, background = null, watermark } = options;
 
         const originalSize = gl.getSize(new THREE.Vector2());
         const originalPixelRatio = gl.getPixelRatio();
@@ -308,11 +309,9 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           const sourceCanvas = watermark
             ? drawWatermark(gl.domElement, watermark)
             : gl.domElement;
-          const dataUrl = sourceCanvas.toDataURL("image/png");
-          const link = document.createElement("a");
-          link.download = `${filename}.png`;
-          link.href = dataUrl;
-          link.click();
+          // Synchronous (toBlob is async), so the caller can still open the
+          // share sheet inside the tap's user activation.
+          return dataUrlToBlob(sourceCanvas.toDataURL("image/png"));
         } finally {
           gl.setPixelRatio(originalPixelRatio);
           gl.setSize(originalSize.x, originalSize.y);

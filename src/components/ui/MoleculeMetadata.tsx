@@ -20,12 +20,21 @@ export function MoleculeMetadata() {
   }
 
   return (
-    <div className={styles.moleculeMetadata}>
+    // id: the viewer's structure chip scrolls the sidebar here (App.tsx)
+    <div className={styles.moleculeMetadata} id="molecule-info">
       <CollapsibleSection title="Molecule Info" defaultOpen={true} storageKey="molecule-info">
         <div className={styles.metadataContent}>
           <div className={styles.metadataRow}>
             <span className={styles.metadataLabel}>Name</span>
-            <span className={styles.metadataValue}>{molecule.name}</span>
+            <span className={styles.metadataValue} data-testid="metadata-name">{molecule.name}</span>
+          </div>
+          <div className={styles.metadataRow}>
+            <span className={styles.metadataLabel}>Atoms</span>
+            <span className={styles.metadataValue} data-testid="metadata-atoms">{molecule.atoms.length.toLocaleString('en-US')}</span>
+          </div>
+          <div className={styles.metadataRow}>
+            <span className={styles.metadataLabel}>Bonds</span>
+            <span className={styles.metadataValue} data-testid="metadata-bonds">{molecule.bonds.length.toLocaleString('en-US')}</span>
           </div>
           <div className={styles.metadataRow}>
             <span className={styles.metadataLabel}>Formula</span>

@@ -16,6 +16,8 @@ import { loadSharedSession, deserializeShareableSession } from '../utils/shareSe
 import { loadStructureFromSource, resolvePubchemCid } from '../utils/structureLoader';
 import { cidForSlug, slugForCid } from '../../site/compoundSlugs';
 import { entryKind, track } from '../utils/track';
+import { isTouchLimited, touchFallbackMessage } from '../utils/representationAvailability';
+import { showToast } from '../utils/toast';
 import type { StructureSource } from '../types';
 
 const settle = () => useUrlSyncStore.getState().settleInitialLoad();
@@ -126,7 +128,13 @@ export function useInitialUrlLoad(): void {
         if (signal.aborted) return;
 
         if (structId) {
-          if (viewParams.repr) store().setStructureRepresentation(structId, viewParams.repr);
+          const molecule = store().structures.get(structId)?.molecule;
+          if (viewParams.repr && molecule && isTouchLimited(viewParams.repr, molecule)) {
+            store().setStructureRepresentation(structId, 'cartoon');
+            showToast(touchFallbackMessage(viewParams.repr));
+          } else if (viewParams.repr) {
+            store().setStructureRepresentation(structId, viewParams.repr);
+          }
           if (viewParams.color) store().setStructureColorScheme(structId, viewParams.color);
           // ?view= from Copy Link: applied by App once the viewer is ready, like a share's camera.
           if (viewParams.camera) store().setPendingCameraSnapshot(viewParams.camera);

@@ -3,24 +3,58 @@ import clsx from 'clsx';
 import { useMoleculeStore, type RepresentationType, type ColorScheme } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
 import { calculateColorSchemeContext } from '../../utils/atomColor';
+import {
+  colorSchemeAvailability,
+  representationAvailability,
+  type Availability,
+} from '../../utils/representationAvailability';
+import { isTouchScreen } from '../../utils/touch';
 import styles from './ControlPanel.module.css';
 
-const REPRESENTATIONS: { value: RepresentationType; label: string; description?: string; disabledDescription?: string }[] = [
+const REPRESENTATIONS: { value: RepresentationType; label: string; description: string }[] = [
   { value: 'ball-and-stick', label: 'Ball & Stick', description: 'Atoms as spheres, bonds as cylinders' },
   { value: 'stick', label: 'Stick', description: 'Bonds only' },
   { value: 'spacefill', label: 'Spacefill', description: 'Van der Waals spheres' },
-  { value: 'cartoon', label: 'Cartoon', description: 'Protein/nucleic acid backbone', disabledDescription: 'Requires backbone atoms (CA or P)' },
-  { value: 'surface-vdw', label: 'Surface', description: 'Van der Waals molecular surface', disabledDescription: 'Too many atoms for surface visualization' },
+  { value: 'cartoon', label: 'Cartoon', description: 'Protein/nucleic acid backbone' },
+  { value: 'surface-vdw', label: 'Surface', description: 'Van der Waals molecular surface' },
 ];
 
-const COLOR_SCHEMES: { value: ColorScheme; label: string; description: string; disabledDescription: string; notForCartoon?: boolean }[] = [
-  { value: 'cpk', label: 'CPK', description: 'Color by element', disabledDescription: 'Not available for Cartoon', notForCartoon: true },
-  { value: 'chain', label: 'Chain', description: 'Color by chain ID', disabledDescription: '' },
-  { value: 'residueType', label: 'Residue', description: 'Color by amino acid type', disabledDescription: 'No residue data available' },
-  { value: 'bfactor', label: 'B-factor', description: 'Blue (low) → Red (high)', disabledDescription: 'No B-factor data available' },
-  { value: 'rainbow', label: 'Rainbow', description: 'N-terminus → C-terminus', disabledDescription: 'No residue sequence data available' },
-  { value: 'secondaryStructure', label: 'Structure', description: 'Helix/Sheet/Coil coloring', disabledDescription: 'No secondary structure data' },
+const COLOR_SCHEMES: { value: ColorScheme; label: string; description: string }[] = [
+  { value: 'cpk', label: 'CPK', description: 'Color by element' },
+  { value: 'chain', label: 'Chain', description: 'Color by chain ID' },
+  { value: 'residueType', label: 'Residue', description: 'Color by amino acid type' },
+  { value: 'bfactor', label: 'B-factor', description: 'Blue (low) → Red (high)' },
+  { value: 'rainbow', label: 'Rainbow', description: 'N-terminus → C-terminus' },
+  { value: 'secondaryStructure', label: 'Structure', description: 'Helix/Sheet/Coil coloring' },
 ];
+
+interface Option<T> {
+  value: T;
+  label: string;
+  title: string;
+  availability: Availability;
+}
+
+/**
+ * Why some options are greyed out, as visible text under them (touch screens
+ * have no tooltips). A hidden structure greys out everything: one line says so.
+ */
+function UnavailableNotes<T>({ options, hidden }: { options: Option<T>[]; hidden: boolean }) {
+  if (hidden) {
+    return <p className={styles.unavailableNote}>The structure is hidden: show it in Structures to change this.</p>;
+  }
+  const unavailable = options.filter((o) => !o.availability.available);
+  if (unavailable.length === 0) return null;
+  return (
+    <ul className={styles.unavailableNotes}>
+      {unavailable.map((o) => (
+        <li key={String(o.value)} className={styles.unavailableNote}>
+          {o.label}: {o.availability.reason}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function ControlPanel() {
   // Use new hooks for cleaner access to active structure
@@ -29,7 +63,7 @@ export function ControlPanel() {
   const setRepresentation = useMoleculeStore(s => s.setRepresentation);
   const setColorScheme = useMoleculeStore(s => s.setColorScheme);
 
-  // Derive properties from active structure
+  // Derive properties from active structure (the same state the toolbar reads)
   const molecule = activeStructure?.molecule;
   const representation = activeStructure?.representation ?? 'ball-and-stick';
   const colorScheme = activeStructure?.colorScheme ?? 'cpk';
@@ -40,82 +74,41 @@ export function ControlPanel() {
     [molecule]
   );
 
-  // Same rule as the coloring itself (isAlphaFoldMolecule in utils/atomColor.ts).
-  const isAlphaFold = colorContext?.isPlddt ?? false;
-
-  if (!molecule || !activeStructure) {
+  if (!molecule || !activeStructure || !colorContext) {
     return null;
   }
 
-  const isSchemeAvailable = (scheme: ColorScheme, schemeConfig: typeof COLOR_SCHEMES[0]): boolean => {
-    // Disable all schemes if structure is hidden
-    if (!visible) return false;
-    if (!colorContext) return false;
-
-    const hasBackbone = colorContext.hasBackboneData === true;
-    const atomCount = molecule?.atoms.length ?? 0;
-    const isComplexProtein = hasBackbone && atomCount > 500;
-
-    // CPK doesn't make sense for Cartoon or complex proteins
-    if (schemeConfig.notForCartoon && (representation === 'cartoon' || isComplexProtein)) {
-      return false;
-    }
-
-    // Residue Type creates noise at scale
-    if (scheme === 'residueType' && isComplexProtein) {
-      return false;
-    }
-
-    switch (scheme) {
-      case 'residueType':
-        return colorContext.hasResidueData === true;
-      case 'bfactor':
-        return colorContext.hasBfactorData === true;
-      case 'rainbow':
-        return colorContext.hasResidueNumbers === true;
-      case 'secondaryStructure':
-        // Available if we have SS data or backbone data (SS can be detected)
-        return colorContext.hasSecondaryStructure === true || hasBackbone;
-      default:
-        return true;
-    }
-  };
-
-  const isRepAvailable = (rep: typeof REPRESENTATIONS[0]): boolean => {
-    // Disable all representations if structure is hidden
-    if (!visible) return false;
-    const hasBackbone = colorContext?.hasBackboneData === true;
-    const atomCount = molecule?.atoms.length ?? 0;
-    const isComplexProtein = hasBackbone && atomCount > 500;
-
-    // Disable surface for very small or very large molecules
-    if (rep.value === 'surface-vdw' && (atomCount < 100 || atomCount > 100_000)) {
-      return false;
-    }
-
-    if (isComplexProtein) {
-      // For complex proteins: only Cartoon and Surface make sense
-      return rep.value === 'cartoon' || rep.value === 'surface-vdw';
-    }
-
-    // For simple molecules: Cartoon requires backbone
-    if (rep.value === 'cartoon') {
-      return hasBackbone;
-    }
-
-    // Surface, Ball & Stick, Stick, Spacefill always available for simple molecules
-    return true;
-  };
-
+  // Same rule as the coloring itself (isAlphaFoldMolecule in utils/atomColor.ts).
+  const isAlphaFold = colorContext.isPlddt ?? false;
   const atomCount = molecule.atoms.length;
+  const hasBackbone = colorContext.hasBackboneData === true;
+  const touch = isTouchScreen();
 
-  const getRepTitle = (rep: typeof REPRESENTATIONS[0], available: boolean) => {
-    if (!visible) return 'Structure is hidden';
-    if (rep.value === 'surface-vdw' && atomCount < 100) return 'Surface not useful for small molecules';
-    if (!available) return rep.disabledDescription;
-    if (rep.value === 'surface-vdw' && atomCount > 20_000) return 'Surface quality reduced for large molecules';
-    return rep.description;
-  };
+  const repOptions: Option<RepresentationType>[] = REPRESENTATIONS.map((rep) => {
+    const availability = representationAvailability(rep.value, { visible, atomCount, hasBackbone, touch });
+    let title = availability.available ? rep.description : `${rep.label}: ${availability.reason}`;
+    if (availability.available && rep.value === 'surface-vdw' && atomCount > 20_000) {
+      title = 'Surface quality reduced for large molecules';
+    }
+    return { value: rep.value, label: rep.label, title, availability };
+  });
+
+  const schemeOptions: Option<ColorScheme>[] = COLOR_SCHEMES.map((scheme) => {
+    const availability = colorSchemeAvailability(scheme.value, {
+      visible,
+      representation,
+      hasBackbone,
+      hasResidueData: colorContext.hasResidueData === true,
+      hasBfactorData: colorContext.hasBfactorData === true,
+      hasResidueNumbers: colorContext.hasResidueNumbers === true,
+      hasSecondaryStructure: colorContext.hasSecondaryStructure === true,
+    });
+    const description = scheme.value === 'bfactor' && isAlphaFold
+      ? 'pLDDT confidence, AlphaFold DB colors: dark blue > 90, light blue 70-90, yellow 50-70, orange < 50'
+      : scheme.description;
+    const title = availability.available ? description : `${scheme.label}: ${availability.reason}`;
+    return { value: scheme.value, label: scheme.label, title, availability };
+  });
 
   return (
     <div className={styles.controlPanel}>
@@ -123,52 +116,40 @@ export function ControlPanel() {
       <div className={styles.controlSection}>
         <h3 className={styles.controlTitle}>Representation</h3>
         <div className={styles.controlOptions}>
-          {REPRESENTATIONS.map((rep) => {
-            const available = isRepAvailable(rep);
-            const title = getRepTitle(rep, available);
-            return (
-              <button
-                key={rep.value}
-                className={clsx(styles.controlButton, representation === rep.value && styles.active)}
-                onClick={() => setRepresentation(rep.value)}
-                aria-pressed={representation === rep.value}
-                title={title}
-                disabled={!available}
-              >
-                {rep.label}
-              </button>
-            );
-          })}
+          {repOptions.map((rep) => (
+            <button
+              key={rep.value}
+              className={clsx(styles.controlButton, representation === rep.value && styles.active)}
+              onClick={() => setRepresentation(rep.value)}
+              aria-pressed={representation === rep.value}
+              title={rep.title}
+              disabled={!rep.availability.available}
+            >
+              {rep.label}
+            </button>
+          ))}
         </div>
+        <UnavailableNotes options={repOptions} hidden={!visible} />
       </div>
 
       {/* Color Scheme Section */}
       <div className={styles.controlSection}>
         <h3 className={styles.controlTitle}>Color Scheme</h3>
         <div className={styles.controlOptions}>
-          {COLOR_SCHEMES.map((scheme) => {
-            const available = isSchemeAvailable(scheme.value, scheme);
-            return (
-              <button
-                key={scheme.value}
-                className={clsx(styles.controlButton, colorScheme === scheme.value && styles.active)}
-                onClick={() => setColorScheme(scheme.value)}
-                aria-pressed={colorScheme === scheme.value}
-                title={!visible ? 'Structure is hidden' : (available ? (scheme.value === 'bfactor' && isAlphaFold ? 'pLDDT confidence, AlphaFold DB colors: dark blue > 90, light blue 70-90, yellow 50-70, orange < 50' : scheme.description) : scheme.disabledDescription)}
-                disabled={!available}
-              >
-                {scheme.label}
-              </button>
-            );
-          })}
+          {schemeOptions.map((scheme) => (
+            <button
+              key={scheme.value}
+              className={clsx(styles.controlButton, colorScheme === scheme.value && styles.active)}
+              onClick={() => setColorScheme(scheme.value)}
+              aria-pressed={colorScheme === scheme.value}
+              title={scheme.title}
+              disabled={!scheme.availability.available}
+            >
+              {scheme.label}
+            </button>
+          ))}
         </div>
-      </div>
-
-      <div className={styles.moleculeInfo}>
-        <h3 className={styles.controlTitle}>Molecule Info</h3>
-        <p><strong>Name:</strong> {molecule.name}</p>
-        <p><strong>Atoms:</strong> {molecule.atoms.length}</p>
-        <p><strong>Bonds:</strong> {molecule.bonds.length}</p>
+        <UnavailableNotes options={schemeOptions} hidden={!visible} />
       </div>
     </div>
   );

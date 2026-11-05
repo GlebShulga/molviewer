@@ -89,7 +89,14 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
   const [activeChain, setActiveChain] = useState<string | null>(null);
   const [hoveredResidue, setHoveredResidue] = useState<string | null>(null);
   const sequenceRef = useRef<HTMLDivElement>(null);
-  const { secondaryStructureUI: ssColors } = useMolecularColors();
+  // The 3D view's colors (Cartoon, Structure scheme), so the sequence and its
+  // legend match the molecule and the legend over the viewer
+  const { secondaryStructure: ssColors } = useMolecularColors();
+  const ssColorVars = {
+    '--ss-helix': ssColors.helix,
+    '--ss-sheet': ssColors.sheet,
+    '--ss-coil': ssColors.coil,
+  } as CSSProperties;
 
   // Analyze residues and chains
   const chains = useMemo(() => {
@@ -171,7 +178,7 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
 
   return (
     <CollapsibleSection title="Sequence" defaultOpen={true} storageKey="sequence">
-      <div className={styles.sequenceViewer}>
+      <div className={styles.sequenceViewer} style={ssColorVars}>
         {/* Structure selector - only show when multiple structures */}
         {structureOrder.length > 1 && (
           <div className={styles.structureSelector}>

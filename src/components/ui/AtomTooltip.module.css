@@ -1,5 +1,9 @@
 .atomTooltip {
   position: fixed;
+  /* Its own width wherever it starts, so the placement measures the real size
+     (near the right edge a fixed box would shrink to the space left) */
+  width: max-content;
+  max-width: calc(100vw - 16px);
   z-index: 1000;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -72,4 +76,37 @@
 
 .coordsValue {
   font-size: 0.7rem;
+}
+
+/* Touch: compact card in the viewer's toolbar-side stack (App.module.css) */
+.dockedCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  padding: 8px 14px;
+  background-color: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.dockedText {
+  min-width: 0;
+}
+
+.dockedTitle {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.dockedAtomName {
+  margin-left: 8px;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.dockedDetail {
+  font-size: 0.8125rem;
+  color: var(--accent-color);
 }

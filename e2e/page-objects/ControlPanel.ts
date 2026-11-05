@@ -28,7 +28,9 @@ export class ControlPanelPage {
   readonly secondaryStructureButton: Locator;
 
   // Molecule info
-  readonly moleculeInfo: Locator;
+  readonly moleculeName: Locator;
+  readonly atomCount: Locator;
+  readonly bondCount: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -51,8 +53,10 @@ export class ControlPanelPage {
     this.rainbowButton = this.colorSchemeSection.getByRole('button', { name: 'Rainbow' });
     this.secondaryStructureButton = this.colorSchemeSection.getByRole('button', { name: 'Structure' });
 
-    // Molecule info
-    this.moleculeInfo = this.panel.locator('[class*="moleculeInfo"]');
+    // Molecule info (the MoleculeMetadata panel, below the control panel)
+    this.moleculeName = page.getByTestId('metadata-name');
+    this.atomCount = page.getByTestId('metadata-atoms');
+    this.bondCount = page.getByTestId('metadata-bonds');
   }
 
   /**
@@ -150,31 +154,25 @@ export class ControlPanelPage {
   }
 
   /**
-   * Get molecule name from info section
+   * Get molecule name from the Molecule Info section (MoleculeMetadata)
    */
   async getMoleculeName(): Promise<string> {
-    const nameElement = this.moleculeInfo.locator('p').filter({ hasText: 'Name:' });
-    const text = await nameElement.textContent();
-    return text?.replace('Name:', '').trim() ?? '';
+    return ((await this.moleculeName.textContent()) ?? '').trim();
   }
 
   /**
-   * Get atom count from info section
+   * Get atom count from the Molecule Info section
    */
   async getAtomCount(): Promise<number> {
-    const atomsElement = this.moleculeInfo.locator('p').filter({ hasText: 'Atoms:' });
-    const text = await atomsElement.textContent();
-    const count = text?.replace('Atoms:', '').trim();
-    return parseInt(count ?? '0', 10);
+    const text = await this.atomCount.textContent();
+    return parseInt((text ?? '0').replace(/\D/g, ''), 10);
   }
 
   /**
-   * Get bond count from info section
+   * Get bond count from the Molecule Info section
    */
   async getBondCount(): Promise<number> {
-    const bondsElement = this.moleculeInfo.locator('p').filter({ hasText: 'Bonds:' });
-    const text = await bondsElement.textContent();
-    const count = text?.replace('Bonds:', '').trim();
-    return parseInt(count ?? '0', 10);
+    const text = await this.bondCount.textContent();
+    return parseInt((text ?? '0').replace(/\D/g, ''), 10);
   }
 }

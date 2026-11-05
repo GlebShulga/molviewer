@@ -86,6 +86,22 @@ test.describe('Onboarding Tour', () => {
     await expect(page.locator('[data-onboarding="spotlight-tooltip"]')).not.toBeVisible();
   });
 
+  test('click on the dimmed area dismisses tour', async ({ page }) => {
+    test.slow();
+    const viewer = new MoleculeViewerPage(page);
+    await viewer.goto({ keepWelcome: true });
+    await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
+    await waitForMoleculeLoaded(page, 60000);
+    await expect(page.locator('[data-onboarding="spotlight-tooltip"]')).toBeVisible();
+
+    // Bottom right of the viewer: step 1 spotlights the sidebar on the left,
+    // with the tooltip beside it.
+    const viewport = page.viewportSize()!;
+    await page.mouse.click(viewport.width - 40, viewport.height - 40);
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-onboarding="spotlight-tooltip"]')).not.toBeVisible();
+  });
+
   test('returning user does not see onboarding', async ({ page }) => {
     const viewer = new MoleculeViewerPage(page);
     await viewer.goto();

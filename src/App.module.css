@@ -112,9 +112,20 @@
 }
 
 .viewerContainer {
+  /* The toolbar's edge plus 8px: 16px from the viewer's edge + the toolbar
+     (32px buttons + 2 × 6px padding + 2px border) + 8px. */
+  --toolbar-offset: 70px;
   flex: 1;
   position: relative;
   background-color: var(--bg-primary);
+}
+
+/* A drag on the molecule rotates it, never scrolls the page. OrbitControls
+   sets this on R3F's wrapper div, and leaves an inline `touch-action: auto`
+   on the canvas when it moves there (its disconnect), hence !important. Only
+   the canvas: the welcome screen and empty state must still scroll. */
+.viewerContainer canvas {
+  touch-action: none !important;
 }
 
 /* Loading State */
@@ -151,12 +162,65 @@
   }
 }
 
-/* Error State */
-.errorMessage {
+/* ========================================
+   VIEWER OVERLAY LAYOUT
+   Two containers, so the chips over the viewer can't overlap:
+   - .toolbarStack next to the toolbar (below it on wide screens, above it
+     below 768px): error banner, measurement hint, docked atom card, in that
+     order from the toolbar outwards.
+   - .statusRow on the side opposite the toolbar: "Details about X" pill or
+     structure title on the left, color legend on the right.
+   The toolbar's "More" menu (Toolbar.module.css, z-index 50) opens over the
+   stack.
+   ======================================== */
+
+.toolbarStack {
   position: absolute;
-  top: 64px;
+  top: var(--toolbar-offset);
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  z-index: 45;
+  pointer-events: none;
+}
+
+.statusRow {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.toolbarStack > *,
+.statusRow > * {
+  pointer-events: auto;
+}
+
+/* The left slot shrinks (the title truncates); the legend keeps its size */
+.statusLeft {
+  display: flex;
+  min-width: 0;
+}
+
+.statusRight {
+  flex-shrink: 0;
+  max-width: 60%;
+  margin-left: auto;
+}
+
+/* Error State */
+.errorMessage {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -165,7 +229,6 @@
   border: 1px solid var(--error-color);
   border-radius: 8px;
   color: var(--error-color);
-  z-index: 100;
 }
 
 .errorIcon {
@@ -224,6 +287,44 @@
   font-size: 0.875rem;
   margin-top: 8px;
   opacity: 0.7;
+}
+
+/* Opens the drawer/sheet: only below 768px, where the sidebar is hidden */
+.emptyPrimary {
+  display: none;
+  margin-top: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--accent-color);
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.emptyPrimary:hover {
+  background-color: var(--accent-hover);
+}
+
+.emptyExamples {
+  margin-top: 16px;
+  padding: 0 16px;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.emptyExample {
+  white-space: nowrap;
+}
+
+.emptyExamples a {
+  font-weight: 500;
+}
+
+.emptySeparator {
+  margin: 0 6px;
+  opacity: 0.5;
 }
 
 /* Error Boundary Fallback */
@@ -357,13 +458,26 @@
     display: flex;
   }
 
+  .emptyPrimary {
+    display: block;
+  }
+
   .themeToggle {
     margin-left: 0;
   }
 
-  /* Toolbar moves to bottom on mobile, so error can be at top */
-  .errorMessage {
-    top: 16px;
+  /* The toolbar moves to the bottom: the stack goes above it (error banner
+     nearest the toolbar), the status row to the top */
+  .toolbarStack {
+    top: auto;
+    bottom: var(--toolbar-offset);
+    flex-direction: column-reverse;
+  }
+
+  .statusRow {
+    top: 12px;
+    bottom: auto;
+    align-items: flex-start;
   }
 
   /* Sidebar becomes off-canvas drawer */
@@ -426,6 +540,8 @@
     padding-top: 56px;
     padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -8px 24px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+    /* A drag at the sheet's end must not scroll the page behind it */
+    overscroll-behavior: contain;
   }
 
   /* Drag handle */
@@ -454,7 +570,17 @@
 
 /* Touch device optimizations */
 @media (pointer: coarse) {
+  /* Touch toolbar: 44px buttons + 2 × 8px padding + 2px border = 62px */
+  .viewerContainer {
+    --toolbar-offset: 86px;
+  }
+
   .themeToggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .githubLink {
     width: 44px;
     height: 44px;
   }
@@ -467,5 +593,14 @@
   .sidebarCloseButton {
     width: 44px;
     height: 44px;
+  }
+
+  .emptyPrimary {
+    min-height: 44px;
+  }
+
+  .emptyExamples a {
+    display: inline-block;
+    padding: 10px 0;
   }
 }

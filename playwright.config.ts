@@ -67,6 +67,7 @@ export default defineConfig({
         '**/navigation/**/*.spec.ts',
         '**/ui/collapsible-persistence.spec.ts',
         '**/ui/component-settings.spec.ts',
+        '**/ui/viewer-overlays.spec.ts',
         '**/edge-cases/error-handling.spec.ts',
         '**/undo-redo/**/*.spec.ts',
         '**/onboarding/**/*.spec.ts',

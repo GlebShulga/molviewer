@@ -1,16 +1,7 @@
 import { Eye, EyeOff, X } from 'lucide-react';
 import type { Structure } from '../../../types';
+import { REPRESENTATION_LABELS } from '../../../utils/representationAvailability';
 import styles from './StructureList.module.css';
-
-// Map representation names to display labels
-const REPRESENTATION_LABELS: Record<string, string> = {
-  'ball-and-stick': 'Ball & Stick',
-  'stick': 'Stick',
-  'spacefill': 'Spacefill',
-  'cartoon': 'Cartoon',
-  'surface-vdw': 'VdW Surface',
-  'surface-sas': 'SAS Surface',
-};
 
 // Map color scheme names to display labels
 const COLOR_SCHEME_LABELS: Record<string, string> = {

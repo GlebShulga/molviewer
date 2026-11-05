@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import {
   Circle,
@@ -14,6 +14,7 @@ import {
   RotateCw,
   Link,
   Check,
+  Ellipsis,
 } from 'lucide-react';
 import { useStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -22,6 +23,10 @@ import { useActiveStructure } from '../../hooks';
 import { buildShareUrl, sourceToPath } from '../../utils/urlParams';
 import { viewerHandle } from '../../utils/viewerHandle';
 import { track } from '../../utils/track';
+import { showToast } from '../../utils/toast';
+import { calculateColorSchemeContext } from '../../utils/atomColor';
+import { representationAvailability } from '../../utils/representationAvailability';
+import { isTouchScreen } from '../../utils/touch';
 import styles from './Toolbar.module.css';
 
 export type MeasurementMode = 'none' | 'distance' | 'angle' | 'dihedral';
@@ -39,8 +44,12 @@ interface ToolbarButton {
   label: string;
   /** Tooltip, when it says more than the label. */
   title?: string;
+  /** Keyboard shortcut as shown to people ("Ctrl+Z"): goes into the tooltip and aria-keyshortcuts. */
+  shortcut?: string;
   onClick: () => void;
   active?: boolean;
+  /** A toggle: announces `active` as aria-pressed. Copy Link's check mark is not one. */
+  toggle?: boolean;
   disabled?: boolean;
 }
 
@@ -49,6 +58,16 @@ const REPRESENTATION_ICONS = {
   'stick': <Maximize size={18} style={{ transform: 'rotate(45deg)' }} />,
   'spacefill': <Circle size={18} />,
 } as const;
+
+function buttonTitle(button: ToolbarButton): string {
+  if (button.title) return button.title;
+  return button.shortcut ? `${button.label} (${button.shortcut})` : button.label;
+}
+
+/** aria-keyshortcuts spells modifiers out ("Control+Z"). */
+function ariaKeyShortcuts(shortcut: string | undefined): string | undefined {
+  return shortcut?.replace(/^Ctrl\+/, 'Control+');
+}
 
 export function Toolbar({
   measurementMode = 'none',
@@ -80,6 +99,8 @@ export function Toolbar({
     const url = buildShareUrl({ source: linkSource, repr, color, camera });
     navigator.clipboard.writeText(url).then(() => {
       track('link_copied', { value: camera ? 'view' : 'plain' });
+      // The check icon below is out of sight when Copy Link is in the "More" menu
+      showToast('Link copied');
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     }).catch(() => {
@@ -95,43 +116,51 @@ export function Toolbar({
   const representation = activeStructure?.representation ?? 'ball-and-stick';
   const hasMolecule = !!molecule;
 
-  const representationButtons = useMemo<ToolbarButton[]>(() => [
-    {
-      icon: REPRESENTATION_ICONS['ball-and-stick'],
-      label: 'Ball & Stick (1)',
-      onClick: () => setRepresentation('ball-and-stick'),
-      active: representation === 'ball-and-stick',
-      disabled: !hasMolecule,
-    },
-    {
-      icon: REPRESENTATION_ICONS['stick'],
-      label: 'Stick (2)',
-      onClick: () => setRepresentation('stick'),
-      active: representation === 'stick',
-      disabled: !hasMolecule,
-    },
-    {
-      icon: REPRESENTATION_ICONS['spacefill'],
-      label: 'Spacefill (3)',
-      onClick: () => setRepresentation('spacefill'),
-      active: representation === 'spacefill',
-      disabled: !hasMolecule,
-    },
-  ], [setRepresentation, representation, hasMolecule]);
+  // The sheet's Representation buttons use the same rule (utils/representationAvailability)
+  const visible = activeStructure?.visible ?? true;
+  const hasBackbone = useMemo(
+    () => (molecule ? calculateColorSchemeContext(molecule).hasBackboneData === true : false),
+    [molecule]
+  );
+  const representationButtons = useMemo<ToolbarButton[]>(() => {
+    const atomCount = molecule?.atoms.length ?? 0;
+    const repButton = (rep: 'ball-and-stick' | 'stick' | 'spacefill', label: string, shortcut: string): ToolbarButton => {
+      const availability = representationAvailability(rep, { visible, atomCount, hasBackbone, touch: isTouchScreen() });
+      return {
+        icon: REPRESENTATION_ICONS[rep],
+        label,
+        title: availability.available ? undefined : `${label}: ${availability.reason}`,
+        shortcut,
+        onClick: () => setRepresentation(rep),
+        active: representation === rep,
+        toggle: true,
+        disabled: !molecule || !availability.available,
+      };
+    };
+    return [
+      repButton('ball-and-stick', 'Ball & Stick', '1'),
+      repButton('stick', 'Stick', '2'),
+      repButton('spacefill', 'Spacefill', '3'),
+    ];
+  }, [setRepresentation, representation, molecule, visible, hasBackbone]);
 
   const measurementButtons = useMemo<ToolbarButton[]>(() => [
     {
       icon: <Ruler size={18} />,
-      label: 'Distance (D)',
+      label: 'Distance',
+      shortcut: 'D',
       onClick: () => onMeasurementModeChange?.(measurementMode === 'distance' ? 'none' : 'distance'),
       active: measurementMode === 'distance',
+      toggle: true,
       disabled: !hasMolecule,
     },
     {
       icon: <Triangle size={18} />,
-      label: 'Angle (A)',
+      label: 'Angle',
+      shortcut: 'A',
       onClick: () => onMeasurementModeChange?.(measurementMode === 'angle' ? 'none' : 'angle'),
       active: measurementMode === 'angle',
+      toggle: true,
       disabled: !hasMolecule,
     },
   ], [onMeasurementModeChange, measurementMode, hasMolecule]);
@@ -139,20 +168,25 @@ export function Toolbar({
   const viewButtons = useMemo<ToolbarButton[]>(() => [
     {
       icon: <Home size={18} />,
-      label: 'Reset View (H)',
+      // e2e waits on button[title*="Reset View"]: keep this casing
+      label: 'Reset View',
+      shortcut: 'H',
       onClick: () => onHomeView?.(),
       disabled: !hasMolecule,
     },
     {
       icon: <RotateCw size={18} />,
-      label: 'Auto Rotate (R)',
+      label: 'Auto Rotate',
+      shortcut: 'R',
       onClick: () => setAutoRotate(!autoRotate),
       active: autoRotate,
+      toggle: true,
       disabled: !hasMolecule,
     },
     {
       icon: <Camera size={18} />,
-      label: 'Export (Ctrl+S)',
+      label: 'Export',
+      shortcut: 'Ctrl+S',
       onClick: () => onExport?.(),
       disabled: !hasMolecule,
     },
@@ -169,13 +203,15 @@ export function Toolbar({
   const undoRedoButtons = useMemo<ToolbarButton[]>(() => [
     {
       icon: <Undo2 size={18} />,
-      label: 'Undo (Ctrl+Z)',
+      label: 'Undo',
+      shortcut: 'Ctrl+Z',
       onClick: () => undo(),
       disabled: pastStates.length === 0,
     },
     {
       icon: <Redo2 size={18} />,
-      label: 'Redo (Ctrl+Y)',
+      label: 'Redo',
+      shortcut: 'Ctrl+Y',
       onClick: () => redo(),
       disabled: futureStates.length === 0,
     },
@@ -184,22 +220,68 @@ export function Toolbar({
   const helpButtons = useMemo<ToolbarButton[]>(() => [
     {
       icon: <Keyboard size={18} />,
-      label: 'Shortcuts (?)',
+      label: 'Shortcuts',
+      shortcut: '?',
       onClick: () => onShowShortcuts?.(),
     },
   ], [onShowShortcuts]);
 
-  const renderButtonGroup = (buttons: ToolbarButton[], onboardingId?: string) => (
-    <div className={styles.toolbarGroup} data-onboarding={onboardingId}>
+  // Phones: Undo/Redo and the View group move into the "More" menu (CSS
+  // decides which one shows, so both are always rendered).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtons = useMemo(() => [...undoRedoButtons, ...viewButtons], [undoRedoButtons, viewButtons]);
+
+  const closeMenu = useCallback((restoreFocus: boolean) => {
+    setMenuOpen(false);
+    if (restoreFocus) moreButtonRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (dockRef.current && !dockRef.current.contains(event.target as Node)) {
+        closeMenu(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closeMenu(true);
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      const items = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+      if (items.length === 0) return;
+      event.preventDefault();
+      const current = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === 'ArrowDown' ? current + 1 : current - 1;
+      items[(next + items.length) % items.length].focus();
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [menuOpen, closeMenu]);
+
+  const renderButtonGroup = (buttons: ToolbarButton[], onboardingId?: string, className?: string) => (
+    <div className={clsx(styles.toolbarGroup, className)} data-onboarding={onboardingId}>
       {buttons.map((button, index) => (
         <button
           key={index}
           className={clsx(styles.toolbarButton, button.active && styles.active)}
           onClick={button.onClick}
           disabled={button.disabled}
-          title={button.title ?? button.label}
+          title={buttonTitle(button)}
           aria-label={button.label}
-          aria-pressed={button.active}
+          aria-keyshortcuts={ariaKeyShortcuts(button.shortcut)}
+          aria-pressed={button.toggle ? !!button.active : undefined}
         >
           {button.icon}
         </button>
@@ -208,29 +290,68 @@ export function Toolbar({
   );
 
   return (
-    <div className={styles.toolbar}>
-      {renderButtonGroup(representationButtons, 'repr-buttons')}
-      <div className={styles.toolbarDivider} />
-      {renderButtonGroup(measurementButtons, 'measurement-buttons')}
-      <div className={styles.toolbarDivider} />
-      {renderButtonGroup(undoRedoButtons)}
-      <div className={styles.toolbarDivider} />
-      {renderButtonGroup(viewButtons, 'view-buttons')}
-      <div className={clsx(styles.toolbarDivider, styles.helpDivider)} />
-      <div className={styles.helpGroup}>
-        {helpButtons.map((button, index) => (
+    <div className={styles.toolbarDock} ref={dockRef}>
+      <div className={styles.toolbar} data-testid="toolbar">
+        {renderButtonGroup(representationButtons, 'repr-buttons')}
+        <div className={styles.toolbarDivider} />
+        {renderButtonGroup(measurementButtons, 'measurement-buttons')}
+        <div className={clsx(styles.toolbarDivider, styles.wideOnly)} />
+        {renderButtonGroup(undoRedoButtons, undefined, styles.wideOnly)}
+        <div className={clsx(styles.toolbarDivider, styles.wideOnly)} />
+        {renderButtonGroup(viewButtons, 'view-buttons', styles.wideOnly)}
+        <div className={clsx(styles.toolbarGroup, styles.moreGroup)}>
           <button
-            key={index}
-            className={clsx(styles.toolbarButton, button.active && styles.active)}
-            onClick={button.onClick}
-            disabled={button.disabled}
-            title={button.label}
-            aria-label={button.label}
+            ref={moreButtonRef}
+            className={clsx(styles.toolbarButton, menuOpen && styles.active)}
+            onClick={() => setMenuOpen(open => !open)}
+            title="More"
+            aria-label="More"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            data-onboarding="more-menu"
           >
-            {button.icon}
+            <Ellipsis size={18} />
           </button>
-        ))}
+        </div>
+        <div className={clsx(styles.toolbarDivider, styles.helpDivider)} />
+        <div className={styles.helpGroup}>
+          {helpButtons.map((button, index) => (
+            <button
+              key={index}
+              className={clsx(styles.toolbarButton, button.active && styles.active)}
+              onClick={button.onClick}
+              disabled={button.disabled}
+              title={buttonTitle(button)}
+              aria-label={button.label}
+              aria-keyshortcuts={ariaKeyShortcuts(button.shortcut)}
+            >
+              {button.icon}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Outside .toolbar: on phones the toolbar scrolls sideways, which would clip the menu */}
+      {menuOpen && (
+        <div ref={menuRef} className={styles.moreMenu} role="menu" aria-label="More actions">
+          {menuButtons.map((button, index) => (
+            <button
+              key={index}
+              role="menuitem"
+              className={clsx(styles.menuItem, button.active && styles.menuItemActive)}
+              onClick={() => {
+                closeMenu(false);
+                button.onClick();
+              }}
+              disabled={button.disabled}
+              title={button.title}
+            >
+              {button.icon}
+              <span>{button.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

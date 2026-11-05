@@ -148,3 +148,38 @@ export function downloadBlob(blob: Blob, filename: string): void {
   // Give the browser time to start the download before releasing the URL.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** A `data:` URL as a Blob, synchronously (canvas.toBlob is async). */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(',', 2);
+  const type = /^data:([^;,]+)/.exec(header)?.[1] ?? 'application/octet-stream';
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type });
+}
+
+export type SaveResult = 'shared' | 'downloaded' | 'cancelled';
+
+/**
+ * Hands a file to the person: the native share sheet on touch devices that
+ * can share files (so a phone can save it to Photos or send it on), a plain
+ * download everywhere else. Call it straight from the tap, before any await:
+ * navigator.share needs the tap's user activation.
+ */
+export async function shareOrDownload(blob: Blob, filename: string): Promise<SaveResult> {
+  const file = new File([blob], filename, { type: blob.type });
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+  if (touch && typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return 'shared';
+    } catch (err) {
+      // Closing the share sheet is not an error; anything else (e.g. the
+      // activation ran out) falls back to the download
+      if (err instanceof DOMException && err.name === 'AbortError') return 'cancelled';
+    }
+  }
+  downloadBlob(blob, filename);
+  return 'downloaded';
+}

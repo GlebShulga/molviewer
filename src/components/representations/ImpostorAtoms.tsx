@@ -1,5 +1,5 @@
 import { useRef, useMemo, useCallback, useEffect } from 'react';
-import { useThree, useFrame, extend } from '@react-three/fiber';
+import { useThree, useFrame, extend, type ThreeEvent } from '@react-three/fiber';
 import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
@@ -147,8 +147,13 @@ export interface ImpostorAtomsProps {
 /** Marks the impostor mesh for model export (see utils/exportModel). */
 const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
 
-/** Threshold for automatic GPU picking activation */
-const GPU_PICKING_THRESHOLD = 1000;
+/**
+ * Threshold for automatic GPU picking activation. GPU picking currently finds
+ * no atom (2026-11: bundled Chromium, and Chrome on Intel Iris Xe / D3D11), so
+ * Spacefill's impostors from 2000 atoms keep CPU picking up to where impostors
+ * started before (5000): hover, selection and the atom menu keep working there.
+ */
+const GPU_PICKING_THRESHOLD = 5000;
 
 /**
  * High-performance atom rendering using sphere impostors.
@@ -156,8 +161,8 @@ const GPU_PICKING_THRESHOLD = 1000;
  *
  * Performance: 7000 atoms = 1 draw call, 14K triangles (vs 7000 draw calls, 7.1M triangles)
  *
- * For large molecules (>1000 atoms), uses GPU-based picking instead of
- * O(n) CPU raycasting for hover/selection.
+ * For large molecules (>= GPU_PICKING_THRESHOLD atoms), uses GPU-based picking
+ * instead of O(n) CPU raycasting for hover/selection.
  */
 export function ImpostorAtoms({
   atomsData,
@@ -173,10 +178,11 @@ export function ImpostorAtoms({
 
   const { gl, camera, size, invalidate } = useThree();
 
-  const { setHoveredAtom, selectAtom, measurementMode, hoveredAtomIndex, activeStructureId } =
+  const { setHoveredAtom, selectAtom, showContextMenu, measurementMode, hoveredAtomIndex, activeStructureId } =
     useMoleculeStore(useShallow(state => ({
       setHoveredAtom: state.setHoveredAtom,
       selectAtom: state.selectAtom,
+      showContextMenu: state.showContextMenu,
       measurementMode: state.measurementMode,
       hoveredAtomIndex: state.hoveredAtomIndex,
       activeStructureId: state.activeStructureId,
@@ -432,6 +438,34 @@ export function ImpostorAtoms({
     [atomsData, camera, gl.domElement]
   );
 
+  // Pointer events (R3F) raycast the mesh before any handler runs. Three's own
+  // test is against the billboards: 1 Å quads in the XY plane, which miss most
+  // of each sphere, and its cached bounding sphere can predate the instance
+  // positions, so every ray missed. Test the spheres, closest hit only. Below
+  // the GPU-picking threshold only: it runs on every pointer move, drags
+  // included, and larger structures keep three's test as before.
+  const raycast = useMemo(() => {
+    if (shouldUseGPUPicking) return THREE.InstancedMesh.prototype.raycast;
+    const inverse = new THREE.Matrix4();
+    const ray = new THREE.Ray();
+    const sphere = new THREE.Sphere();
+    const hit = new THREE.Vector3();
+    return function (this: THREE.InstancedMesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+      inverse.copy(this.matrixWorld).invert();
+      ray.copy(raycaster.ray).applyMatrix4(inverse);
+      let closest: THREE.Intersection | null = null;
+      for (let i = 0; i < atomsData.length; i++) {
+        sphere.set(atomsData[i].position, atomsData[i].radius);
+        if (!ray.intersectSphere(sphere, hit)) continue;
+        const point = hit.clone().applyMatrix4(this.matrixWorld);
+        const distance = raycaster.ray.origin.distanceTo(point);
+        if (distance < raycaster.near || distance > raycaster.far) continue;
+        if (!closest || distance < closest.distance) closest = { distance, point, object: this, instanceId: i };
+      }
+      if (closest) intersects.push(closest);
+    };
+  }, [atomsData, shouldUseGPUPicking]);
+
   // Unified picking handler
   const pickAtom = useCallback(
     (clientX: number, clientY: number): number | null => {
@@ -497,6 +531,28 @@ export function ImpostorAtoms({
     [atomsData, selectAtom, setHoveredAtom, effectiveStructureId, pickAtom]
   );
 
+  // The atom menu (Focus, Measure From Here, Add Label, ...), as SelectableAtom
+  // opens it for one mesh per atom. Long-press on Android fires contextmenu too.
+  const handleContextMenu = useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      const pickedIndex = pickAtom(event.clientX, event.clientY);
+      if (pickedIndex === null || pickedIndex < 0 || pickedIndex >= atomsData.length) return;
+      event.stopPropagation();
+      event.nativeEvent.preventDefault();
+      const { atom, index } = atomsData[pickedIndex];
+      showContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        atomIndex: index,
+        structureId: effectiveStructureId,
+        chainId: atom.chainId,
+        residueName: atom.residueName,
+        residueNumber: atom.residueNumber,
+      });
+    },
+    [atomsData, effectiveStructureId, pickAtom, showContextMenu]
+  );
+
   if (!isWebGL2) {
     console.warn('ImpostorAtoms requires WebGL2 for gl_FragDepth support');
     return null;
@@ -512,9 +568,11 @@ export function ImpostorAtoms({
         // Model export (utils/exportModel) replaces these billboards with real
         // spheres, read from instanceMatrix + instanceRadius + instanceColor.
         userData={IMPOSTOR_EXPORT_USER_DATA}
+        raycast={raycast}
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         <sphereImpostorMaterial
           ref={materialRef}

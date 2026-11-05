@@ -42,19 +42,16 @@
   composes: controlButtonActive from '../../styles/buttons.module.css';
 }
 
-.moleculeInfo {
-  padding: 12px;
-  background-color: var(--bg-tertiary);
-  border-radius: 8px;
+/* Why an option is greyed out: visible, since touch screens have no tooltips */
+.unavailableNotes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.moleculeInfo p {
-  font-size: 0.875rem;
+.unavailableNote {
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--text-secondary);
-  margin-top: 4px;
-}
-
-.moleculeInfo strong {
-  color: var(--text-primary);
 }
 

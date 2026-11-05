@@ -30,28 +30,29 @@ export class ToolbarPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.toolbar = page.locator('[class*="toolbar"]').first();
+    this.toolbar = page.getByTestId('toolbar');
 
-    // Representation buttons (by title) - use exact names with shortcuts to avoid matching ControlPanel buttons
-    this.ballAndStickButton = page.getByRole('button', { name: 'Ball & Stick (1)' });
-    this.stickButton = page.getByRole('button', { name: 'Stick (2)' });
-    this.spacefillButton = page.getByRole('button', { name: 'Spacefill (3)' });
+    // Scoped to the toolbar with exact names: the ControlPanel and ExportPanel
+    // have buttons with the same names ("Ball & Stick", "Export").
+    this.ballAndStickButton = this.toolbar.getByRole('button', { name: 'Ball & Stick', exact: true });
+    this.stickButton = this.toolbar.getByRole('button', { name: 'Stick', exact: true });
+    this.spacefillButton = this.toolbar.getByRole('button', { name: 'Spacefill', exact: true });
 
     // Measurement buttons
-    this.distanceButton = page.getByRole('button', { name: /Distance/i });
-    this.angleButton = page.getByRole('button', { name: /Angle/i });
+    this.distanceButton = this.toolbar.getByRole('button', { name: 'Distance', exact: true });
+    this.angleButton = this.toolbar.getByRole('button', { name: 'Angle', exact: true });
 
-    // Undo/Redo buttons
-    this.undoButton = page.getByRole('button', { name: /Undo/i });
-    this.redoButton = page.getByRole('button', { name: /Redo/i });
+    // Undo/Redo buttons (in the "More" menu below 768px)
+    this.undoButton = this.toolbar.getByRole('button', { name: 'Undo', exact: true });
+    this.redoButton = this.toolbar.getByRole('button', { name: 'Redo', exact: true });
 
-    // View buttons - use exact name with shortcut to avoid matching other Export buttons
-    this.homeViewButton = page.getByRole('button', { name: /Reset View/i });
-    this.autoRotateButton = page.getByRole('button', { name: /Auto Rotate/i });
-    this.exportButton = page.getByRole('button', { name: 'Export (Ctrl+S)' });
+    // View buttons (in the "More" menu below 768px)
+    this.homeViewButton = this.toolbar.getByRole('button', { name: 'Reset View', exact: true });
+    this.autoRotateButton = this.toolbar.getByRole('button', { name: 'Auto Rotate', exact: true });
+    this.exportButton = this.toolbar.getByRole('button', { name: 'Export', exact: true });
 
     // Help
-    this.shortcutsButton = page.getByRole('button', { name: /Shortcuts/i });
+    this.shortcutsButton = this.toolbar.getByRole('button', { name: 'Shortcuts', exact: true });
   }
 
   /**

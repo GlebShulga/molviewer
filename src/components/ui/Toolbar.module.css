@@ -1,8 +1,17 @@
-.toolbar {
+/* Positions the toolbar and its "More" menu. Kept free of overflow, so the
+   menu is not clipped when the toolbar scrolls sideways on narrow screens.
+   A block with width: max-content: with left: 50%, a shrink-to-fit width
+   would be capped at half the viewer and squeeze the toolbar. */
+.toolbarDock {
   position: absolute;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
+  width: max-content;
+  z-index: 50;
+}
+
+.toolbar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -11,7 +20,6 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 50;
 }
 
 .toolbarGroup {
@@ -56,6 +64,55 @@
   border-color: var(--accent-color);
 }
 
+/* "More" button: only on narrow screens, where it replaces the .wideOnly groups */
+.moreGroup {
+  display: none;
+}
+
+.moreMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 6px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--bg-primary) 70%, transparent);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover:not(:disabled),
+.menuItem:focus-visible {
+  background-color: var(--bg-tertiary);
+}
+
+.menuItem:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.menuItemActive {
+  color: var(--accent-color);
+}
+
 /* ========================================
    RESPONSIVE STYLES - MOBILE
    ======================================== */
@@ -66,14 +123,16 @@
   gap: 2px;
 }
 
-/* Mobile: < 768px - toolbar moves to bottom */
+/* Mobile: < 768px - toolbar moves to bottom (keep in sync with MOBILE_BREAKPOINT in SpotlightTour.tsx) */
 @media (max-width: 768px) {
-  .toolbar {
+  .toolbarDock {
     top: auto;
     bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: calc(100vw - 32px);
+    max-width: calc(100vw - 16px);
+  }
+
+  .toolbar {
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -81,6 +140,21 @@
   /* Hide shortcuts button and its divider on mobile */
   .helpGroup,
   .helpDivider {
+    display: none;
+  }
+
+  /* Undo/Redo and the View group move into the "More" menu */
+  .wideOnly {
+    display: none;
+  }
+
+  .moreGroup {
+    display: flex;
+  }
+}
+
+@media (min-width: 769px) {
+  .moreMenu {
     display: none;
   }
 }

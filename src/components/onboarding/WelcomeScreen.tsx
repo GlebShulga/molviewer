@@ -11,7 +11,8 @@ interface WelcomeScreenProps {
   onIntent?: () => void;
 }
 
-const EXAMPLES = [
+/** Also offered by the empty state, once onboarding is over. */
+export const EXAMPLES = [
   { path: '/pdb/4HHB', label: 'Hemoglobin 4HHB' },
   { path: '/af/P04637', label: 'p53 AlphaFold' },
   { path: '/compound/caffeine', label: 'Caffeine' },

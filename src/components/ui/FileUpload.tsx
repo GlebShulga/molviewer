@@ -399,6 +399,10 @@ export function FileUpload() {
             placeholder="e.g., 1CRN"
             className={styles.pdbInput}
             aria-label="PDB ID"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
             maxLength={4}
             disabled={isLoading}
           />
@@ -425,6 +429,10 @@ export function FileUpload() {
             placeholder="e.g., P69905"
             className={styles.pdbInput}
             aria-label="UniProt ID"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
             maxLength={10}
             disabled={isLoading}
           />
@@ -451,6 +459,10 @@ export function FileUpload() {
             placeholder="e.g., caffeine or 2519"
             className={styles.pdbInput}
             aria-label="Compound name or PubChem CID"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="go"
             maxLength={120}
             disabled={isLoading}
           />
