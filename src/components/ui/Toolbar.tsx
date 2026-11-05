@@ -337,10 +337,14 @@ export function Toolbar({
           {menuButtons.map((button, index) => (
             <button
               key={index}
-              role="menuitem"
+              // A toggle (Auto Rotate) announces its state, as aria-pressed does in the toolbar
+              role={button.toggle ? 'menuitemcheckbox' : 'menuitem'}
+              aria-checked={button.toggle ? !!button.active : undefined}
               className={clsx(styles.menuItem, button.active && styles.menuItemActive)}
               onClick={() => {
-                closeMenu(false);
+                // Back to "More", so a keyboard or screen reader isn't left on
+                // nothing. After a tap the programmatic focus shows no ring.
+                closeMenu(true);
                 button.onClick();
               }}
               disabled={button.disabled}

@@ -75,7 +75,7 @@ test.describe('Toolbar on phones', () => {
     await openMoreMenu(page);
 
     const result = await page.getByRole('menu', { name: 'More actions' }).evaluate((menu) => {
-      const items = Array.from(menu.querySelectorAll('[role="menuitem"]'));
+      const items = Array.from(menu.querySelectorAll('[role^="menuitem"]'));
       return {
         box: menu.getBoundingClientRect().toJSON(),
         vw: window.innerWidth,
@@ -133,6 +133,30 @@ test.describe('Toolbar on phones', () => {
     const toolbar = (await page.getByTestId('toolbar').boundingBox())!;
     expect(toolbar.y - (toast.y + toast.height)).toBeGreaterThanOrEqual(0);
     expect(toolbar.y - (toast.y + toast.height)).toBeLessThanOrEqual(24);
+  });
+
+  test('from the keyboard, choosing an item returns focus to "More", and Auto Rotate says it is on', async ({ page }) => {
+    await withCaffeine(page);
+    const more = page.getByRole('button', { name: 'More', exact: true });
+    const autoRotate = page.getByRole('menuitemcheckbox', { name: 'Auto Rotate' });
+
+    await more.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menu', { name: 'More actions' })).toBeVisible();
+    await expect(autoRotate).toHaveAttribute('aria-checked', 'false');
+    // The menu focuses its first enabled item; arrows move to Auto Rotate
+    for (let i = 0; i < 6 && !(await autoRotate.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press('ArrowDown');
+    }
+    await expect(autoRotate).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(more).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await expect(autoRotate).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('menuitem', { name: 'Reset View' })).toBeVisible();
   });
 
   test('Copy Link from the menu says the link was copied', async ({ page }) => {
