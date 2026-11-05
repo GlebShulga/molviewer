@@ -129,17 +129,20 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
       minBfactor = Math.min(minBfactor, atom.tempFactor);
       maxBfactor = Math.max(maxBfactor, atom.tempFactor);
     }
-    const isPolymerResidue = !!atom.residueName && !!ALL_RESIDUE_COLORS[atom.residueName.toUpperCase()];
+    const isStandardResidue = !!atom.residueName && !!ALL_RESIDUE_COLORS[atom.residueName.toUpperCase()];
+    // Modified amino acids (MSE, HIE, ...) are in the chain too: an alpha
+    // carbon tells them apart from ligands and water (calcium is CA too)
+    const isAlphaCarbon = atom.name?.trim().toUpperCase() === 'CA' && atom.element?.toUpperCase() === 'C';
     if (atom.residueNumber !== undefined) {
       hasResidueNumbers = true;
       minAnyResNum = Math.min(minAnyResNum, atom.residueNumber);
       maxAnyResNum = Math.max(maxAnyResNum, atom.residueNumber);
-      if (isPolymerResidue) {
+      if (isStandardResidue || isAlphaCarbon) {
         minResNum = Math.min(minResNum, atom.residueNumber);
         maxResNum = Math.max(maxResNum, atom.residueNumber);
       }
     }
-    if (isPolymerResidue) {
+    if (isStandardResidue) {
       hasResidueData = true;
     }
     if (atom.secondaryStructure !== undefined) {

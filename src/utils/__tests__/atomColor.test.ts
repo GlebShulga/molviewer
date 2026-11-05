@@ -51,6 +51,13 @@ describe('Rainbow coloring', () => {
     expect(getAtomColor(protein[9], 'rainbow', ctx)).toBe('hsl(0, 100%, 50%)');
   });
 
+  it('counts a modified residue at the chain end, by its alpha carbon, but not calcium', () => {
+    const mse = { ...residue('MSE', 11), name: 'CA' } as Atom;
+    const calcium = { ...residue('CA', 300), name: 'CA', element: 'Ca' } as Atom;
+    const ctx = calculateColorSchemeContext({ name: '1ABC', atoms: [...protein, mse, calcium], bonds: [] });
+    expect([ctx.minResNum, ctx.maxResNum]).toEqual([1, 11]);
+  });
+
   it('spans every residue when there is no polymer', () => {
     const ligands = [residue('ATP', 3), residue('MG', 7)];
     const ctx = calculateColorSchemeContext({ name: 'ATP', atoms: ligands, bonds: [] });
