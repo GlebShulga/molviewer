@@ -126,6 +126,37 @@ test.describe('Viewer overlays on wide screens', () => {
     await expect(toolbar.getByRole('button', { name: 'Auto Rotate', exact: true })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('the structure chip scrolls the sidebar to Molecule Info, with no dialog', async ({ page }) => {
+    const viewer = new MoleculeViewerPage(page);
+    await viewer.goto();
+    await viewer.loadSampleMolecule('caffeine');
+    const sidebar = page.locator('aside');
+
+    await page.getByTestId('structure-title').click({ force: true });
+    // Molecule Info at the top of the sidebar, or the sidebar scrolled to its end
+    await expect.poll(() => sidebar.evaluate((aside) => {
+      const target = document.getElementById('molecule-info')!.getBoundingClientRect().top - aside.getBoundingClientRect().top;
+      return Math.abs(target - 16) < 4 || aside.scrollTop + aside.clientHeight >= aside.scrollHeight - 1;
+    })).toBe(true);
+    // Beside the viewer, not over it: no modal dialog
+    await expect(sidebar).not.toHaveAttribute('role');
+    await expect(sidebar).not.toHaveAttribute('aria-modal');
+
+    // The chip didn't open a drawer that a narrower window would then show
+    await page.setViewportSize({ width: 390, height: 800 });
+    await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0);
+    await expect(sidebar).not.toBeInViewport();
+
+    // A drawer open while the window widens is closed when it narrows again
+    await page.getByRole('button', { name: 'Open menu' }).click({ force: true });
+    await expect(page.getByRole('dialog', { name: 'Menu' })).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await expect(sidebar).not.toHaveAttribute('role');
+    await page.setViewportSize({ width: 390, height: 800 });
+    await expect(page.getByRole('dialog', { name: 'Menu' })).toHaveCount(0);
+    await expect(sidebar).not.toBeInViewport();
+  });
+
   test('Export downloads the image and says so', async ({ page }) => {
     const viewer = new MoleculeViewerPage(page);
     await viewer.goto();

@@ -42,6 +42,7 @@ import { MeasurementHint } from './components/viewer/MeasurementHint';
 import { StructureTitle } from './components/viewer/StructureTitle';
 import { ColorLegend } from './components/viewer/ColorLegend';
 import { useLandingShown } from './hooks/useLandingShown';
+import { useMediaQuery } from './hooks/useMediaQuery';
 import { Sun, Moon, Menu, X, Github } from 'lucide-react';
 import styles from './App.module.css';
 import './styles/globals.css';
@@ -276,6 +277,15 @@ function AppContent() {
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Up to 768px the sidebar is a drawer or sheet over the viewer
+  // (App.module.css); wider, it is always there beside it.
+  const isDrawer = useMediaQuery(DRAWER_QUERY);
+  // Widening past the drawer closes it, so narrowing again starts closed
+  const [wasDrawer, setWasDrawer] = useState(isDrawer);
+  if (wasDrawer !== isDrawer) {
+    setWasDrawer(isDrawer);
+    if (!isDrawer) setSidebarOpen(false);
+  }
   const [exportSettings, setExportSettings] = useState({ scale: 2, background: '#0d1117' as string | null, filename: 'molecule' });
   const viewerRef = useRef<MoleculeViewerHandle>(null);
   const setViewerRef = useCallback((handle: MoleculeViewerHandle | null) => {
@@ -384,13 +394,13 @@ function AppContent() {
   useEffect(() => {
     const wasOpen = wasSidebarOpenRef.current;
     wasSidebarOpenRef.current = sidebarOpen;
-    if (isTouringSidebar || wasOpen === sidebarOpen) return;
+    if (!isDrawer || isTouringSidebar || wasOpen === sidebarOpen) return;
     if (sidebarOpen) {
       sidebarCloseButtonRef.current?.focus({ preventScroll: true });
     } else if (sidebarRef.current?.contains(document.activeElement) || document.activeElement === document.body) {
       menuButtonRef.current?.focus({ preventScroll: true });
     }
-  }, [sidebarOpen, isTouringSidebar]);
+  }, [sidebarOpen, isTouringSidebar, isDrawer]);
 
   // iOS ignores overscroll-behavior on the sheet in some cases: lock the page
   // itself while the sheet is open, so a drag at its end can't scroll it.
@@ -410,7 +420,7 @@ function AppContent() {
   // sidebar is already there) at Molecule Info. Scrolls the sidebar itself,
   // never the page; the rects move together while the sheet slides in.
   const showMoleculeInfo = useCallback(() => {
-    setSidebarOpen(true);
+    if (isDrawer) setSidebarOpen(true);
     requestAnimationFrame(() => {
       const sidebar = sidebarRef.current;
       const target = document.getElementById('molecule-info');
@@ -418,7 +428,7 @@ function AppContent() {
       const offset = target.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
       sidebar.scrollTo({ top: sidebar.scrollTop + offset - 16, behavior: 'smooth' });
     });
-  }, []);
+  }, [isDrawer]);
 
   const handleExport = useCallback((options?: { scale: number; background: string | null; filename: string }) => {
     if (options) {
@@ -533,10 +543,10 @@ function AppContent() {
           className={`${styles.sidebar} ${sidebarOpen ? styles.open : ''} ${isTouringSidebar ? styles.tourActive : ''}`}
           onTouchStart={handleSheetTouchStart}
           onTouchEnd={handleSheetTouchEnd}
-          // Open only below 768px, where it is a drawer or sheet over the viewer
-          role={sidebarOpen ? 'dialog' : undefined}
-          aria-modal={sidebarOpen || undefined}
-          aria-label={sidebarOpen ? 'Menu' : undefined}
+          // A dialog only as the open drawer or sheet over the viewer
+          role={sidebarOpen && isDrawer ? 'dialog' : undefined}
+          aria-modal={(sidebarOpen && isDrawer) || undefined}
+          aria-label={sidebarOpen && isDrawer ? 'Menu' : undefined}
         >
           <button
             ref={sidebarCloseButtonRef}
@@ -669,6 +679,9 @@ const EmbedApp = lazy(() => import('./components/embed/EmbedApp'));
 
 /** Keep in sync with the bottom-sheet media query in App.module.css. */
 const BOTTOM_SHEET_MAX_WIDTH = 600;
+
+/** Keep in sync with the drawer media query in App.module.css. */
+const DRAWER_QUERY = '(max-width: 768px)';
 
 /** /embed/* pages render a minimal viewer for <iframe>s. */
 const IS_EMBED = typeof window !== 'undefined' && parsePathnameParams(window.location.pathname)?.embed === true;
