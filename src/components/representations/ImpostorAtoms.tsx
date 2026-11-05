@@ -152,6 +152,14 @@ const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
  * Threshold for automatic GPU picking activation. Below it the raycast tests
  * every atom's sphere on the CPU (Spacefill's impostors from 2000 atoms); from
  * it, one GPU pick per pointer event replaces that O(n) loop.
+ *
+ * Open question (parked 2026-11-05): whether picking on structures this large
+ * is used at all (hover, click to measure, the atom menu in Spacefill, Ball &
+ * Stick or Stick). Analytics can't tell yet: `representation_changed` and
+ * `measurement_added` (utils/track.ts) carry no structure size. Add a size
+ * bucket to them before deciding to keep the GPU path, or to replace it with
+ * the CPU loop for every size (likely a few ms per event even at 100k atoms,
+ * not measured).
  */
 const GPU_PICKING_THRESHOLD = 5000;
 
