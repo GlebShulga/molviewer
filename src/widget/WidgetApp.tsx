@@ -40,6 +40,16 @@ const COLORS: { value: ColorScheme; label: string }[] = [
   { value: 'rainbow', label: 'Rainbow' },
 ];
 
+/**
+ * The view with the style and color the store applied, for the dropdowns:
+ * Cartoon never keeps CPK (withValidColor), so asking for both shows its
+ * smart default instead.
+ */
+function appliedView(id: string, view: WidgetView): WidgetView {
+  const structure = useMoleculeStore.getState().structures.get(id);
+  return structure ? { ...view, repr: structure.representation, color: structure.colorScheme } : view;
+}
+
 function toSource(load: WidgetLoad): StructureSource {
   switch (load.kind) {
     case 'pdb':
@@ -104,9 +114,9 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
           // Ball & Stick and Stick stop at 1,000 atoms on touch screens, as in the app.
           // The atom count is known only now, so the dropdown is corrected here.
           const repr = isTouchLimited(initial.repr, molecule) ? 'cartoon' : initial.repr;
-          if (repr !== initial.repr) setView({ ...initial, repr });
           store().setStructureRepresentation(id, repr);
           store().setStructureColorScheme(id, initial.color);
+          setView(appliedView(id, initial));
         }
         store().setAutoRotate(initial.spin);
         if (warning) store().setError(warning);
@@ -129,11 +139,11 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
       // dropdown never shows a style that wasn't applied.
       if (next.repr && isTouchLimited(next.repr, structure.molecule)) next = { ...next, repr: view.repr };
       const merged = { ...view, ...next };
-      setView(merged);
       const store = useMoleculeStore.getState();
       if (next.repr) store.setStructureRepresentation(structure.id, next.repr);
       if (next.color) store.setStructureColorScheme(structure.id, next.color);
       if (next.spin !== undefined) store.setAutoRotate(next.spin);
+      setView(appliedView(structure.id, merged));
     },
     [payload, view, structure]
   );

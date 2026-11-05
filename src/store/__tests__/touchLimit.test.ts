@@ -22,6 +22,7 @@ const store = () => useMoleculeStore.getState();
 const stubTouch = (coarse: boolean) =>
   vi.stubGlobal('matchMedia', (query: string) => ({ matches: coarse && query === '(pointer: coarse)' }));
 const repOf = (s: Structure, type: string) => s.componentSettings.find((c) => c.type === type)?.representation;
+const colorOf = (s: Structure, type: string) => s.componentSettings.find((c) => c.type === type)?.colorScheme;
 const only = () => [...store().structures.values()][0];
 
 /** A large protein in Ball & Stick, set up on a desktop. */
@@ -120,6 +121,63 @@ describe('sessions on a touch screen', () => {
     expect(only().representation).toBe('cartoon');
     expect(repOf(only(), 'protein')).toBe('cartoon');
     expect(useToastStore.getState().message).toBe('Showing Cartoon: Stick is limited to 1,000 atoms on touch screens');
+  });
+
+  it('opens a shared Ball & Stick + CPK view in Cartoon with Secondary structure, the heme still CPK', () => {
+    const id = ballAndStickProtein();
+    store().setStructureColorScheme(id, 'cpk');
+    const share = serializeShareableSession(store(), null);
+    const [shared] = share.structures;
+
+    stubTouch(true);
+    store().applyShareableSession({
+      structures: [{ molecule: bigProteinWithLigand(), source: SOURCE, shareableStructure: shared }],
+      skipped: [],
+      layoutMode: share.layoutMode,
+      camera: null,
+      measurements: [],
+      labels: [],
+      surfaceSettings: share.surfaceSettings,
+      autoRotate: false,
+      sourceStructures: share.structures,
+    });
+
+    expect(only().representation).toBe('cartoon');
+    expect(only().colorScheme).toBe('secondaryStructure');
+    expect(colorOf(only(), 'protein')).toBe('secondaryStructure');
+    expect(colorOf(only(), 'ligand')).toBe('cpk');
+  });
+
+  it('opens a saved Ball & Stick + CPK session in Cartoon with Secondary structure', () => {
+    const id = ballAndStickProtein();
+    store().setStructureColorScheme(id, 'cpk');
+    const session = store().buildSession('saved', null);
+    store().reset();
+
+    stubTouch(true);
+    store().loadSession(session);
+
+    expect(only().representation).toBe('cartoon');
+    expect(only().colorScheme).toBe('secondaryStructure');
+    expect(colorOf(only(), 'ligand')).toBe('cpk');
+  });
+
+  it('opens an old session saved with Cartoon + CPK in Secondary structure, on a desktop too', () => {
+    const id = ballAndStickProtein();
+    store().setStructureColorScheme(id, 'cpk');
+    // Possible before the Cartoon rule: set directly, as the store can't now
+    const structures = new Map(store().structures);
+    structures.set(id, { ...structures.get(id)!, representation: 'cartoon' });
+    useMoleculeStore.setState({ structures });
+    const session = store().buildSession('saved', null);
+    store().reset();
+
+    store().loadSession(session);
+
+    expect(only().representation).toBe('cartoon');
+    expect(only().colorScheme).toBe('secondaryStructure');
+    expect(colorOf(only(), 'protein')).toBe('secondaryStructure');
+    expect(colorOf(only(), 'ligand')).toBe('cpk');
   });
 
   it('keeps the saved style on a desktop', () => {

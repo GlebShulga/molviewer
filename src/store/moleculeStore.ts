@@ -112,7 +112,27 @@ export function withRepresentation(structure: Structure, rep: RepresentationType
           ? { ...cs, representation: rep === 'cartoon' ? SMART_DEFAULTS[cs.type].representation : rep }
           : cs
       );
-  return { ...structure, representation: rep, componentSettings };
+  return withValidColor({ ...structure, representation: rep, componentSettings });
+}
+
+/**
+ * Cartoon never shows CPK: element colors on a backbone ribbon are all carbon
+ * grey (colorSchemeAvailability). CPK under Cartoon becomes the polymer
+ * components' smart default (Secondary structure for proteins, Rainbow for
+ * DNA and RNA), with the primary component's for the structure, as on load.
+ * Ligands, ions and water keep CPK: they are drawn as atoms, and the parsers
+ * mark their atoms 'coil' too, so Secondary structure would turn them grey.
+ * Applied wherever a style or color is set, links, the widget and sessions
+ * included.
+ */
+export function withValidColor(structure: Structure): Structure {
+  if (structure.representation !== 'cartoon' || structure.colorScheme !== 'cpk') return structure;
+  const primary = structure.classification?.primaryType;
+  const colorScheme = SMART_DEFAULTS[primary && POLYMER_COMPONENTS.has(primary) ? primary : 'protein'].colorScheme;
+  const componentSettings = structure.componentSettings.map((cs) =>
+    POLYMER_COMPONENTS.has(cs.type) && cs.colorScheme === 'cpk' ? { ...cs, colorScheme: SMART_DEFAULTS[cs.type].colorScheme } : cs
+  );
+  return { ...structure, colorScheme, componentSettings };
 }
 
 /**
@@ -131,14 +151,18 @@ export function touchSafeStructure(structure: Structure): { structure: Structure
   return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
 }
 
-/** Every structure through touchSafeStructure, with one toast if any fell back. */
-function touchSafeStructures(structures: Map<string, Structure>): Map<string, Structure> {
+/**
+ * A session's structures as they can be shown here: through touchSafeStructure,
+ * with one toast if any fell back, and withValidColor, for sessions saved with
+ * Cartoon + CPK.
+ */
+function sessionStructures(structures: Map<string, Structure>): Map<string, Structure> {
   let fellBackFrom: RepresentationType | undefined;
   const result = new Map<string, Structure>();
   for (const [id, structure] of structures) {
     const safe = touchSafeStructure(structure);
     fellBackFrom ??= safe.fellBackFrom;
-    result.set(id, safe.structure);
+    result.set(id, withValidColor(safe.structure));
   }
   if (fellBackFrom) showToast(touchFallbackMessage(fellBackFrom));
   return result;
@@ -627,7 +651,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   setStructureColorScheme: (id, scheme) => {
     const { structures } = get();
     const structure = structures.get(id);
-    if (!structure || structure.colorScheme === scheme) return; // Early exit if unchanged
+    if (!structure) return;
 
     // Also update componentSettings for smart defaults mode
     // This ensures Cartoon/other representations in component mode receive the new color scheme
@@ -635,13 +659,13 @@ export const useMoleculeStore = create<MoleculeState>()(
       ...cs,
       colorScheme: scheme,
     }));
+    // CPK asked for under Cartoon gives its smart default instead
+    const updated = withValidColor({ ...structure, colorScheme: scheme, componentSettings: newComponentSettings });
+    // Early exit if unchanged: the color actually applied, so no empty undo step
+    if (updated.colorScheme === structure.colorScheme) return;
 
     const newStructures = new Map(structures);
-    newStructures.set(id, {
-      ...structure,
-      colorScheme: scheme,
-      componentSettings: newComponentSettings,
-    });
+    newStructures.set(id, updated);
     set({ structures: newStructures });
   },
 
@@ -988,7 +1012,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       clearSelectorCaches();
       set({
         ...initialState,
-        structures: touchSafeStructures(data.structures),
+        structures: sessionStructures(data.structures),
         structureOrder: data.structureOrder,
         activeStructureId: data.activeStructureId,
         layoutMode: data.layoutMode,
@@ -1078,7 +1102,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       set({
         ...initialState,
         // After representation and componentSettings are restored above
-        structures: touchSafeStructures(newStructures),
+        structures: sessionStructures(newStructures),
         structureOrder: newOrder,
         activeStructureId: newOrder[0] ?? null,
         layoutMode: payload.layoutMode,
