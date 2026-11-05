@@ -203,8 +203,10 @@ export interface PdbDetails {
   releaseDate?: string;
   /** Date of the latest revision. */
   revisionDate?: string;
-  /** Deposited atom count (includes solvent). */
+  /** Heavy atoms in one deposited model (`deposited_atom_count`, solvent included, hydrogens not). */
   atomCount?: number;
+  /** Hydrogens in one model, which RCSB counts apart from `atomCount` (most X-ray entries have none). */
+  hydrogenAtomCount?: number;
   /** Number of deposited models (NMR ensembles have many). */
   modelCount?: number;
   polymerEntityCount?: number;

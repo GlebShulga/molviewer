@@ -469,10 +469,10 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
   const pdb = args.kind === 'pdb' ? (r.details as PdbDetails | undefined) : undefined;
   // Ball & Stick and Stick stop at DESKTOP_ATOM_STYLE_LIMIT atoms with a
   // backbone, where the viewer shows Cartoon on every device (phones stop
-  // earlier, which the server can't know). The viewer reads the first model;
-  // the deposited count covers them all.
+  // earlier, which the server can't know). The viewer reads one model and
+  // keeps its hydrogens; RCSB counts one model too, hydrogens apart.
   if ((style === 'ball-and-stick' || style === 'stick') && pdb?.atomCount && (pdb.polymerEntityCount ?? 1) > 0) {
-    const atoms = pdb.atomCount / Math.max(1, pdb.modelCount ?? 1);
+    const atoms = pdb.atomCount + (pdb.hydrogenAtomCount ?? 0);
     if (atoms > DESKTOP_ATOM_STYLE_LIMIT) {
       const name = style === 'stick' ? 'Stick' : 'Ball and stick';
       notes.push(`${name} is limited to ${DESKTOP_ATOM_STYLE_LIMIT.toLocaleString('en-US')} atoms, so this entry is shown as cartoon.`);

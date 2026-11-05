@@ -322,10 +322,14 @@ describe('show_structure', () => {
   });
 
   describe('Ball & Stick and Stick over 100,000 atoms, which the viewer shows as Cartoon', () => {
-    /** 4HHB's entry with another size: `atoms` across `models` deposited models. */
-    const withSize = (atoms: number, models = 1) => {
+    /**
+     * 4HHB's entry with another size. RCSB counts one model: `atoms` heavy atoms
+     * and `hydrogens` apart (1D3Z and 2K39, 10 and 116 models: 602 + 629 each).
+     */
+    const withSize = (atoms: number, { hydrogens = 0, models = 1 } = {}) => {
       const body = readFileSync(new URL('../../../site/upstream/__fixtures__/rcsb-core-4HHB.json', import.meta.url), 'utf8')
         .replace(/"deposited_atom_count": *\d+/, `"deposited_atom_count": ${atoms}`)
+        .replace(/"deposited_hydrogen_atom_count": *\d+/, `"deposited_hydrogen_atom_count": ${hydrogens}`)
         .replace(/"deposited_model_count": *\d+/, `"deposited_model_count": ${models}`);
       return upstream({ 'rcsb-core-4HHB.json': { status: 200, body } });
     };
@@ -340,12 +344,21 @@ describe('show_structure', () => {
       }
     });
 
-    it('keeps the style up to the limit, counting one model of a multi-model entry', async () => {
+    it('keeps the style up to the limit', async () => {
       const atLimit = await showStructure({ kind: 'pdb', id: '4HHB', style: 'stick' }, withSize(100_000));
       expect(atLimit.structuredContent).toMatchObject({ shown: { style: 'stick' } });
-      // 10 models of 12,000 atoms: the viewer shows one
-      const ensemble = await showStructure({ kind: 'pdb', id: '4HHB', style: 'ball-and-stick' }, withSize(120_000, 10));
-      expect(ensemble.structuredContent).toMatchObject({ shown: { style: 'ball-and-stick' } });
+    });
+
+    it('counts hydrogens, as the viewer keeps them, and does not divide by the models', async () => {
+      // 70k heavy atoms and 40k hydrogens: the viewer gets 110k
+      const withHydrogens = await showStructure({ kind: 'pdb', id: '4HHB', style: 'stick' }, withSize(70_000, { hydrogens: 40_000 }));
+      expect(withHydrogens.structuredContent).toMatchObject({ shown: { style: 'cartoon' } });
+      // The count is already per model: 20 models of 110k atoms are still 110k in the viewer
+      const ensemble = await showStructure(
+        { kind: 'pdb', id: '4HHB', style: 'ball-and-stick' },
+        withSize(110_000, { models: 20 })
+      );
+      expect(ensemble.structuredContent).toMatchObject({ shown: { style: 'cartoon' } });
     });
 
     it('leaves Spacefill alone at any size', async () => {

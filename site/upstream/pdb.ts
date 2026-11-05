@@ -95,6 +95,7 @@ interface RawCoreEntry {
   rcsb_entry_info?: {
     resolution_combined?: number[];
     deposited_atom_count?: number;
+    deposited_hydrogen_atom_count?: number;
     deposited_model_count?: number;
     deposited_polymer_entity_instance_count?: number;
     polymer_entity_count?: number;
@@ -390,6 +391,7 @@ export function normalizeCore(id: string, raw: RawCoreEntry): CoreFields {
     releaseDate: isoDate(acc.initial_release_date),
     revisionDate: isoDate(acc.revision_date),
     atomCount: num(info.deposited_atom_count),
+    hydrogenAtomCount: num(info.deposited_hydrogen_atom_count),
     modelCount: num(info.deposited_model_count),
     polymerEntityCount: num(info.polymer_entity_count),
     proteinEntityCount: num(info.polymer_entity_count_protein),
