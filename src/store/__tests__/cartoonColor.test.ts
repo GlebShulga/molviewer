@@ -71,6 +71,19 @@ describe('withValidColor', () => {
     expect(colorOf(structure, 'dna')).toBe('rainbow');
   });
 
+  it('repairs a ligand saved in a chain scheme (sessions from before the rule)', () => {
+    const saved = get(inCpk(protein()));
+    const old: Structure = {
+      ...saved,
+      colorScheme: 'secondaryStructure',
+      componentSettings: saved.componentSettings.map((cs) => ({ ...cs, colorScheme: 'secondaryStructure' as const })),
+    };
+    const structure = withValidColor(old);
+    expect(structure.colorScheme).toBe('secondaryStructure');
+    expect(colorOf(structure, 'protein')).toBe('secondaryStructure');
+    expect(colorOf(structure, 'ligand')).toBe('cpk');
+  });
+
   it('leaves other colors, and CPK in other styles, untouched', () => {
     const id = inCpk(protein());
     const ballAndStick = get(id);
@@ -114,6 +127,15 @@ describe('the store actions', () => {
       const iron = get(id).molecule.atoms.find((a) => a.element === 'Fe')!;
       expect(getAtomColor(iron, colorOf(get(id), 'ligand')!)).toBe(getAtomColor(iron, 'cpk'));
     }
+  });
+
+  it('picking Secondary structure again repairs a ligand left grey', () => {
+    const id = inCpk(protein());
+    store().setStructureColorScheme(id, 'secondaryStructure');
+    // As a session saved before the rule left it
+    store().setStructureComponentSettings(id, get(id).componentSettings.map((cs) => ({ ...cs, colorScheme: 'secondaryStructure' as const })));
+    store().setStructureColorScheme(id, 'secondaryStructure');
+    expect(colorOf(get(id), 'ligand')).toBe('cpk');
   });
 
   it('Chain colors the ligand too', () => {

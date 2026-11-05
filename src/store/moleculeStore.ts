@@ -128,18 +128,27 @@ export function withRepresentation(structure: Structure, rep: RepresentationType
  * grey (colorSchemeAvailability). CPK under Cartoon becomes the polymer
  * components' smart default (Secondary structure for proteins, Rainbow for
  * DNA and RNA), with the primary component's for the structure, as on load.
- * Ligands, ions and water keep CPK: they are drawn as atoms, and the parsers
- * mark their atoms 'coil' too, so Secondary structure would turn them grey.
+ * Ligands, ions and water beside a polymer never take a chain scheme
+ * (CHAIN_SCHEMES): they get their smart default (CPK) instead.
  * Applied wherever a style or color is set, links, the widget and sessions
- * included.
+ * included, so sessions saved before the ligand rule are repaired on load.
+ * Returns the same object when nothing changes.
  */
 export function withValidColor(structure: Structure): Structure {
-  if (structure.representation !== 'cartoon' || structure.colorScheme !== 'cpk') return structure;
+  const cartoonCpk = structure.representation === 'cartoon' && structure.colorScheme === 'cpk';
+  const hasPolymer = structure.componentSettings.some((cs) => POLYMER_COMPONENTS.has(cs.type));
+  const componentSettings = structure.componentSettings.map((cs) => {
+    const invalid = POLYMER_COMPONENTS.has(cs.type)
+      ? cartoonCpk && cs.colorScheme === 'cpk'
+      : hasPolymer && CHAIN_SCHEMES.has(cs.colorScheme);
+    return invalid ? { ...cs, colorScheme: SMART_DEFAULTS[cs.type].colorScheme } : cs;
+  });
+  const componentsChanged = componentSettings.some((cs, i) => cs !== structure.componentSettings[i]);
+  if (!cartoonCpk && !componentsChanged) return structure;
   const primary = structure.classification?.primaryType;
-  const colorScheme = SMART_DEFAULTS[primary && POLYMER_COMPONENTS.has(primary) ? primary : 'protein'].colorScheme;
-  const componentSettings = structure.componentSettings.map((cs) =>
-    POLYMER_COMPONENTS.has(cs.type) && cs.colorScheme === 'cpk' ? { ...cs, colorScheme: SMART_DEFAULTS[cs.type].colorScheme } : cs
-  );
+  const colorScheme = cartoonCpk
+    ? SMART_DEFAULTS[primary && POLYMER_COMPONENTS.has(primary) ? primary : 'protein'].colorScheme
+    : structure.colorScheme;
   return { ...structure, colorScheme, componentSettings };
 }
 
@@ -662,19 +671,19 @@ export const useMoleculeStore = create<MoleculeState>()(
     if (!structure) return;
 
     // Also update componentSettings for smart defaults mode
-    // This ensures Cartoon/other representations in component mode receive the new color scheme.
-    // Under a chain scheme, ligands, ions and water beside a polymer keep theirs
-    // (CHAIN_SCHEMES); a file of ligands alone takes it, as it has nothing else.
-    const keepNonPolymer = CHAIN_SCHEMES.has(scheme) &&
-      structure.componentSettings.some(cs => POLYMER_COMPONENTS.has(cs.type));
+    // This ensures Cartoon/other representations in component mode receive the new color scheme
     const newComponentSettings = structure.componentSettings.map(cs => ({
       ...cs,
-      colorScheme: keepNonPolymer && !POLYMER_COMPONENTS.has(cs.type) ? SMART_DEFAULTS[cs.type].colorScheme : scheme,
+      colorScheme: scheme,
     }));
-    // CPK asked for under Cartoon gives its smart default instead
+    // CPK asked for under Cartoon, or a chain scheme for ligands beside a
+    // polymer, gives the smart default instead
     const updated = withValidColor({ ...structure, colorScheme: scheme, componentSettings: newComponentSettings });
-    // Early exit if unchanged: the color actually applied, so no empty undo step
-    if (updated.colorScheme === structure.colorScheme) return;
+    // Early exit if unchanged: the colors actually applied, so no empty undo step
+    if (
+      updated.colorScheme === structure.colorScheme &&
+      updated.componentSettings.every((cs, i) => cs.colorScheme === structure.componentSettings[i]?.colorScheme)
+    ) return;
 
     const newStructures = new Map(structures);
     newStructures.set(id, updated);
