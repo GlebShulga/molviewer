@@ -7,7 +7,7 @@ import { fetchPdbDetails } from '../../../site/upstream/pdb';
 import { fetchAfDetails } from '../../../site/upstream/af';
 import { fetchPubchemCompound, resolvePubchemCid } from '../../../site/upstream/pubchem';
 import { searchRcsb, searchUniProt } from '../../../site/upstream/search';
-import type { UpstreamOptions } from '../../../site/upstream/types';
+import type { PdbDetails, UpstreamOptions } from '../../../site/upstream/types';
 import { PDB_ID_RE, UNIPROT_RE } from '../../../site/identifiers';
 import { slugForCid } from '../../../site/compoundSlugs';
 import {
@@ -465,6 +465,23 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     color = 'bfactor';
     notes.push('Confidence (pLDDT) coloring is for AlphaFold models; this entry is colored by B-factor instead.');
   }
+  // The viewer never shows CPK on Cartoon (withValidColor in the app's store):
+  // each polymer gets its smart default, and ligands keep element colors. The
+  // payload still asks for CPK, so the widget applies that rule; only what the
+  // text and `shown` report changes.
+  let shownColor = color;
+  let colorWords = COLOR_WORDS[color];
+  if (style === 'cartoon' && color === 'cpk') {
+    const pdb = args.kind === 'pdb' ? (r.details as PdbDetails | undefined) : undefined;
+    // AlphaFold models, and entries without details, are taken as proteins
+    const protein = !pdb || (pdb.proteinEntityCount ?? 1) > 0;
+    const nucleic = (pdb?.nucleicAcidEntityCount ?? 0) > 0;
+    shownColor = protein ? 'secondaryStructure' : 'rainbow';
+    colorWords = protein && nucleic
+      ? `${COLOR_WORDS.secondaryStructure} on protein chains and ${COLOR_WORDS.rainbow} on nucleic-acid chains`
+      : COLOR_WORDS[shownColor];
+    notes.push('Cartoon draws chains, not atoms, so it has no element colors; ligands keep them.');
+  }
   // First in the text, where the model reads it before writing its answer.
   const chainsNote = typeof r.summary.chainsNote === 'string' ? r.summary.chainsNote : undefined;
   if (chainsNote) notes.unshift(`Note: ${chainsNote}`);
@@ -476,7 +493,6 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
     ...(r.caption ? { caption: r.caption } : {}),
     pageUrl: r.pageUrl,
   };
-  const colorWords = COLOR_WORDS[color];
   // ChatGPT often writes nothing after the viewer whatever this text says (three
   // wordings tried in the 2026-10-03 test runs, including a separate first block,
   // which seemed to make it worse). The key facts are in the viewer's caption,
@@ -493,7 +509,7 @@ export async function showStructure(args: ShowArgs, upstream: UpstreamOptions): 
 
   return {
     text,
-    structuredContent: { ...r.summary, shown: { style, color } },
+    structuredContent: { ...r.summary, shown: { style, color: shownColor } },
     meta: { [WIDGET_META_KEY]: payload },
     status: 'ok',
     cacheable: !r.partial && !r.degraded,

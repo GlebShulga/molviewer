@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { fixtureFetch } from '../../../site/upstream/__fixtures__/fixtureFetch';
 import { WIDGET_META_KEY, readWidgetPayload } from '../../../site/appContract';
@@ -318,6 +319,48 @@ describe('show_structure', () => {
     const r = await showStructure({ kind: 'pdb', id: '3DNI', color: 'confidence' }, upstream());
     expect(readWidgetPayload(r.meta)?.view.color).toBe('bfactor');
     expect(r.text).toContain('AlphaFold models');
+  });
+
+  describe('Cartoon with element (CPK) colors, which the viewer never shows', () => {
+    /** 3DNI's entry with other polymer counts: a DNA-only entry or a protein-DNA complex. */
+    const withPolymers = (protein: number, nucleic: number) => {
+      const body = readFileSync(new URL('../../../site/upstream/__fixtures__/rcsb-core-3DNI.json', import.meta.url), 'utf8')
+        .replace(/"polymer_entity_count_protein": *\d+/, `"polymer_entity_count_protein": ${protein}`)
+        .replace(/"polymer_entity_count_nucleic_acid": *\d+/, `"polymer_entity_count_nucleic_acid": ${nucleic}`);
+      return upstream({ 'rcsb-core-3DNI.json': { status: 200, body } });
+    };
+
+    it('reports a protein as colored by secondary structure, and leaves the widget to apply it', async () => {
+      const r = await showStructure({ kind: 'pdb', id: '4HHB', style: 'cartoon', color: 'cpk' }, upstream());
+      expect(r.text).toContain('as cartoon, colored by secondary structure in the 3D viewer');
+      expect(r.text).toContain('ligands keep them');
+      expect(r.text).not.toContain('element (CPK)');
+      expect(r.structuredContent).toMatchObject({ shown: { style: 'cartoon', color: 'secondaryStructure' } });
+      // The widget's own rule keeps the ligands in element colors
+      expect(readWidgetPayload(r.meta)?.view).toMatchObject({ repr: 'cartoon', color: 'cpk' });
+    });
+
+    it('reports DNA as colored by sequence position (rainbow)', async () => {
+      const r = await showStructure({ kind: 'pdb', id: '3DNI', style: 'cartoon', color: 'cpk' }, withPolymers(0, 1));
+      expect(r.text).toContain('colored by sequence position (rainbow) in the 3D viewer');
+      expect(r.structuredContent).toMatchObject({ shown: { color: 'rainbow' } });
+    });
+
+    it('reports a protein-DNA complex chain by chain', async () => {
+      const r = await showStructure({ kind: 'pdb', id: '3DNI', style: 'cartoon', color: 'cpk' }, withPolymers(1, 1));
+      expect(r.text).toContain('colored by secondary structure on protein chains and sequence position (rainbow) on nucleic-acid chains');
+    });
+
+    it('reports an AlphaFold model as colored by secondary structure', async () => {
+      const r = await showStructure({ kind: 'alphafold', id: 'P69905', style: 'cartoon', color: 'cpk' }, upstream());
+      expect(r.structuredContent).toMatchObject({ shown: { color: 'secondaryStructure' } });
+    });
+
+    it('keeps element colors in the atom styles', async () => {
+      const r = await showStructure({ kind: 'pdb', id: '4HHB', style: 'spacefill', color: 'cpk' }, upstream());
+      expect(r.text).toContain('colored by element (CPK)');
+      expect(r.structuredContent).toMatchObject({ shown: { color: 'cpk' } });
+    });
   });
 
   it('refuses Schedule 1 agents by name, slug and CID', async () => {
