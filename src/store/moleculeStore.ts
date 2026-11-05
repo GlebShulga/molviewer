@@ -92,6 +92,14 @@ import {
 /** Components that follow the structure's Style choice (the rest keep their smart defaults). */
 const POLYMER_COMPONENTS = new Set<MoleculeComponentType>(['protein', 'dna', 'rna']);
 
+/**
+ * Schemes that color by position along a chain, which says nothing about
+ * ligands, ions or water: the parsers mark their atoms 'coil' (Secondary
+ * structure would draw a heme grey) and their residue numbers aren't sequence
+ * positions (Rainbow). Next to a polymer they keep their smart default (CPK).
+ */
+const CHAIN_SCHEMES = new Set<ColorScheme>(['secondaryStructure', 'rainbow']);
+
 const isSurfaceRepresentation = (rep: RepresentationType) => rep === 'surface-vdw' || rep === 'surface-sas';
 
 /**
@@ -654,10 +662,14 @@ export const useMoleculeStore = create<MoleculeState>()(
     if (!structure) return;
 
     // Also update componentSettings for smart defaults mode
-    // This ensures Cartoon/other representations in component mode receive the new color scheme
+    // This ensures Cartoon/other representations in component mode receive the new color scheme.
+    // Under a chain scheme, ligands, ions and water beside a polymer keep theirs
+    // (CHAIN_SCHEMES); a file of ligands alone takes it, as it has nothing else.
+    const keepNonPolymer = CHAIN_SCHEMES.has(scheme) &&
+      structure.componentSettings.some(cs => POLYMER_COMPONENTS.has(cs.type));
     const newComponentSettings = structure.componentSettings.map(cs => ({
       ...cs,
-      colorScheme: scheme,
+      colorScheme: keepNonPolymer && !POLYMER_COMPONENTS.has(cs.type) ? SMART_DEFAULTS[cs.type].colorScheme : scheme,
     }));
     // CPK asked for under Cartoon gives its smart default instead
     const updated = withValidColor({ ...structure, colorScheme: scheme, componentSettings: newComponentSettings });

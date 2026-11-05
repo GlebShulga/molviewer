@@ -102,6 +102,37 @@ describe('the store actions', () => {
     expect(colorOf(get(id), 'ligand')).toBe('cpk');
   });
 
+  it('a chain scheme leaves the ligand beside a polymer in CPK', () => {
+    for (const scheme of ['secondaryStructure', 'rainbow'] as const) {
+      const id = inCpk(protein());
+      store().setStructureColorScheme(id, scheme);
+      expect(get(id).colorScheme).toBe(scheme);
+      expect(colorOf(get(id), 'protein')).toBe(scheme);
+      expect(colorOf(get(id), 'ligand')).toBe('cpk');
+
+      // The heme in its element colors, not coil grey
+      const iron = get(id).molecule.atoms.find((a) => a.element === 'Fe')!;
+      expect(getAtomColor(iron, colorOf(get(id), 'ligand')!)).toBe(getAtomColor(iron, 'cpk'));
+    }
+  });
+
+  it('Chain colors the ligand too', () => {
+    const id = inCpk(protein());
+    store().setStructureColorScheme(id, 'chain');
+    expect(colorOf(get(id), 'protein')).toBe('chain');
+    expect(colorOf(get(id), 'ligand')).toBe('chain');
+  });
+
+  it('a file of ligands alone takes Rainbow, as it has nothing else', () => {
+    const atoms: Atom[] = [1, 2, 3].map((residueNumber, i) => (
+      { id: i, element: 'C', name: `C${i}`, residueName: 'ATP', residueNumber, chainId: 'A', x: i * 1.5, y: 0, z: 0 }
+    ));
+    const id = inCpk({ name: 'ATP', atoms, bonds: [] });
+    store().setStructureColorScheme(id, 'rainbow');
+    expect(get(id).colorScheme).toBe('rainbow');
+    expect(colorOf(get(id), 'ligand')).toBe('rainbow');
+  });
+
   it('asking for CPK on a Cartoon already in Secondary structure records no undo step', () => {
     const id = add(protein());
     expect(get(id).colorScheme).toBe('secondaryStructure');
