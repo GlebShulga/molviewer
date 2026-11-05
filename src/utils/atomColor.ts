@@ -62,7 +62,9 @@ function getRainbowColor(atom: Atom, minResNum: number, maxResNum: number): stri
   const range = maxResNum - minResNum;
   if (range === 0) return RAINBOW_ENDPOINTS.cTerminus;
 
-  const normalized = (atom.residueNumber - minResNum) / range;
+  // Clamped: residues outside the polymer's range (a modified residue, a
+  // water) take an end color instead of wrapping past blue or red
+  const normalized = Math.min(1, Math.max(0, (atom.residueNumber - minResNum) / range));
 
   // HSL color wheel: 240 (blue) -> 0 (red)
   const hue = 240 * (1 - normalized);
@@ -109,8 +111,12 @@ export function isAlphaFoldMolecule(molecule: Pick<Molecule, 'name'>): boolean {
 export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeContext {
   let minBfactor = Infinity;
   let maxBfactor = -Infinity;
+  // Rainbow's range: polymer residues only, as waters and ligands are numbered
+  // past the chain (4HHB: protein 1-146, waters to 205). All atoms when none.
   let minResNum = Infinity;
   let maxResNum = -Infinity;
+  let minAnyResNum = Infinity;
+  let maxAnyResNum = -Infinity;
   let hasResidueData = false;
   let hasBfactorData = false;
   let hasResidueNumbers = false;
@@ -123,12 +129,17 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
       minBfactor = Math.min(minBfactor, atom.tempFactor);
       maxBfactor = Math.max(maxBfactor, atom.tempFactor);
     }
+    const isPolymerResidue = !!atom.residueName && !!ALL_RESIDUE_COLORS[atom.residueName.toUpperCase()];
     if (atom.residueNumber !== undefined) {
       hasResidueNumbers = true;
-      minResNum = Math.min(minResNum, atom.residueNumber);
-      maxResNum = Math.max(maxResNum, atom.residueNumber);
+      minAnyResNum = Math.min(minAnyResNum, atom.residueNumber);
+      maxAnyResNum = Math.max(maxAnyResNum, atom.residueNumber);
+      if (isPolymerResidue) {
+        minResNum = Math.min(minResNum, atom.residueNumber);
+        maxResNum = Math.max(maxResNum, atom.residueNumber);
+      }
     }
-    if (atom.residueName && ALL_RESIDUE_COLORS[atom.residueName.toUpperCase()]) {
+    if (isPolymerResidue) {
       hasResidueData = true;
     }
     if (atom.secondaryStructure !== undefined) {
@@ -144,6 +155,11 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
   // B-factor coloring only makes sense if there's actual variation in values
   // (all zeros or uniform values means no meaningful data)
   const hasMeaningfulBfactorData = hasBfactorData && minBfactor !== maxBfactor;
+
+  if (minResNum === Infinity) {
+    minResNum = minAnyResNum;
+    maxResNum = maxAnyResNum;
+  }
 
   return {
     minBfactor: minBfactor === Infinity ? 0 : minBfactor,

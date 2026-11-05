@@ -39,3 +39,26 @@ describe('B-factor coloring', () => {
     expect(getAtomColor(m.atoms[1], 'bfactor', ctx)).toBe('rgb(255, 0, 0)');
   });
 });
+
+describe('Rainbow coloring', () => {
+  const residue = (residueName: string, residueNumber: number): Atom =>
+    ({ id: 0, element: 'C', x: 0, y: 0, z: 0, name: 'C1', residueName, residueNumber }) as Atom;
+  const protein = [...Array.from({ length: 10 }, (_, i) => residue('ALA', i + 1)), residue('HEM', 11), residue('HOH', 500)];
+
+  it('spans the polymer residues only, so the last one is red', () => {
+    const ctx = calculateColorSchemeContext({ name: '4HHB', atoms: protein, bonds: [] });
+    expect([ctx.minResNum, ctx.maxResNum]).toEqual([1, 10]);
+    expect(getAtomColor(protein[9], 'rainbow', ctx)).toBe('hsl(0, 100%, 50%)');
+  });
+
+  it('spans every residue when there is no polymer', () => {
+    const ligands = [residue('ATP', 3), residue('MG', 7)];
+    const ctx = calculateColorSchemeContext({ name: 'ATP', atoms: ligands, bonds: [] });
+    expect([ctx.minResNum, ctx.maxResNum]).toEqual([3, 7]);
+  });
+
+  it('gives a residue past the range the red end, not a wrapped hue', () => {
+    const ctx = calculateColorSchemeContext({ name: '4HHB', atoms: protein, bonds: [] });
+    expect(getAtomColor(protein[11], 'rainbow', ctx)).toBe('hsl(0, 100%, 50%)');
+  });
+});
