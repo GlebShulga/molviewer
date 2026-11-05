@@ -398,46 +398,6 @@ export function ImpostorAtoms({
     [gl.domElement]
   );
 
-  // CPU-based picking (fallback for small molecules)
-  const handleCPUPick = useCallback(
-    (clientX: number, clientY: number): number | null => {
-      const rect = gl.domElement.getBoundingClientRect();
-      const mouse = new THREE.Vector2(
-        ((clientX - rect.left) / rect.width) * 2 - 1,
-        -((clientY - rect.top) / rect.height) * 2 + 1
-      );
-
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, camera);
-
-      let closestDist = Infinity;
-      let closestIndex = -1;
-
-      for (let i = 0; i < atomsData.length; i++) {
-        const data = atomsData[i];
-        const sphereCenter = data.position;
-        const radius = data.radius;
-
-        const oc = raycaster.ray.origin.clone().sub(sphereCenter);
-        const a = raycaster.ray.direction.dot(raycaster.ray.direction);
-        const b = 2.0 * oc.dot(raycaster.ray.direction);
-        const c = oc.dot(oc) - radius * radius;
-        const discriminant = b * b - 4 * a * c;
-
-        if (discriminant >= 0) {
-          const t = (-b - Math.sqrt(discriminant)) / (2.0 * a);
-          if (t > 0 && t < closestDist) {
-            closestDist = t;
-            closestIndex = i;
-          }
-        }
-      }
-
-      return closestIndex >= 0 ? closestIndex : null;
-    },
-    [atomsData, camera, gl.domElement]
-  );
-
   // Pointer events (R3F) raycast the mesh before any handler runs. Three's own
   // test is against the billboards: 1 Å quads in the XY plane, which miss most
   // of each sphere, and its cached bounding sphere can predate the instance
@@ -466,28 +426,30 @@ export function ImpostorAtoms({
     };
   }, [atomsData, shouldUseGPUPicking]);
 
-  // Unified picking handler
+  // The atom under the pointer. Below the GPU-picking threshold the raycast
+  // above already found it, in world space (so with the structure's offset).
   const pickAtom = useCallback(
-    (clientX: number, clientY: number): number | null => {
+    (event: ThreeEvent<MouseEvent>): number | null => {
       if (shouldUseGPUPicking) {
-        return handleGPUPick(clientX, clientY);
+        return handleGPUPick(event.clientX, event.clientY);
       }
-      return handleCPUPick(clientX, clientY);
+      return event.instanceId ?? null;
     },
-    [shouldUseGPUPicking, handleGPUPick, handleCPUPick]
+    [shouldUseGPUPicking, handleGPUPick]
   );
 
   // Pointer move handler
   const handlePointerMove = useCallback(
-    (event: THREE.Event & { point?: THREE.Vector3; clientX?: number; clientY?: number }) => {
+    (event: ThreeEvent<PointerEvent>) => {
+      // The nearest structure's atom wins where structures overlap (Overlay).
+      // First, before setHoveredAtom: stopping sends a pointer-out, which
+      // clears the hover, to the farther mesh's atom hovered on the last move.
+      event.stopPropagation();
       // Fingers don't hover: a tap shows the tooltip instead (handleClick).
       if (isTouchPointer(event)) return;
-      const clientX = (event as unknown as PointerEvent).clientX;
-      const clientY = (event as unknown as PointerEvent).clientY;
+      const { clientX, clientY } = event;
 
-      if (clientX === undefined || clientY === undefined) return;
-
-      const pickedIndex = pickAtom(clientX, clientY);
+      const pickedIndex = pickAtom(event);
 
       if (pickedIndex !== null && pickedIndex >= 0 && pickedIndex < atomsData.length) {
         const data = atomsData[pickedIndex];
@@ -512,13 +474,11 @@ export function ImpostorAtoms({
   );
 
   const handleClick = useCallback(
-    (event: THREE.Event & { clientX?: number; clientY?: number }) => {
-      const clientX = (event as unknown as MouseEvent).clientX;
-      const clientY = (event as unknown as MouseEvent).clientY;
+    (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation(); // Only the nearest structure's atom is selected
+      const { clientX, clientY } = event;
 
-      if (clientX === undefined || clientY === undefined) return;
-
-      const pickedIndex = pickAtom(clientX, clientY);
+      const pickedIndex = pickAtom(event);
 
       if (pickedIndex !== null && pickedIndex >= 0 && pickedIndex < atomsData.length) {
         const data = atomsData[pickedIndex];
@@ -535,7 +495,7 @@ export function ImpostorAtoms({
   // opens it for one mesh per atom. Long-press on Android fires contextmenu too.
   const handleContextMenu = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
-      const pickedIndex = pickAtom(event.clientX, event.clientY);
+      const pickedIndex = pickAtom(event);
       if (pickedIndex === null || pickedIndex < 0 || pickedIndex >= atomsData.length) return;
       event.stopPropagation();
       event.nativeEvent.preventDefault();

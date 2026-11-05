@@ -1,6 +1,19 @@
 import { Page, Locator, expect } from '@playwright/test';
 import { waitForSceneReady, waitForMoleculeLoaded } from '../helpers/wait-for-render';
 
+/** One impostor atom on screen (Canvas3DPage.getImpostorAtomScreenPositions). */
+export interface ImpostorAtomPosition {
+  instance: number;
+  x: number;
+  y: number;
+  /** Distance from the camera along the view axis, in Å */
+  depth: number;
+  /** In Å */
+  radius: number;
+  /** On screen, in CSS pixels */
+  radiusPx: number;
+}
+
 /**
  * Page object for the 3D canvas/viewer area
  */
@@ -184,54 +197,75 @@ export class Canvas3DPage {
    * so getAtomScreenPosition finds nothing there. `nearest` is the on-screen atom
    * closest to the camera, which nothing covers. Null when there are no
    * impostors on screen, with no fallback click.
+   *
+   * `mesh` picks the structure: impostor meshes come in structure order, and the
+   * default is the last one. Per atom: `instance` (the atom index for a whole
+   * structure), `depth` and `radius` in Å along the view axis, and `radiusPx`,
+   * the sphere's radius on screen.
    */
-  async getImpostorAtomScreenPositions(): Promise<{
-    nearest: { x: number; y: number };
-    all: { x: number; y: number }[];
+  async getImpostorAtomScreenPositions(mesh?: number): Promise<{
+    nearest: ImpostorAtomPosition;
+    all: ImpostorAtomPosition[];
   } | null> {
-    return this.page.evaluate(() => {
-      interface Vec { set(x: number, y: number, z: number): Vec; applyMatrix4(m: unknown): Vec; project(c: unknown): Vec; x: number; y: number; z: number }
+    return this.page.evaluate((meshNumber) => {
+      interface Vec { set(x: number, y: number, z: number): Vec; applyMatrix4(m: unknown): Vec; clone(): Vec; x: number; y: number; z: number }
       interface ImpostorMesh {
         isInstancedMesh?: boolean;
         userData?: { exportAs?: string };
         count: number;
         instanceMatrix: { array: ArrayLike<number> };
+        geometry: { getAttribute(name: string): { array: ArrayLike<number> } | undefined };
         matrixWorld: unknown;
         position: { clone(): Vec };
       }
-      const win = window as unknown as { __mol3d_scene?: { traverse(cb: (o: unknown) => void): void }; __mol3d_camera?: unknown };
+      interface Camera { matrixWorldInverse: unknown; projectionMatrix: unknown }
+      const win = window as unknown as { __mol3d_scene?: { traverse(cb: (o: unknown) => void): void }; __mol3d_camera?: Camera };
       const canvas = document.querySelector('canvas');
-      if (!win.__mol3d_scene || !win.__mol3d_camera || !canvas) return null;
+      const camera = win.__mol3d_camera;
+      if (!win.__mol3d_scene || !camera || !canvas) return null;
 
-      let mesh: ImpostorMesh | null = null;
+      const meshes: ImpostorMesh[] = [];
       win.__mol3d_scene.traverse((o) => {
         const m = o as ImpostorMesh;
-        if (m.isInstancedMesh && m.userData?.exportAs === 'spheres') mesh = m;
+        if (m.isInstancedMesh && m.userData?.exportAs === 'spheres') meshes.push(m);
       });
-      const found = mesh as ImpostorMesh | null;
+      const found = meshes[meshNumber ?? meshes.length - 1];
       if (!found || found.count === 0) return null;
 
       // No THREE global in the page: a Vector3 cloned from the mesh does the math
-      const v = found.position.clone();
+      const center = found.position.clone();
       const rect = canvas.getBoundingClientRect();
       const array = found.instanceMatrix.array;
-      const all: { x: number; y: number }[] = [];
-      let nearest = { x: 0, y: 0 };
-      let nearestZ = Infinity;
+      const radii = found.geometry.getAttribute('instanceRadius')?.array;
+      const all: ImpostorAtomPosition[] = [];
+      let nearest: ImpostorAtomPosition | null = null;
       for (let i = 0; i < found.count; i++) {
-        // An instance's translation is elements 12-14 of its 4x4 matrix
-        v.set(array[i * 16 + 12], array[i * 16 + 13], array[i * 16 + 14]).applyMatrix4(found.matrixWorld).project(win.__mol3d_camera);
-        const point = { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((-v.y + 1) / 2) * rect.height };
-        all.push(point);
+        // An instance's translation is elements 12-14 of its 4x4 matrix, in view space here
+        center.set(array[i * 16 + 12], array[i * 16 + 13], array[i * 16 + 14])
+          .applyMatrix4(found.matrixWorld)
+          .applyMatrix4(camera.matrixWorldInverse);
+        const radius = radii?.[i] ?? 0;
+        // The centre moved by the radius sideways, projected: the radius on screen
+        const edge = center.clone();
+        edge.x += radius;
+        const depth = -center.z;
+        center.applyMatrix4(camera.projectionMatrix);
+        edge.applyMatrix4(camera.projectionMatrix);
+        const atom = {
+          instance: i,
+          x: rect.left + ((center.x + 1) / 2) * rect.width,
+          y: rect.top + ((-center.y + 1) / 2) * rect.height,
+          depth,
+          radius,
+          radiusPx: ((edge.x - center.x) / 2) * rect.width,
+        };
+        all.push(atom);
         // Framing can leave the closest corner off screen: only atoms well inside count
-        const onScreen = Math.abs(v.x) < 0.8 && Math.abs(v.y) < 0.8;
-        if (onScreen && v.z < nearestZ) {
-          nearestZ = v.z;
-          nearest = point;
-        }
+        const onScreen = Math.abs(center.x) < 0.8 && Math.abs(center.y) < 0.8;
+        if (onScreen && (!nearest || depth < nearest.depth)) nearest = atom;
       }
-      return nearestZ === Infinity ? null : { nearest, all };
-    });
+      return nearest ? { nearest, all } : null;
+    }, mesh);
   }
 
   /**
