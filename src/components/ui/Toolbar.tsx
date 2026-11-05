@@ -24,7 +24,7 @@ import { buildShareUrl, sourceToPath } from '../../utils/urlParams';
 import { viewerHandle } from '../../utils/viewerHandle';
 import { track } from '../../utils/track';
 import { showToast } from '../../utils/toast';
-import { calculateColorSchemeContext } from '../../utils/atomColor';
+import { hasBackboneData } from '../../utils/backboneExtraction';
 import { representationAvailability } from '../../utils/representationAvailability';
 import { isTouchScreen } from '../../utils/touch';
 import styles from './Toolbar.module.css';
@@ -119,7 +119,7 @@ export function Toolbar({
   // The sheet's Representation buttons use the same rule (utils/representationAvailability)
   const visible = activeStructure?.visible ?? true;
   const hasBackbone = useMemo(
-    () => (molecule ? calculateColorSchemeContext(molecule).hasBackboneData === true : false),
+    () => (molecule ? hasBackboneData(molecule) : false),
     [molecule]
   );
   const representationButtons = useMemo<ToolbarButton[]>(() => {

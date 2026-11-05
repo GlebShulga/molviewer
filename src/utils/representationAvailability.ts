@@ -1,5 +1,5 @@
 import type { ColorScheme, Molecule, RepresentationType } from '../types';
-import { calculateColorSchemeContext } from './atomColor';
+import { hasBackboneData } from './backboneExtraction';
 import { isTouchScreen } from './touch';
 
 /**
@@ -15,7 +15,7 @@ export interface Availability {
 export interface StructureFacts {
   visible: boolean;
   atomCount: number;
-  /** CA or P atoms, from calculateColorSchemeContext. */
+  /** CA or P atoms (hasBackboneData). */
   hasBackbone: boolean;
   /** A phone or tablet (isTouchScreen). */
   touch: boolean;
@@ -76,9 +76,9 @@ export function representationAvailability(rep: RepresentationType, facts: Struc
  * keys, the widget).
  */
 export function isTouchLimited(rep: RepresentationType, molecule: Molecule): boolean {
-  // The cheap checks first: the backbone check walks every atom
+  // The cheap checks first: the backbone check can walk every atom
   if (!overTouchLimit(rep, { touch: isTouchScreen(), atomCount: molecule.atoms.length, hasBackbone: true })) return false;
-  return calculateColorSchemeContext(molecule).hasBackboneData === true;
+  return hasBackboneData(molecule);
 }
 
 /** Why a link or session opened in Cartoon instead of the style it asked for. */
