@@ -1,6 +1,7 @@
 import type { Atom, Molecule } from '../types';
 import type { ColorScheme } from '../store/moleculeStore';
 import { UNIPROT_RE } from '../../site/identifiers';
+import { isBackboneAtom } from './backboneExtraction';
 import {
   getElementColor,
   getChainColor,
@@ -148,9 +149,8 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
     if (atom.secondaryStructure !== undefined) {
       hasSecondaryStructure = true;
     }
-    // Check for backbone atoms (CA for proteins, P for nucleic acids - needed for cartoon representation)
-    const atomName = atom.name?.trim().toUpperCase();
-    if ((atomName === 'CA' || atomName === 'P') && atom.residueNumber !== undefined) {
+    // An atom Cartoon can trace, by the same rule as hasBackboneData
+    if (!hasBackboneData && isBackboneAtom(atom)) {
       hasBackboneData = true;
     }
   }

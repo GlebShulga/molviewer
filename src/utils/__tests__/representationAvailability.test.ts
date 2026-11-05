@@ -92,6 +92,15 @@ describe('isStyleLimited', () => {
     expect(isStyleLimited('stick', chain(DESKTOP_ATOM_STYLE_LIMIT + 4, false))).toBe(false);
   });
 
+  it('does not limit a lipid system: its phosphorus is no backbone, so there is no Cartoon to show', () => {
+    stubTouch(false);
+    const atoms: Atom[] = Array.from({ length: DESKTOP_ATOM_STYLE_LIMIT + 4 }, (_, i) => ({
+      id: i, element: i % 4 === 0 ? 'P' : 'C', name: i % 4 === 0 ? 'P' : `C${i % 4}`, residueName: 'POPC',
+      residueNumber: Math.floor(i / 4) + 1, chainId: 'M', x: i, y: 0, z: 0,
+    }));
+    expect(isStyleLimited('ball-and-stick', { name: 'membrane', atoms, bonds: [] })).toBe(false);
+  });
+
   it('names the requested style and this device\'s limit in the fallback message', () => {
     stubTouch(true);
     expect(styleFallbackMessage('stick')).toBe('Showing Cartoon: Stick is limited to 1,000 atoms on touch screens');

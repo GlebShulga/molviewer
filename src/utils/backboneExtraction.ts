@@ -1,4 +1,4 @@
-import type { Molecule, SecondaryStructure } from '../types';
+import type { Atom, Molecule, SecondaryStructure } from '../types';
 
 export interface BackboneResidue {
   residueNumber: number;
@@ -127,12 +127,24 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
 }
 
 /**
- * Check if a molecule has backbone data suitable for cartoon representation.
- * Returns true if the molecule has CA atoms (proteins) or P atoms (nucleic acids).
+ * An atom Cartoon can trace: a protein's alpha carbon, or a nucleotide's
+ * phosphorus (as extractBackbone takes P only in nucleic acids). Not a lipid's
+ * P (POPC has one), and not a calcium ion, which PDB files also name CA; files
+ * without an element column give a protein's CA the element C (the parsers
+ * read it from the name).
+ */
+export function isBackboneAtom(atom: Atom): boolean {
+  if (atom.residueNumber === undefined) return false;
+  const name = atom.name?.trim().toUpperCase();
+  if (name === 'CA') return atom.element?.toUpperCase() === 'C';
+  if (name === 'P') return NUCLEIC_ACID_RESIDUES.has(atom.residueName?.toUpperCase() ?? '');
+  return false;
+}
+
+/**
+ * Check if a molecule has backbone data suitable for cartoon representation:
+ * any atom Cartoon can trace (isBackboneAtom). Stops at the first one.
  */
 export function hasBackboneData(molecule: Molecule): boolean {
-  return molecule.atoms.some(atom => {
-    const name = atom.name?.trim().toUpperCase();
-    return (name === 'CA' || name === 'P') && atom.residueNumber !== undefined;
-  });
+  return molecule.atoms.some(isBackboneAtom);
 }
