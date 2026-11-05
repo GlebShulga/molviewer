@@ -149,10 +149,9 @@ export interface ImpostorAtomsProps {
 const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
 
 /**
- * Threshold for automatic GPU picking activation. GPU picking currently finds
- * no atom (2026-11: bundled Chromium, and Chrome on Intel Iris Xe / D3D11), so
- * Spacefill's impostors from 2000 atoms keep CPU picking up to where impostors
- * started before (5000): hover, selection and the atom menu keep working there.
+ * Threshold for automatic GPU picking activation. Below it the raycast tests
+ * every atom's sphere on the CPU (Spacefill's impostors from 2000 atoms); from
+ * it, one GPU pick per pointer event replaces that O(n) loop.
  */
 const GPU_PICKING_THRESHOLD = 5000;
 
@@ -173,8 +172,6 @@ export function ImpostorAtoms({
 }: ImpostorAtomsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const pickingMeshRef = useRef<THREE.InstancedMesh>(null);
-  const pickingSceneRef = useRef<THREE.Scene | null>(null);
   const gpuPickerRef = useRef<GPUPickingManager | null>(null);
 
   const { gl, camera, size, invalidate } = useThree();
@@ -223,9 +220,6 @@ export function ImpostorAtoms({
   useEffect(() => {
     if (!shouldUseGPUPicking || !isWebGL2) return;
 
-    // Create picking scene
-    pickingSceneRef.current = new THREE.Scene();
-
     // Create GPU picker
     gpuPickerRef.current = new GPUPickingManager(gl, camera, {
       resolutionScale: 0.25,
@@ -235,7 +229,6 @@ export function ImpostorAtoms({
     return () => {
       gpuPickerRef.current?.dispose();
       gpuPickerRef.current = null;
-      pickingSceneRef.current = null;
     };
   }, [shouldUseGPUPicking, isWebGL2, gl, camera]);
 
@@ -258,6 +251,57 @@ export function ImpostorAtoms({
       depthWrite: true,
     });
   }, [shouldUseGPUPicking]);
+
+  // The picking copy of the mesh, alone in a scene of its own (so it needs no
+  // `visible={false}`, which the picking render would skip too). Built here,
+  // not in JSX: R3F rebuilds an element whose `args` change by reference, a
+  // fresh geometry.clone() on every hover re-render, and the rebuilt mesh would
+  // land in the main scene without the picking attributes.
+  const pickingScene = useMemo(() => new THREE.Scene(), []);
+  const pickingMesh = useMemo(() => {
+    if (!pickingMaterial) return null;
+    const mesh = new THREE.InstancedMesh(geometry.clone(), pickingMaterial, atomsData.length);
+    mesh.frustumCulled = false;
+    // Its matrix is the main mesh's world matrix, copied in raycast
+    mesh.matrixAutoUpdate = false;
+    return mesh;
+  }, [geometry, pickingMaterial, atomsData.length]);
+
+  useEffect(() => {
+    if (!pickingMesh) return;
+    pickingScene.add(pickingMesh);
+    return () => {
+      pickingScene.remove(pickingMesh);
+      pickingMesh.geometry.dispose();
+    };
+  }, [pickingScene, pickingMesh]);
+
+  // Whether the event being handled is part of an orbit or pan drag (a button
+  // held) or a wheel zoom: the camera moves and no tooltip is wanted there, and
+  // a GPU pick on each such event halved the frame rate (6,000 atoms, software
+  // GL). Pointer-down, -up, clicks and plain moves still pick. Capture on the
+  // canvas: it runs before R3F's listeners on its parent raycast.
+  const inGestureRef = useRef(false);
+  useEffect(() => {
+    if (!shouldUseGPUPicking) return;
+    const canvas = gl.domElement;
+    const onEvent = (event: Event) => {
+      inGestureRef.current = event.type === 'wheel' || (event.type === 'pointermove' && (event as PointerEvent).buttons !== 0);
+    };
+    const types = ['pointerdown', 'pointermove', 'pointerup', 'click', 'dblclick', 'contextmenu', 'wheel'];
+    for (const type of types) canvas.addEventListener(type, onEvent, { capture: true, passive: true });
+    return () => {
+      for (const type of types) canvas.removeEventListener(type, onEvent, { capture: true });
+    };
+  }, [shouldUseGPUPicking, gl]);
+
+  // The atoms' bounds (local space), so a ray off the structure costs no GPU pick
+  const bounds = useMemo(() => {
+    if (!shouldUseGPUPicking) return null;
+    const sphere = new THREE.Sphere().setFromPoints(atomsData.map((data) => data.position));
+    sphere.radius += atomsData.reduce((max, data) => Math.max(max, data.radius), 0);
+    return sphere;
+  }, [atomsData, shouldUseGPUPicking]);
 
   // Update instance matrices and attributes
   useEffect(() => {
@@ -312,13 +356,14 @@ export function ImpostorAtoms({
     if (hoveredAttr) hoveredAttr.needsUpdate = true;
 
     // Update picking mesh if using GPU picking
-    if (pickingMeshRef.current && shouldUseGPUPicking) {
-      atomsData.forEach((data, i) => {
-        dummy.position.copy(data.position);
-        dummy.updateMatrix();
-        pickingMeshRef.current!.setMatrixAt(i, dummy.matrix);
-      });
-      pickingMeshRef.current.instanceMatrix.needsUpdate = true;
+    if (pickingMesh) {
+      (pickingMesh.instanceMatrix.array as Float32Array).set(mesh.instanceMatrix.array);
+      pickingMesh.instanceMatrix.needsUpdate = true;
+      // Shared arrays; the attributes exist once the effect below has run
+      const pickingRadius = pickingMesh.geometry.getAttribute('instanceRadius');
+      const pickingIndex = pickingMesh.geometry.getAttribute('instanceIndex');
+      if (pickingRadius) pickingRadius.needsUpdate = true;
+      if (pickingIndex) pickingIndex.needsUpdate = true;
     }
 
     // Buffers changed outside React's props, so request a frame (demand rendering).
@@ -333,7 +378,7 @@ export function ImpostorAtoms({
     hoveredArray,
     indexArray,
     dummy,
-    shouldUseGPUPicking,
+    pickingMesh,
     invalidate,
   ]);
 
@@ -360,26 +405,13 @@ export function ImpostorAtoms({
 
   // Set up picking mesh attributes
   useEffect(() => {
-    if (!pickingMeshRef.current || !shouldUseGPUPicking) return;
-
-    const mesh = pickingMeshRef.current;
-    const geo = mesh.geometry;
+    if (!pickingMesh) return;
 
     // Add picking-specific attributes
+    const geo = pickingMesh.geometry;
     geo.setAttribute('instanceRadius', new THREE.InstancedBufferAttribute(radiusArray, 1));
     geo.setAttribute('instanceIndex', new THREE.InstancedBufferAttribute(indexArray, 1));
-
-    // Add picking mesh to picking scene
-    if (pickingSceneRef.current) {
-      pickingSceneRef.current.add(mesh);
-    }
-
-    return () => {
-      if (pickingSceneRef.current && mesh) {
-        pickingSceneRef.current.remove(mesh);
-      }
-    };
-  }, [radiusArray, indexArray, shouldUseGPUPicking]);
+  }, [pickingMesh, radiusArray, indexArray]);
 
   // Update projection matrix uniform each frame
   useFrame(() => {
@@ -388,29 +420,45 @@ export function ImpostorAtoms({
     }
   });
 
-  // GPU-based picking handler
-  const handleGPUPick = useCallback(
-    (clientX: number, clientY: number): number | null => {
-      if (!gpuPickerRef.current || !pickingSceneRef.current) return null;
-
-      const rect = gl.domElement.getBoundingClientRect();
-      return gpuPickerRef.current.pick(clientX, clientY, pickingSceneRef.current, rect);
-    },
-    [gl.domElement]
-  );
-
-  // Pointer events (R3F) raycast the mesh before any handler runs. Three's own
-  // test is against the billboards: 1 Å quads in the XY plane, which miss most
-  // of each sphere, and its cached bounding sphere can predate the instance
-  // positions, so every ray missed. Test the spheres, closest hit only. Below
-  // the GPU-picking threshold only: it runs on every pointer move, drags
-  // included, and larger structures keep three's test as before.
+  // Pointer events (R3F) raycast the mesh before any handler runs, and the
+  // handlers take the atom from the hit (event.instanceId). Three's own test is
+  // against the billboards: 1 Å quads in the XY plane, which miss most of each
+  // sphere, and its cached bounding sphere can predate the instance positions,
+  // so every ray missed. Test the spheres instead, closest hit only: one by one
+  // below the GPU-picking threshold, and above it with a GPU pick where the ray
+  // meets the screen. The CPU test runs on every pointer event over the
+  // structure, drags and wheel included; the GPU pick skips those (above).
   const raycast = useMemo(() => {
-    if (shouldUseGPUPicking) return THREE.InstancedMesh.prototype.raycast;
     const inverse = new THREE.Matrix4();
     const ray = new THREE.Ray();
     const sphere = new THREE.Sphere();
     const hit = new THREE.Vector3();
+    if (shouldUseGPUPicking) {
+      const ndc = new THREE.Vector3();
+      return function (this: THREE.InstancedMesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
+        const picker = gpuPickerRef.current;
+        if (!picker || !pickingMesh || !bounds || inGestureRef.current) return;
+        // Off the structure: no GPU work
+        sphere.copy(bounds).applyMatrix4(this.matrixWorld);
+        if (!raycaster.ray.intersectsSphere(sphere)) return;
+        // The picking copy takes this mesh's place: Side-by-Side moves each
+        // structure by its group. The picking render updates its matrixWorld.
+        pickingMesh.matrix.copy(this.matrixWorld);
+        pickingMesh.matrixWorldNeedsUpdate = true;
+        // A point along the ray, projected: not its origin, which is the camera
+        ndc.copy(raycaster.ray.origin).add(raycaster.ray.direction).project(camera);
+        const i = picker.pickNdc(ndc.x, ndc.y, pickingScene);
+        if (i === null || i >= atomsData.length) return;
+        // The hit on that atom's sphere orders structures nearest first (Overlay).
+        // The 1/4-resolution pick can land just outside it: then its nearest side.
+        sphere.set(atomsData[i].position, atomsData[i].radius).applyMatrix4(this.matrixWorld);
+        const distance = raycaster.ray.intersectSphere(sphere, hit)
+          ? raycaster.ray.origin.distanceTo(hit)
+          : raycaster.ray.origin.distanceTo(sphere.center) - sphere.radius;
+        const point = raycaster.ray.at(distance, new THREE.Vector3());
+        intersects.push({ distance, point, object: this, instanceId: i });
+      };
+    }
     return function (this: THREE.InstancedMesh, raycaster: THREE.Raycaster, intersects: THREE.Intersection[]) {
       inverse.copy(this.matrixWorld).invert();
       ray.copy(raycaster.ray).applyMatrix4(inverse);
@@ -425,19 +473,7 @@ export function ImpostorAtoms({
       }
       if (closest) intersects.push(closest);
     };
-  }, [atomsData, shouldUseGPUPicking]);
-
-  // The atom under the pointer. Below the GPU-picking threshold the raycast
-  // above already found it, in world space (so with the structure's offset).
-  const pickAtom = useCallback(
-    (event: ThreeEvent<MouseEvent>): number | null => {
-      if (shouldUseGPUPicking) {
-        return handleGPUPick(event.clientX, event.clientY);
-      }
-      return event.instanceId ?? null;
-    },
-    [shouldUseGPUPicking, handleGPUPick]
-  );
+  }, [atomsData, shouldUseGPUPicking, pickingMesh, pickingScene, bounds, camera]);
 
   // Pointer move handler
   const handlePointerMove = useCallback(
@@ -450,7 +486,7 @@ export function ImpostorAtoms({
       if (isTouchPointer(event)) return;
       const { clientX, clientY } = event;
 
-      const pickedIndex = pickAtom(event);
+      const pickedIndex = event.instanceId ?? null;
 
       if (pickedIndex !== null && pickedIndex >= 0 && pickedIndex < atomsData.length) {
         const data = atomsData[pickedIndex];
@@ -461,7 +497,7 @@ export function ImpostorAtoms({
         setHoveredAtom(null, null, null, null);
       }
     },
-    [atomsData, gl.domElement, measurementMode, setHoveredAtom, effectiveStructureId, pickAtom]
+    [atomsData, gl.domElement, measurementMode, setHoveredAtom, effectiveStructureId]
   );
 
   const handlePointerOut = useCallback(
@@ -479,7 +515,7 @@ export function ImpostorAtoms({
       event.stopPropagation(); // Only the nearest structure's atom is selected
       const { clientX, clientY } = event;
 
-      const pickedIndex = pickAtom(event);
+      const pickedIndex = event.instanceId ?? null;
 
       if (pickedIndex !== null && pickedIndex >= 0 && pickedIndex < atomsData.length) {
         const data = atomsData[pickedIndex];
@@ -489,14 +525,14 @@ export function ImpostorAtoms({
         }
       }
     },
-    [atomsData, selectAtom, setHoveredAtom, effectiveStructureId, pickAtom]
+    [atomsData, selectAtom, setHoveredAtom, effectiveStructureId]
   );
 
   // The atom menu (Focus, Measure From Here, Add Label, ...), as SelectableAtom
   // opens it for one mesh per atom. Long-press on Android fires contextmenu too.
   const handleContextMenu = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
-      const pickedIndex = pickAtom(event);
+      const pickedIndex = event.instanceId ?? null;
       if (pickedIndex === null || pickedIndex < 0 || pickedIndex >= atomsData.length) return;
       event.stopPropagation();
       event.nativeEvent.preventDefault();
@@ -511,7 +547,7 @@ export function ImpostorAtoms({
         residueNumber: atom.residueNumber,
       });
     },
-    [atomsData, effectiveStructureId, pickAtom, showContextMenu]
+    [atomsData, effectiveStructureId, showContextMenu]
   );
 
   if (!isWebGL2) {
@@ -543,16 +579,6 @@ export function ImpostorAtoms({
           side={THREE.DoubleSide}
         />
       </instancedMesh>
-
-      {/* Picking mesh (rendered to offscreen buffer, not visible) */}
-      {shouldUseGPUPicking && pickingMaterial && (
-        <instancedMesh
-          ref={pickingMeshRef}
-          args={[geometry.clone(), pickingMaterial, atomsData.length]}
-          visible={false}
-          frustumCulled={false}
-        />
-      )}
     </>
   );
 }

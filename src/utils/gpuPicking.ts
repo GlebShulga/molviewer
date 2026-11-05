@@ -13,7 +13,7 @@ import { IMPOSTOR_BILLBOARD_SCALE } from '../config/rendering';
  * @see https://threejs.org/examples/#webgl_interactive_cubes_gpu
  */
 
-/** Maximum atoms supported (24-bit color = 16.7M) */
+/** Maximum atoms supported (24-bit color = 16.7M, black is "no atom") */
 export const MAX_PICKABLE_ATOMS = 16777215;
 
 /** Encode atom index as RGB color (24-bit) */
@@ -83,8 +83,9 @@ export const pickingFragmentShader = /* glsl */ `
     float ndcDepth = clipPos.z / clipPos.w;
     gl_FragDepth = ndcDepth * 0.5 + 0.5;
 
-    // Encode index as RGB color
-    float idx = vIndex;
+    // Encode index + 1 as RGB color: black is the cleared background, so atom 0
+    // must not be black too. GPUPickingManager.pickNdc subtracts the 1 again.
+    float idx = vIndex + 1.0;
     float r = mod(idx, 256.0) / 255.0;
     float g = mod(floor(idx / 256.0), 256.0) / 255.0;
     float b = floor(idx / 65536.0) / 255.0;
@@ -107,8 +108,8 @@ export interface GPUPickingManagerOptions {
  * ```typescript
  * const picker = new GPUPickingManager(renderer, camera);
  *
- * // On mouse move (throttled internally)
- * const atomIndex = picker.pick(mouseX, mouseY, pickingScene);
+ * // At a point in NDC, e.g. where a raycast's ray meets the screen (throttled internally)
+ * const atomIndex = picker.pickNdc(ndcX, ndcY, pickingScene);
  * if (atomIndex !== null) {
  *   // Atom at index was hit
  * }
@@ -124,10 +125,11 @@ export class GPUPickingManager {
   private pixelBuffer: Uint8Array;
   private resolutionScale: number;
   private throttleMs: number;
-  private lastPickTime: number = 0;
+  private lastPickTime: number = -Infinity;
   private cachedResult: number | null = null;
-  private lastMouseX: number = -1;
-  private lastMouseY: number = -1;
+  private lastNdcX: number = NaN;
+  private lastNdcY: number = NaN;
+  private canvasSize = new THREE.Vector2();
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -166,46 +168,36 @@ export class GPUPickingManager {
   }
 
   /**
-   * Pick an atom at the given screen coordinates.
+   * Pick an atom at a point in normalized device coordinates (-1 to 1, y up).
    *
-   * @param mouseX - Mouse X in screen pixels
-   * @param mouseY - Mouse Y in screen pixels
+   * Throttled: within `throttleMs` of the last pick and less than 2 CSS pixels
+   * from it, the last result comes back without rendering.
+   *
+   * @param ndcX - X in NDC
+   * @param ndcY - Y in NDC
    * @param pickingScene - Scene containing picking meshes
-   * @param canvasRect - Canvas bounding rect
    * @returns Atom index or null if no atom hit
    */
-  pick(
-    mouseX: number,
-    mouseY: number,
-    pickingScene: THREE.Scene,
-    canvasRect: DOMRect
-  ): number | null {
+  pickNdc(ndcX: number, ndcY: number, pickingScene: THREE.Scene): number | null {
     const now = performance.now();
 
-    // Throttle picking updates
-    if (now - this.lastPickTime < this.throttleMs) {
-      // Return cached result if mouse hasn't moved significantly
-      if (
-        Math.abs(mouseX - this.lastMouseX) < 2 &&
-        Math.abs(mouseY - this.lastMouseY) < 2
-      ) {
-        return this.cachedResult;
-      }
+    // 2 CSS pixels in NDC, which spans 2 across the canvas
+    const canvas = this.renderer.getSize(this.canvasSize);
+    if (
+      now - this.lastPickTime < this.throttleMs &&
+      Math.abs(ndcX - this.lastNdcX) < (2 * 2) / canvas.x &&
+      Math.abs(ndcY - this.lastNdcY) < (2 * 2) / canvas.y
+    ) {
+      return this.cachedResult;
     }
 
     this.lastPickTime = now;
-    this.lastMouseX = mouseX;
-    this.lastMouseY = mouseY;
+    this.lastNdcX = ndcX;
+    this.lastNdcY = ndcY;
 
-    // Convert mouse position to picking buffer coordinates
-    const x = Math.floor(
-      ((mouseX - canvasRect.left) / canvasRect.width) *
-        this.pickingTarget.width
-    );
-    const y = Math.floor(
-      ((canvasRect.height - (mouseY - canvasRect.top)) / canvasRect.height) *
-        this.pickingTarget.height
-    );
+    // Convert to picking buffer coordinates (origin bottom-left, as NDC)
+    const x = Math.floor(((ndcX + 1) / 2) * this.pickingTarget.width);
+    const y = Math.floor(((ndcY + 1) / 2) * this.pickingTarget.height);
 
     // Clamp to buffer bounds
     if (
@@ -246,15 +238,10 @@ export class GPUPickingManager {
     // Decode color to index
     const [r, g, b, a] = this.pixelBuffer;
 
-    // Check for background (alpha = 0 or black)
-    if (a === 0 || (r === 0 && g === 0 && b === 0)) {
-      this.cachedResult = null;
-      return null;
-    }
-
-    const index = decodeColorToIndex(r, g, b);
-    this.cachedResult = index;
-    return index;
+    // Background (alpha = 0 or black). Atoms are drawn as index + 1.
+    const encoded = a === 0 ? 0 : decodeColorToIndex(r, g, b);
+    this.cachedResult = encoded === 0 ? null : encoded - 1;
+    return this.cachedResult;
   }
 
   /**
