@@ -123,7 +123,7 @@
   gap: 2px;
 }
 
-/* Mobile: < 768px - toolbar moves to bottom (keep in sync with MOBILE_BREAKPOINT in SpotlightTour.tsx) */
+/* Up to 768px - toolbar moves to bottom (the breakpoint of the drawer in App.module.css, the tour's phone steps in SpotlightTour.tsx and prefersDockedCards in utils/touch.ts) */
 @media (max-width: 768px) {
   .toolbarDock {
     top: auto;

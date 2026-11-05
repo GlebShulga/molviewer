@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { TOUR_STEPS } from './tourSteps';
 import styles from './SpotlightTour.module.css';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 interface SpotlightTourProps {
   step: number;
@@ -19,7 +20,6 @@ interface TargetRect {
 
 const PADDING = 8;
 const TOOLTIP_GAP = 12;
-const MOBILE_BREAKPOINT = 768;
 const TARGET_POLL_INTERVAL = 100;
 const TARGET_POLL_MAX_ATTEMPTS = 30; // 3 seconds
 
@@ -44,7 +44,8 @@ export function SpotlightTour({ step, onNext, onPrev, onSkip, setSidebarOpen }: 
   const stepIndex = step - 1;
   const currentStep = TOUR_STEPS[stepIndex];
   const isLastStep = step >= TOUR_STEPS.length;
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
+  // The toolbar's and the drawer's breakpoint (Toolbar.module.css, App.module.css)
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   // Save/restore focus
   useEffect(() => {

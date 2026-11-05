@@ -58,6 +58,36 @@ test.describe('Onboarding Tour', () => {
     await expect(page.locator('[data-onboarding="spotlight-tooltip"]')).not.toBeVisible();
   });
 
+  test('at exactly 768px the tour takes the phone path: the drawer, then the "More" menu', async ({ page }) => {
+    test.slow();
+    // The toolbar and the drawer switch at max-width: 768px, so 768 is a phone layout
+    await page.setViewportSize({ width: 768, height: 1024 });
+    const viewer = new MoleculeViewerPage(page);
+    await viewer.goto({ keepWelcome: true });
+    await page.getByRole('button', { name: 'Get Started' }).click({ force: true });
+    await waitForMoleculeLoaded(page, 60000);
+
+    // Step 1 points into the drawer, so it opens it
+    await expect(page.getByText('1 of 4')).toBeVisible();
+    await expect(page.locator('aside')).toBeInViewport();
+
+    for (const next of ['2 of 4', '3 of 4', '4 of 4']) {
+      await page.getByRole('button', { name: 'Next' }).click({ force: true });
+      await page.waitForTimeout(400);
+      await expect(page.getByText(next)).toBeVisible();
+    }
+
+    // Step 4: the phone text, around the "More" button
+    await expect(page.getByText('are in the ⋯ menu')).toBeVisible();
+    const more = (await page.getByRole('button', { name: 'More', exact: true }).boundingBox())!;
+    const ring = (await page.locator('[class*="spotlightRing"]').boundingBox())!;
+    const center = { x: more.x + more.width / 2, y: more.y + more.height / 2 };
+    expect(center.x).toBeGreaterThan(ring.x);
+    expect(center.x).toBeLessThan(ring.x + ring.width);
+    expect(center.y).toBeGreaterThan(ring.y);
+    expect(center.y).toBeLessThan(ring.y + ring.height);
+  });
+
   test('Skip button dismisses tour and sets flag', async ({ page }) => {
     test.slow();
     const viewer = new MoleculeViewerPage(page);
