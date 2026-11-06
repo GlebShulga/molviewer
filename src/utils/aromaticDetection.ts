@@ -94,9 +94,10 @@ function otherAtom(bond: Bond, atom: number): number {
  * 1. a double (or flagged) bond to a ring partner, meaning an atom of this
  *    ring or of a fused ring already found aromatic: 1
  * 2. any other double bond (C=O, exocyclic C=C, S(=O)2): 0
- * 3. N, O or S, or any atom with a -1 formal charge (the carbanion of
- *    cyclopentadienide), with single bonds only (lone pair): 2
- * 4. a carbon with single bonds only: the ring is not aromatic.
+ * 3. N, O or S without a positive charge, or any atom with a -1 formal charge
+ *    (the carbanion of cyclopentadienide), with single bonds only (lone pair): 2
+ * 4. any other atom with single bonds only (a neutral carbon, a quaternary N+,
+ *    a carbocation): the ring is not aromatic.
  * The ring is aromatic when the total is exactly 6. Counting aromatic fused
  * partners lets either Kekulé form of naphthalene or indole pass for both
  * rings, while an o-quinoid ring next to a non-aromatic one (2H-indene) fails.
@@ -105,6 +106,9 @@ function otherAtom(bond: Bond, atom: number): number {
  * convention for ferrocene, CID 10219726) or as anions without their charge
  * are not marked, since such a ring has 5 π electrons as drawn. Loosening
  * rule 4 to catch them would mark cyclopentadiene and cyclohexadienes again.
+ *
+ * Only 5- and 6-membered rings are candidates, so azulene's five-ring is not
+ * marked either: the double bond into its seven-ring counts 0 here.
  */
 function isAromaticRing(
   ring: RingCandidate,
@@ -126,7 +130,10 @@ function isAromaticRing(
       electrons += 1;
     } else if (own.some(b => b.order === 2)) {
       // A double bond out of the ring system gives this ring no π electrons
-    } else if (atoms[idx].element !== 'C' || atoms[idx].formalCharge === -1) {
+    } else if (
+      atoms[idx].formalCharge === -1 ||
+      (atoms[idx].element !== 'C' && (atoms[idx].formalCharge ?? 0) <= 0)
+    ) {
       electrons += 2;
     } else {
       return false;

@@ -220,6 +220,23 @@ describe('detectAromaticRings', () => {
       expect(ringSets(cp)).toEqual([[0, 1, 2, 3, 4]]);
     });
 
+    it('a positive atom with single bonds only is not aromatic (N,N-dimethylpyrrolium)', () => {
+      // Quaternary N+ has no lone pair
+      const m = ring(['N', 'C', 'C', 'C', 'C'], [1, 2, 1, 2, 1], {
+        elements: ['C', 'C'],
+        bonds: [[0, 5, 1], [0, 6, 1]],
+      });
+      expect(ringSets(m)).toHaveLength(1);
+      m.atoms[0].formalCharge = 1;
+      expect(ringSets(m)).toEqual([]);
+    });
+
+    it('pyridinium drawn with N+=C stays aromatic', () => {
+      const m = ring(['N', 'C', 'C', 'C', 'C', 'C'], [2, 1, 2, 1, 2, 1], { elements: ['C'], bonds: [[0, 6, 1]] });
+      m.atoms[0].formalCharge = 1;
+      expect(ringSets(m)).toEqual([[0, 1, 2, 3, 4, 5]]);
+    });
+
     it('a -1 charge does not override a double bond on the same atom', () => {
       // C1(-)=C2: still rule 1, 1 electron; the ring stays at 5 with the CH2 at 4 failing
       const m = ring(['C', 'C', 'C', 'C', 'C'], [2, 1, 2, 1, 1]);
