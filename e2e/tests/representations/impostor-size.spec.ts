@@ -19,6 +19,9 @@ const CASES = [
   { representation: 'stick', residues: 1250, spacing: 0.5 },
 ] as const;
 
+/** Building the mesh for thousands of atoms takes CI's software WebGL more than the default 5 s. */
+const MESH_TIMEOUT = 20_000;
+
 for (const { representation, residues, spacing } of CASES) {
   test(`${representation} impostors (${(residues * 4).toLocaleString('en-US')} atoms) are drawn at the atom's full radius`, async ({ page }) => {
     test.slow();
@@ -31,7 +34,7 @@ for (const { representation, residues, spacing } of CASES) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__mol3d_store.getState().setStructureRepresentation(id, representation);
     }, { id, representation });
-    await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions())?.all.length ?? 0).toBe(residues * 4);
+    await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions())?.all.length ?? 0, { timeout: MESH_TIMEOUT }).toBe(residues * 4);
     await page.waitForTimeout(500); // Let the camera settle after framing
 
     const { all } = (await viewer.canvas.getImpostorAtomScreenPositions())!;

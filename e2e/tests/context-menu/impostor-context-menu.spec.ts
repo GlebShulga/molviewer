@@ -8,6 +8,10 @@ import type { ImpostorAtomPosition } from '../../page-objects/Canvas3D';
  * Spacefill draws impostors from 2000 atoms (no mesh per atom), and the atom
  * menu comes from picking on the impostor mesh (ImpostorAtoms).
  */
+
+/** Building the mesh for thousands of atoms takes CI's software WebGL more than the default 5 s. */
+const MESH_TIMEOUT = 20_000;
+
 test('right-click on an atom of a 2,400-atom Spacefill structure opens the atom menu', async ({ page }) => {
   test.slow();
   const viewer = new MoleculeViewerPage(page);
@@ -19,7 +23,7 @@ test('right-click on an atom of a 2,400-atom Spacefill structure opens the atom 
   }, id);
 
   // 1. The impostor path is on: the impostor mesh, and no sphere meshes
-  await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions())?.all.length ?? 0).toBe(2400);
+  await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions())?.all.length ?? 0, { timeout: MESH_TIMEOUT }).toBe(2400);
   expect(await viewer.canvas.getAtomScreenPosition(0)).toBeNull();
   await page.waitForTimeout(500); // Let the camera settle after framing
 
@@ -88,7 +92,7 @@ async function spacefillStructures(
     for (const id of ids) state.setStructureRepresentation(id, 'spacefill');
   }, { ids, layout });
   for (let mesh = 0; mesh < ids.length; mesh++) {
-    await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions(mesh))?.all.length ?? 0).toBe(residues * 4);
+    await expect.poll(async () => (await viewer.canvas.getImpostorAtomScreenPositions(mesh))?.all.length ?? 0, { timeout: MESH_TIMEOUT }).toBe(residues * 4);
   }
   await page.waitForTimeout(500); // Let the camera settle after framing
   return { viewer, ids };
