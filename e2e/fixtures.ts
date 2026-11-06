@@ -2,6 +2,18 @@ import { test as base } from '@playwright/test';
 
 // Custom test fixture with one-time storage clearing
 export const test = base.extend({
+  // CI runs these tests against production (BASE_URL): keep them out of its
+  // analytics, both Cloudflare Web Analytics and the product events. Answered
+  // rather than aborted: an aborted request logs a console error, and some
+  // tests fail on those.
+  context: async ({ context }, use) => {
+    await context.route(/cloudflareinsights\.com/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+    );
+    await context.route('**/api/event', (route) => route.fulfill({ status: 204 }));
+    await use(context);
+  },
+
   // Override page fixture to clear storage once at start
   page: async ({ page }, use) => {
     // Add init script that clears storage ONCE using a sessionStorage flag

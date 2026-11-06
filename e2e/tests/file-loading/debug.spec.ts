@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test } from '../../fixtures';
 
 test('[DB-01] debug: capture console errors on load', async ({ page }) => {
   // Capture all console messages
