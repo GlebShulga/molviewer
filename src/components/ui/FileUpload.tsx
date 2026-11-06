@@ -9,7 +9,7 @@ import { decompressGzip } from '../../utils/decompressGzip';
 import type { Molecule, StructureSource } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/errorReporter';
-import { track, entryKind } from '../../utils/track';
+import { track, entryKind, roundAtoms } from '../../utils/track';
 import { loadStructureFromSource, resolvePubchemCid } from '../../utils/structureLoader';
 import { slugForCid } from '../../../site/compoundSlugs';
 import { UNIPROT_RE } from '../../../site/identifiers';
@@ -115,7 +115,7 @@ export function FileUpload() {
       const inlineSource: StructureSource | undefined =
         inlineFormat ? { type: 'inline', format: inlineFormat, data: content } : undefined;
       loadMolecule(molecule, name, inlineSource);
-      track('structure_loaded', { source: 'file', entry: entryKind() });
+      track('structure_loaded', { source: 'file', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to parse file'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.handleFile' });
@@ -166,9 +166,10 @@ export function FileUpload() {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      let molecule: Molecule;
       if (isRcsb) {
         const pdbId = sample.file.slice(5); // strip 'rcsb:'
-        const { molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal);
+        ({ molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal));
         loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId });
       } else {
         const response = await fetch(sample.file, { signal: controller.signal });
@@ -176,7 +177,7 @@ export function FileUpload() {
           throw new Error('Failed to load sample molecule');
         }
         const content = await response.text();
-        const molecule = parseFile(content, sample.file);
+        molecule = parseFile(content, sample.file);
         const inlineFormat = detectInlineFormat(sample.file);
         const sampleSource: StructureSource | undefined = sample.pdbId
           ? { type: 'rcsb', id: sample.pdbId }
@@ -185,7 +186,7 @@ export function FileUpload() {
             : undefined;
         loadMolecule(molecule, sample.name, sampleSource);
       }
-      track('structure_loaded', { source: 'sample', entry: entryKind() });
+      track('structure_loaded', { source: 'sample', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load sample', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.loadSample' });
@@ -223,7 +224,7 @@ export function FileUpload() {
       const source = { type: 'rcsb', id: trimmedId } as const;
       const { molecule } = await loadStructureFromSource(source, controller.signal);
       loadMolecule(molecule, trimmedId, source);
-      track('structure_loaded', { source: 'rcsb', entry: entryKind() });
+      track('structure_loaded', { source: 'rcsb', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setPdbId(''); // Clear input on success
     } catch (err) {
       setError(getErrorMessage(
@@ -270,7 +271,7 @@ export function FileUpload() {
       const source = { type: 'alphafold', id: trimmedId } as const;
       const { molecule, name } = await loadStructureFromSource(source, controller.signal);
       loadMolecule(molecule, name, source);
-      track('structure_loaded', { source: 'af', entry: entryKind() });
+      track('structure_loaded', { source: 'af', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setUniprotId(''); // Clear input on success
     } catch (err) {
       setError(getErrorMessage(
@@ -314,7 +315,7 @@ export function FileUpload() {
       const source = { type: 'pubchem', cid, slug: slugForCid(cid) } as const;
       const { molecule, name, warning } = await loadStructureFromSource(source, controller.signal);
       loadMolecule(molecule, name, source);
-      track('structure_loaded', { source: 'pubchem', entry: entryKind() });
+      track('structure_loaded', { source: 'pubchem', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setCompoundQuery('');
       // Loading clears errors; show the 2D notice after the structure is in.
       if (warning) setError(warning);

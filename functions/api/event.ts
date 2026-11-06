@@ -9,7 +9,7 @@
  *   blob2.. = STRING_FIELDS in order (source, entry, format, kind, ref, value)
  *   blob8   = page kind (home, pdb, af, compound, share, embed, other)
  *   blob9   = country (from Cloudflare)
- *   double1.. = NUMBER_FIELDS in order (scale, seconds)
+ *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms)
  */
 import { isEventName, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
 

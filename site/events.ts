@@ -18,6 +18,10 @@ export const EVENT_NAMES = [
   'embed_view',
   'representation_changed',
   'measurement_added',
+  // A 3D label added from the atom menu; value: the structure's style.
+  'label_added',
+  // The atom menu opened (right-click on an atom); value: the structure's style.
+  'atom_menu_opened',
   'onboarding_completed',
   // The chat app widget (src/widget). The MCP server writes its own
   // `mcp_tool_call` points straight to the dataset (workers/mcp/src/analytics.ts).
@@ -33,8 +37,12 @@ export type EventName = (typeof EVENT_NAMES)[number];
  */
 export const STRING_FIELDS = ['source', 'entry', 'format', 'kind', 'ref', 'value'] as const;
 
-/** Numeric fields, stored as doubles in this order. */
-export const NUMBER_FIELDS = ['scale', 'seconds'] as const;
+/**
+ * Numeric fields, stored as doubles in this order. New fields go at the end so
+ * the columns of older ones don't move. `atoms`: the structure's atom count to
+ * two significant figures (roundAtoms in src/utils/track.ts).
+ */
+export const NUMBER_FIELDS = ['scale', 'seconds', 'atoms'] as const;
 
 export type EventProps = Partial<
   Record<(typeof STRING_FIELDS)[number], string> & Record<(typeof NUMBER_FIELDS)[number], number>

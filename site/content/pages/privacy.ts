@@ -3,7 +3,7 @@ import type { ContentPage } from '../types';
 export const page: ContentPage = {
   path: '/privacy',
   kind: 'legal',
-  updated: '2026-10-13',
+  updated: '2026-11-06',
   title: 'Privacy policy | MolViewer',
   description:
     'What MolViewer collects on molviewer.bio and in its ChatGPT and Claude app: anonymous usage counts, no accounts, no tracking cookies, and no sale of data.',
@@ -19,7 +19,7 @@ export const page: ContentPage = {
         `<li><strong>Files you open</strong> from your computer are processed on your device and never uploaded, unless you create a share link for a scene that includes a small local file. That file is then stored with the link.</li>` +
         `<li><strong>Share links</strong> (/s/...) store the scene you chose to share (structure references, view settings, measurements and labels) for one year.</li>` +
         `<li><strong>Saved sessions and preferences</strong> stay in your browser's local storage and never leave your device.</li>` +
-        `<li><strong>Analytics:</strong> Cloudflare Web Analytics counts page views without cookies or personal profiles. MolViewer also records anonymous product events, such as "a structure was loaded from PubChem" or "a PNG was exported", with the page type and the country Cloudflare derives from the request. No IP address, cookie, account or device identifier is stored with them.</li>` +
+        `<li><strong>Analytics:</strong> Cloudflare Web Analytics counts page views without cookies or personal profiles. MolViewer also records anonymous product events, such as "a structure was loaded from PubChem" or "a PNG was exported", with the page type, the country Cloudflare derives from the request and, for some events, the structure's approximate atom count (rounded, for example 4,800). No IP address, cookie, account or device identifier is stored with them.</li>` +
         `<li><strong>Error reports:</strong> if the app hits an error, a short report (the message, the page address and your browser version) is sent to New Relic so the bug can be fixed.</li>` +
         `</ul>`,
     },

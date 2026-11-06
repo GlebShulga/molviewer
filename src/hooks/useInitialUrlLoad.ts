@@ -15,7 +15,7 @@ import { getInitialUrlLoad, parseViewParams, type UrlMoleculeParams } from '../u
 import { loadSharedSession, deserializeShareableSession } from '../utils/shareSession';
 import { loadStructureFromSource, resolvePubchemCid } from '../utils/structureLoader';
 import { cidForSlug, slugForCid } from '../../site/compoundSlugs';
-import { entryKind, track } from '../utils/track';
+import { entryKind, roundAtoms, track } from '../utils/track';
 import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
 import { showToast } from '../utils/toast';
 import type { StructureSource } from '../types';
@@ -68,7 +68,12 @@ export async function loadStructureFromParams(
   if (signal.aborted) return { structId: null, source, warning };
 
   const structId = store.addStructure(molecule, name, source);
-  track('structure_loaded', { source: trackSource(source), entry: entryKind(), ...(via ? { value: via } : {}) });
+  track('structure_loaded', {
+    source: trackSource(source),
+    entry: entryKind(),
+    atoms: roundAtoms(molecule.atoms.length),
+    ...(via ? { value: via } : {}),
+  });
   return { structId, source, warning };
 }
 
@@ -107,7 +112,9 @@ export function useInitialUrlLoad(): void {
           if (deserialized.skipped.length) {
             store().setError(`Some structures in this share could not be restored: ${deserialized.skipped.join(', ')}`);
           }
-          track('structure_loaded', { source: 'share', entry: entryKind() });
+          // One event per share; its size is the largest structure in it
+          const atoms = Math.max(0, ...deserialized.structures.map((s) => s.molecule.atoms.length));
+          track('structure_loaded', { source: 'share', entry: entryKind(), atoms: roundAtoms(atoms) });
         } catch (err) {
           if (signal.aborted) return;
           store().setError(err instanceof Error ? err.message : 'Failed to load shared session');

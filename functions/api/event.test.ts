@@ -17,6 +17,12 @@ describe('/api/event', () => {
     expect(points).toHaveLength(1);
   });
 
+  it('stores the numeric fields in order, atoms third', async () => {
+    const { res, points } = post(JSON.stringify({ e: 'representation_changed', p: { value: 'spacefill', atoms: 4800 } }));
+    await res;
+    expect((points[0] as { doubles: number[] }).doubles).toEqual([0, 0, 4800]);
+  });
+
   it('rejects unknown events', async () => {
     expect((await post(JSON.stringify({ e: 'nope' })).res).status).toBe(400);
   });

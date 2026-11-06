@@ -155,11 +155,11 @@ const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
  *
  * Open question (parked 2026-11-05): whether picking on structures this large
  * is used at all (hover, click to measure, the atom menu in Spacefill, Ball &
- * Stick or Stick). Analytics can't tell yet: `representation_changed` and
- * `measurement_added` (utils/track.ts) carry no structure size. Add a size
- * bucket to them before deciding to keep the GPU path, or to replace it with
- * the CPU loop for every size (likely a few ms per event even at 100k atoms,
- * not measured).
+ * Stick or Stick). `scripts/query-events.ts --styles` counts style switches,
+ * measurements, labels and atom menus per 100 loads by structure size; decide
+ * from it whether to keep the GPU path or to replace it with the CPU loop for
+ * every size (likely a few ms per event even at 100k atoms, not measured).
+ * Hover isn't counted: it fires on every mouse move.
  */
 const GPU_PICKING_THRESHOLD = 5000;
 

@@ -21,7 +21,7 @@ import { detectAromaticRings } from '../utils/aromaticDetection';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
-import { track } from '../utils/track';
+import { roundAtoms, track } from '../utils/track';
 import { showToast } from '../utils/toast';
 import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
 import { AROMATIC_DETECTION_THRESHOLD } from '../config';
@@ -119,6 +119,12 @@ const POLYMER_COMPONENTS = new Set<MoleculeComponentType>(['protein', 'dna', 'rn
 const CHAIN_SCHEMES = new Set<ColorScheme>(['secondaryStructure', 'rainbow']);
 
 const isSurfaceRepresentation = (rep: RepresentationType) => rep === 'surface-vdw' || rep === 'surface-sas';
+
+/** A structure's style and rounded size, for the events of actions done on it. */
+const styleProps = (structure: Structure) => ({
+  value: structure.representation,
+  atoms: roundAtoms(structure.molecule.atoms.length),
+});
 
 /**
  * The structure in a new style. Multi-component structures (protein + ligands,
@@ -786,11 +792,12 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   setRepresentation: (representation) => {
-    const { activeStructureId } = get();
-    if (activeStructureId) {
-      get().setStructureRepresentation(activeStructureId, representation);
-      track('representation_changed', { value: representation });
-    }
+    const { activeStructureId, structures } = get();
+    const structure = activeStructureId ? structures.get(activeStructureId) : undefined;
+    // A click on the style already shown changes nothing and isn't counted
+    if (!structure || structure.representation === representation) return;
+    get().setStructureRepresentation(structure.id, representation);
+    track('representation_changed', { value: representation, atoms: roundAtoms(structure.molecule.atoms.length) });
   },
 
   setColorScheme: (colorScheme) => {
@@ -848,7 +855,7 @@ export const useMoleculeStore = create<MoleculeState>()(
           measurements: [...get().measurements, measurement],
           selectedAtoms: [],
         });
-        track('measurement_added', { kind: measurementMode });
+        track('measurement_added', { kind: measurementMode, ...styleProps(structure) });
       }
     } else {
       set({ selectedAtoms: newSelection });
@@ -1196,6 +1203,10 @@ export const useMoleculeStore = create<MoleculeState>()(
         ...state,
       },
     });
+    const { structures, activeStructureId } = get();
+    const structureId = state.structureId ?? activeStructureId;
+    const structure = structureId ? structures.get(structureId) : undefined;
+    if (structure && state.atomIndex !== null) track('atom_menu_opened', styleProps(structure));
   },
 
   hideContextMenu: () => {
@@ -1215,6 +1226,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     set({
       labels: [...get().labels, { id, structureId, atomIndex, text }],
     });
+    const structure = get().structures.get(structureId);
+    if (structure) track('label_added', styleProps(structure));
   },
 
   removeLabel: (id) => {

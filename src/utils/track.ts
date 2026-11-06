@@ -18,6 +18,16 @@ export function entryKind(): 'landing' | 'share' | 'embed' | 'home' {
 }
 
 /**
+ * A structure's atom count to two significant figures (4,782 -> 4,800): enough
+ * to tell a ligand from a large protein, too coarse to recognise someone's file.
+ */
+export function roundAtoms(count: number): number {
+  if (!(count > 0)) return 0;
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(count)) - 1);
+  return Math.round(count / step) * step;
+}
+
+/**
  * Where events go. The chat widget runs on the host's sandbox origin, so it
  * sets an absolute endpoint and its own page kind (src/widget/main.tsx).
  */
