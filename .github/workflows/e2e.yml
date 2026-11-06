@@ -33,6 +33,8 @@ jobs:
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium webkit
+        # Usually 1-2 minutes; an apt mirror stall once held it for the whole job timeout
+        timeout-minutes: 10
 
       - name: Run E2E tests (shard ${{ matrix.shard }}/3)
         run: pnpm test:e2e --shard=${{ matrix.shard }}/3
