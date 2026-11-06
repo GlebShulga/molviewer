@@ -989,36 +989,37 @@ export const useMoleculeStore = create<MoleculeState>()(
     // Async: entries of 50,000+ atoms live in IndexedDB, which the
     // synchronous loader can't read
     const data = await loadMoleculeAsync(id);
-    if (data) {
-      // Use setMolecule to clear and load single structure. Stored rings are
-      // dropped so they are detected again, as for a session.
-      get().setMolecule({ ...data.molecule, aromaticRings: undefined });
-      // Then restore measurements. A saved molecule is one structure with a new
-      // ID, so every ref points at it. Old saves carry only atomIndices; a
-      // measurement that spanned several structures lost the others and is dropped.
-      // Older saves also kept measurements taken on other structures: those
-      // would land on unrelated atoms, so a measurement is kept only if its
-      // stored value matches these atoms.
-      const { activeStructureId } = get();
-      if (activeStructureId && data.measurements.length > 0) {
-        const { structures } = get();
-        const migratedMeasurements = data.measurements
-          .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
-          .map(m => ({
-            ...m,
-            atomRefs: (m.atomRefs?.map(ref => ref.atomIndex) ?? m.atomIndices).map(idx => ({
-              structureId: activeStructureId,
-              atomIndex: idx,
-            })),
-          }))
-          .filter(m => matchesStoredValue(m, structures));
-        set({
-          measurements: refreshDihedrals(migratedMeasurements, structures),
-          loadedMoleculeId: id,
-        });
-      } else {
-        set({ loadedMoleculeId: id });
-      }
+    // The storage loaders log a failed read and return null; tell the user
+    if (!data) throw new Error('This saved molecule could not be read.');
+
+    // Use setMolecule to clear and load single structure. Stored rings are
+    // dropped so they are detected again, as for a session.
+    get().setMolecule({ ...data.molecule, aromaticRings: undefined });
+    // Then restore measurements. A saved molecule is one structure with a new
+    // ID, so every ref points at it. Old saves carry only atomIndices; a
+    // measurement that spanned several structures lost the others and is dropped.
+    // Older saves also kept measurements taken on other structures: those
+    // would land on unrelated atoms, so a measurement is kept only if its
+    // stored value matches these atoms.
+    const { activeStructureId } = get();
+    if (activeStructureId && data.measurements.length > 0) {
+      const { structures } = get();
+      const migratedMeasurements = data.measurements
+        .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
+        .map(m => ({
+          ...m,
+          atomRefs: (m.atomRefs?.map(ref => ref.atomIndex) ?? m.atomIndices).map(idx => ({
+            structureId: activeStructureId,
+            atomIndex: idx,
+          })),
+        }))
+        .filter(m => matchesStoredValue(m, structures));
+      set({
+        measurements: refreshDihedrals(migratedMeasurements, structures),
+        loadedMoleculeId: id,
+      });
+    } else {
+      set({ loadedMoleculeId: id });
     }
   },
 
@@ -1127,7 +1128,8 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   loadSavedSession: async (id) => {
     const session = await loadSessionAsync(id);
-    if (!session) return null;
+    // The storage loaders log a failed read and return null; tell the user
+    if (!session) throw new Error('This saved session could not be read.');
     const camera = get().loadSession(session);
     set({ loadedMoleculeId: id });
     return camera;
