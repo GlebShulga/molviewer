@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,6 +15,28 @@ export interface SelectableAtomProps {
   selected?: boolean;
   /** Structure ID for multi-structure support. Falls back to active structure if not provided. */
   structureId?: string;
+  /** Sphere tessellation. Defaults to 32x16. */
+  segments?: { width: number; height: number };
+}
+
+const DEFAULT_SEGMENTS = { width: 32, height: 16 } as const;
+
+/**
+ * Unit-radius spheres shared by every atom, one per segment count; each atom
+ * scales its mesh to its radius. One geometry per atom cost a 32x16 sphere per
+ * atom (4.5M triangles on 4HHB) and leaked them all, as R3F never disposes a
+ * geometry passed as a prop. The few shared ones live for the session.
+ */
+const unitSpheres = new Map<string, THREE.SphereGeometry>();
+
+export function getUnitSphere(widthSegments: number, heightSegments: number): THREE.SphereGeometry {
+  const key = `${widthSegments}x${heightSegments}`;
+  let geometry = unitSpheres.get(key);
+  if (!geometry) {
+    geometry = new THREE.SphereGeometry(1, widthSegments, heightSegments);
+    unitSpheres.set(key, geometry);
+  }
+  return geometry;
 }
 
 const EMISSIVE_SELECTED = new THREE.Color(0x44aaff);
@@ -29,6 +51,7 @@ export function SelectableAtom({
   color,
   selected = false,
   structureId,
+  segments = DEFAULT_SEGMENTS,
 }: SelectableAtomProps) {
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
   const [hovered, setHovered] = useState(false);
@@ -106,12 +129,12 @@ export function SelectableAtom({
     });
   }, [atom, atomIndex, effectiveStructureId, showContextMenu]);
 
-  // Memoize geometry to avoid recreation
-  const geometry = useMemo(() => new THREE.SphereGeometry(radius, 32, 16), [radius]);
+  const geometry = getUnitSphere(segments.width, segments.height);
 
   return (
     <mesh
       position={position}
+      scale={radius}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
       onClick={handleClick}

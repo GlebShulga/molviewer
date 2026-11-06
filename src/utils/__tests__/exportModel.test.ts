@@ -231,6 +231,23 @@ describe('buildExportScene', () => {
   });
 });
 
+describe('buildExportScene with shared unit-sphere atoms', () => {
+  it('exports a scaled unit sphere at the scaled radius', () => {
+    const scene = new THREE.Scene();
+    const atom = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.MeshStandardMaterial());
+    atom.position.set(5, 0, 0);
+    atom.scale.setScalar(1.7);
+    scene.add(atom);
+    const { group, sphereCount } = buildExportScene(scene, { center: false });
+    expect(sphereCount).toBe(1);
+    const mesh = group.children[0] as THREE.Mesh;
+    mesh.geometry.computeBoundingBox();
+    const box = mesh.geometry.boundingBox!;
+    expect(box.max.x).toBeCloseTo(6.7, 3);
+    expect(box.min.x).toBeCloseTo(3.3, 3);
+  });
+});
+
 describe('buildExportScene with InstancedBonds meshes', () => {
   const bondGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
   const vertsPerBond = bondGeometry.getAttribute('position').count;

@@ -5,7 +5,7 @@ import { getVdwRadius } from "../../constants";
 import { useMoleculeStore, type ColorScheme } from "../../store/moleculeStore";
 import { selectDetectAromaticRingsIfNeeded } from "../../store/selectors";
 import { useRepresentationSetup } from "../../hooks";
-import { SCALES, COLORS, getQualityPreset } from "../../config";
+import { SCALES, COLORS, getQualityPreset, PERFORMANCE_THRESHOLDS } from "../../config";
 import { getAtomColor } from "../../utils";
 import { SelectableAtom } from "./SelectableAtom";
 import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
@@ -88,6 +88,9 @@ export function BallAndStick({
     [molecule.atoms.length]
   );
   const useImpostors = qualityPreset.useImpostors;
+  // Fewer sphere segments only from 2,000 atoms (16x8); smaller structures keep 32x16
+  const atomSegments =
+    molecule.atoms.length >= PERFORMANCE_THRESHOLDS.medium ? qualityPreset.sphereSegments : undefined;
 
   // Atom data for SelectableAtom (tuple positions)
   const atomsData = useMemo<AtomRenderData[]>(() => {
@@ -171,6 +174,7 @@ export function BallAndStick({
             radius={atomData.radius}
             color={atomData.color}
             selected={selectedAtomIndices.includes(atomData.index)}
+            segments={atomSegments}
             structureId={effectiveStructureId}
           />
         ))

@@ -4,7 +4,13 @@ import type { Molecule, Atom } from "../../types";
 import { useMoleculeStore, type ColorScheme } from "../../store/moleculeStore";
 import { selectDetectAromaticRingsIfNeeded } from "../../store/selectors";
 import { useRepresentationSetup } from "../../hooks";
-import { SCALES, COLORS, getQualityPreset, AROMATIC_DETECTION_THRESHOLD } from "../../config";
+import {
+  SCALES,
+  COLORS,
+  getQualityPreset,
+  AROMATIC_DETECTION_THRESHOLD,
+  PERFORMANCE_THRESHOLDS,
+} from "../../config";
 import { getAtomColor } from "../../utils";
 import { SelectableAtom } from "./SelectableAtom";
 import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
@@ -82,6 +88,9 @@ export function Stick({
     [molecule.atoms.length]
   );
   const useImpostors = qualityPreset.useImpostors;
+  // Fewer sphere segments only from 2,000 atoms (16x8); smaller structures keep 32x16
+  const atomSegments =
+    molecule.atoms.length >= PERFORMANCE_THRESHOLDS.medium ? qualityPreset.sphereSegments : undefined;
 
   // Small spheres for atom selection (tuple positions)
   const atomsData = useMemo<AtomRenderData[]>(() => {
@@ -182,6 +191,7 @@ export function Stick({
             radius={bondRadius * 1.5}
             color={atomData.color}
             selected={selectedAtomIndices.includes(atomData.index)}
+            segments={atomSegments}
             structureId={effectiveStructureId}
           />
         ))
