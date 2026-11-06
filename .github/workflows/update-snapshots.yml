@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   update-snapshots:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # same image as e2e.yml, so the baselines match the runs that check them
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
