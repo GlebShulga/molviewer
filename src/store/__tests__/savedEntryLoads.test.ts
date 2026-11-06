@@ -91,3 +91,55 @@ describe('loadSavedSession', () => {
     expect(shownNames()).toEqual(['On screen']);
   });
 });
+
+/** A promise resolved from outside, to finish reads in a chosen order. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => (resolve = r));
+  return { promise, resolve };
+}
+
+describe('two loads from the Saved panel in quick succession', () => {
+  it('shows the one clicked last when the first read finishes after it', async () => {
+    const slow = deferred<MolViewerSession | null>();
+    const fast = deferred<MolViewerSession | null>();
+    storage.loadSessionAsync.mockReturnValueOnce(slow.promise).mockReturnValueOnce(fast.promise);
+    const sessionA = session('A');
+    const sessionB = session('B');
+
+    const first = useMoleculeStore.getState().loadSavedSession('a');
+    const second = useMoleculeStore.getState().loadSavedSession('b');
+    fast.resolve(sessionB);
+    await second;
+    slow.resolve(sessionA);
+    await first;
+
+    expect(shownNames()).toEqual(['B']);
+    expect(useMoleculeStore.getState().loadedMoleculeId).toBe('b');
+  });
+
+  it('applies to a saved molecule and a session together', async () => {
+    const slow = deferred<{ molecule: Molecule; measurements: [] } | null>();
+    storage.loadMoleculeAsync.mockReturnValueOnce(slow.promise);
+    storage.loadSessionAsync.mockResolvedValueOnce(session('Session'));
+
+    const first = useMoleculeStore.getState().loadSavedMolecule('m');
+    await useMoleculeStore.getState().loadSavedSession('s');
+    slow.resolve({ molecule: molecule('Old molecule'), measurements: [] });
+    await first;
+
+    expect(shownNames()).toEqual(['Session']);
+  });
+
+  it('does not report a failure of a load that was overtaken', async () => {
+    const slow = deferred<MolViewerSession | null>();
+    storage.loadSessionAsync.mockReturnValueOnce(slow.promise).mockResolvedValueOnce(session('B'));
+
+    const first = useMoleculeStore.getState().loadSavedSession('broken');
+    await useMoleculeStore.getState().loadSavedSession('b');
+    slow.resolve(null);
+
+    await expect(first).resolves.toBeNull();
+    expect(shownNames()).toEqual(['B']);
+  });
+});

@@ -214,6 +214,13 @@ export function styleSafeStructure(structure: Structure): { structure: Structure
   return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
 }
 
+/**
+ * Numbers loads from the Saved panel (sessions and saved molecules). Their
+ * reads are async, so a slow read could finish after a later click; only the
+ * latest load is applied.
+ */
+let latestSavedLoad = 0;
+
 /** Measurements whose atoms all belong to one structure, for saving that structure alone. */
 function measurementsOn(measurements: Measurement[], structureId: string): Measurement[] {
   return measurements.filter((m) => m.atomRefs.every((ref) => ref.structureId === structureId));
@@ -988,7 +995,10 @@ export const useMoleculeStore = create<MoleculeState>()(
   loadSavedMolecule: async (id) => {
     // Async: entries of 50,000+ atoms live in IndexedDB, which the
     // synchronous loader can't read
+    const load = ++latestSavedLoad;
     const data = await loadMoleculeAsync(id);
+    // A later click from the Saved panel wins, even if its read finished first
+    if (load !== latestSavedLoad) return;
     // The storage loaders log a failed read and return null; tell the user
     if (!data) throw new Error('This saved molecule could not be read.');
 
@@ -1127,7 +1137,10 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedSession: async (id) => {
+    const load = ++latestSavedLoad;
     const session = await loadSessionAsync(id);
+    // A later click from the Saved panel wins, even if its read finished first
+    if (load !== latestSavedLoad) return null;
     // The storage loaders log a failed read and return null; tell the user
     if (!session) throw new Error('This saved session could not be read.');
     const camera = get().loadSession(session);
