@@ -2,7 +2,7 @@
  * Anonymous product events (see site/events.ts). Fire-and-forget: tracking
  * must never break or slow down the app. Disabled in development and tests.
  */
-import { pageKind, type EventName, type EventProps, type EventPayload } from '../../site/events';
+import { CROSS_ORIGIN_EVENTS, pageKind, type EventName, type EventProps, type EventPayload } from '../../site/events';
 
 export type { EventName, EventProps };
 
@@ -39,11 +39,14 @@ export function configureTracking(next: { endpoint: string; page?: string }): vo
 
 export function track(event: EventName, props?: EventProps): void {
   if (import.meta.env.DEV || typeof window === 'undefined') return;
+  const sameOrigin = config.endpoint.startsWith('/');
+  // The widget shares components (and so events) with the site, but another
+  // origin may only post the widget's own events: the rest would get a 403.
+  if (!sameOrigin && !CROSS_ORIGIN_EVENTS.has(event)) return;
   try {
     const payload: EventPayload = { e: event, p: props, page: config.page ?? pageKind(window.location.pathname) };
     const body = JSON.stringify(payload);
     // Same origin: JSON. Cross-origin: text/plain, a "simple" request that needs no CORS preflight.
-    const sameOrigin = config.endpoint.startsWith('/');
     const type = sameOrigin ? 'application/json' : 'text/plain';
     if (navigator.sendBeacon?.(config.endpoint, new Blob([body], { type }))) return;
     void fetch(config.endpoint, {

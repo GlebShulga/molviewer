@@ -21,10 +21,10 @@ import { detectAromaticRings } from '../utils/aromaticDetection';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
-import { roundAtoms, track } from '../utils/track';
+import { roundAtoms, track, type EventProps } from '../utils/track';
 import { showToast } from '../utils/toast';
 import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
-import { AROMATIC_DETECTION_THRESHOLD } from '../config';
+import { AROMATIC_DETECTION_THRESHOLD, GPU_PICKING_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
 import {
@@ -120,11 +120,27 @@ const CHAIN_SCHEMES = new Set<ColorScheme>(['secondaryStructure', 'rainbow']);
 
 const isSurfaceRepresentation = (rep: RepresentationType) => rep === 'surface-vdw' || rep === 'surface-sas';
 
-/** A structure's style and rounded size, for the events of actions done on it. */
-const styleProps = (structure: Structure) => ({
-  value: structure.representation,
-  atoms: roundAtoms(structure.molecule.atoms.length),
-});
+/**
+ * Event fields for an action on one atom (measure, label, atom menu): the
+ * structure's rounded size, the style the atom is drawn in and whether it was
+ * picked on the GPU. A structure split into components (protein, ligand,
+ * ion...) draws each visible one on its own (StructureRepresentation.tsx), so
+ * a ligand next to a Cartoon protein is drawn in Ball & Stick, and GPU picking
+ * depends on the atoms its component draws, not on the whole structure.
+ */
+function pickProps(structure: Structure, atomIndex: number): EventProps {
+  const component = structure.classification?.hasMultipleTypes
+    ? structure.componentSettings.find((c) => c.visible && c.atomIndices.includes(atomIndex))
+    : undefined;
+  const style = component?.representation ?? structure.representation;
+  const drawn = component ? component.atomIndices.length : structure.molecule.atoms.length;
+  return {
+    // A surface component draws its atoms in Ball & Stick (ComponentRepresentation.tsx)
+    value: isSurfaceRepresentation(style) ? 'ball-and-stick' : style,
+    format: drawn >= GPU_PICKING_THRESHOLD ? 'gpu' : 'cpu',
+    atoms: roundAtoms(structure.molecule.atoms.length),
+  };
+}
 
 /**
  * The structure in a new style. Multi-component structures (protein + ligands,
@@ -855,7 +871,8 @@ export const useMoleculeStore = create<MoleculeState>()(
           measurements: [...get().measurements, measurement],
           selectedAtoms: [],
         });
-        track('measurement_added', { kind: measurementMode, ...styleProps(structure) });
+        // Across two structures, the last atom picked speaks for the measurement
+        track('measurement_added', { kind: measurementMode, ...pickProps(structure, atomIndex) });
       }
     } else {
       set({ selectedAtoms: newSelection });
@@ -1206,7 +1223,7 @@ export const useMoleculeStore = create<MoleculeState>()(
     const { structures, activeStructureId } = get();
     const structureId = state.structureId ?? activeStructureId;
     const structure = structureId ? structures.get(structureId) : undefined;
-    if (structure && state.atomIndex !== null) track('atom_menu_opened', styleProps(structure));
+    if (structure && state.atomIndex !== null) track('atom_menu_opened', pickProps(structure, state.atomIndex));
   },
 
   hideContextMenu: () => {
@@ -1227,7 +1244,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       labels: [...get().labels, { id, structureId, atomIndex, text }],
     });
     const structure = get().structures.get(structureId);
-    if (structure) track('label_added', styleProps(structure));
+    if (structure) track('label_added', pickProps(structure, atomIndex));
   },
 
   removeLabel: (id) => {

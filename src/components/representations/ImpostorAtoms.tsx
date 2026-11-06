@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Atom } from '../../types';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { isTouchPointer, lastPointerWasTouch } from '../../hooks/useTouchTooltip';
-import { IMPOSTOR_BILLBOARD_SCALE } from '../../config/rendering';
+import { GPU_PICKING_THRESHOLD, IMPOSTOR_BILLBOARD_SCALE } from '../../config/rendering';
 import {
   GPUPickingManager,
   pickingVertexShader,
@@ -147,21 +147,6 @@ export interface ImpostorAtomsProps {
 
 /** Marks the impostor mesh for model export (see utils/exportModel). */
 const IMPOSTOR_EXPORT_USER_DATA = { exportAs: 'spheres' } as const;
-
-/**
- * Threshold for automatic GPU picking activation. Below it the raycast tests
- * every atom's sphere on the CPU (Spacefill's impostors from 2000 atoms); from
- * it, one GPU pick per pointer event replaces that O(n) loop.
- *
- * Open question (parked 2026-11-05): whether picking on structures this large
- * is used at all (hover, click to measure, the atom menu in Spacefill, Ball &
- * Stick or Stick). `scripts/query-events.ts --styles` counts style switches,
- * measurements, labels and atom menus per 100 loads by structure size; decide
- * from it whether to keep the GPU path or to replace it with the CPU loop for
- * every size (likely a few ms per event even at 100k atoms, not measured).
- * Hover isn't counted: it fires on every mouse move.
- */
-const GPU_PICKING_THRESHOLD = 5000;
 
 /**
  * High-performance atom rendering using sphere impostors.

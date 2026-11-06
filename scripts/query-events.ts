@@ -22,8 +22,11 @@
  *
  * --styles asks whether atom styles are used on large structures: loads, style
  * switches, measurements, labels and atom menus by structure size (double3),
- * also per 100 loads of that size. Touch screens and desktops are counted
- * together. Size "?" is events from before sizes were recorded.
+ * also per 100 loads of that size, and how many of those picks ran on the GPU
+ * (blob4 = 'gpu', see GPU_PICKING_THRESHOLD). A pick's style (blob7) is the one
+ * its atom is drawn in: a ligand next to a Cartoon protein counts as Ball &
+ * Stick. Touch screens and desktops are counted together. Size "?" is events
+ * from before sizes were recorded.
  *
  * The token needs the "Account Analytics: Read" permission.
  * Column layout: blob1 = event, blob2..blob7 = source, entry, format, kind, ref, value,
@@ -78,6 +81,7 @@ const SIZES = ['?', '<1k', '1k-5k', '5k-20k', '20k-100k', '100k+'] as const;
 const SIZE_SQL = `if(double3 = 0, '?', if(double3 <= 1000, '<1k', if(double3 < 5000, '1k-5k',
        if(double3 < 20000, '5k-20k', if(double3 <= 100000, '20k-100k', '100k+')))))`;
 const ATOM_STYLES = new Set(['ball-and-stick', 'stick', 'spacefill']);
+const PICK_EVENTS = ['measurement_added', 'label_added', 'atom_menu_opened'];
 const STYLES = ['ball-and-stick', 'stick', 'spacefill', 'cartoon', 'surface-vdw', 'surface-sas'];
 
 const LOADS_SQL = `SELECT ${SIZE_SQL} AS size, SUM(_sample_interval) AS loads
@@ -87,11 +91,11 @@ const LOADS_SQL = `SELECT ${SIZE_SQL} AS size, SUM(_sample_interval) AS loads
        FORMAT JSON`;
 
 const STYLE_EVENTS_SQL = `SELECT blob1 AS event, ${SIZE_SQL} AS size, blob7 AS style, blob5 AS kind,
-       SUM(_sample_interval) AS count
+       blob4 AS picking, SUM(_sample_interval) AS count
        FROM molviewer_events
        WHERE ${SINCE}
          AND blob1 IN ('representation_changed', 'measurement_added', 'label_added', 'atom_menu_opened')
-       GROUP BY event, size, style, kind
+       GROUP BY event, size, style, kind, picking
        ORDER BY count DESC
        FORMAT JSON`;
 
@@ -115,23 +119,24 @@ async function printStyles(): Promise<void> {
   const per100 = (n: number, of: number) => (of > 0 ? Math.round((n / of) * 1000) / 10 : '-');
   const summary = SIZES.map((size) => {
     const rows = (events.data ?? []).filter((r) => r.size === size);
-    const count = (event: string, style?: (s: string) => boolean) =>
+    const count = (names: string[], keep: (r: Row) => boolean = () => true) =>
       rows
-        .filter((r) => r.event === event && (!style || style(String(r.style))))
+        .filter((r) => names.includes(String(r.event)) && keep(r))
         .reduce((sum, r) => sum + Number(r.count), 0);
-    const inAtomStyle = (s: string) => ATOM_STYLES.has(s);
     const loadCount = Number((loads.data ?? []).find((r) => r.size === size)?.loads ?? 0);
-    const toAtomStyle = count('representation_changed', inAtomStyle);
-    const measured = count('measurement_added', inAtomStyle);
-    const labelled = count('label_added', inAtomStyle);
-    const menus = count('atom_menu_opened', inAtomStyle);
+    const toAtomStyle = count(['representation_changed'], (r) => ATOM_STYLES.has(String(r.style)));
+    const measured = count(['measurement_added']);
+    const labelled = count(['label_added']);
+    const menus = count(['atom_menu_opened']);
+    const gpuPicks = count(PICK_EVENTS, (r) => r.picking === 'gpu');
     return {
       size,
       loads: loadCount,
-      ...Object.fromEntries(STYLES.map((s) => [`to ${s}`, count('representation_changed', (v) => v === s)])),
-      'measure (atom styles)': measured,
-      'label (atom styles)': labelled,
-      'menu (atom styles)': menus,
+      ...Object.fromEntries(STYLES.map((s) => [`to ${s}`, count(['representation_changed'], (r) => r.style === s)])),
+      measure: measured,
+      label: labelled,
+      menu: menus,
+      'of them on GPU': gpuPicks,
       'to atom styles /100': per100(toAtomStyle, loadCount),
       'measure /100': per100(measured, loadCount),
       'label /100': per100(labelled, loadCount),

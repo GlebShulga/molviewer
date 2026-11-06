@@ -112,8 +112,10 @@ export function useInitialUrlLoad(): void {
           if (deserialized.skipped.length) {
             store().setError(`Some structures in this share could not be restored: ${deserialized.skipped.join(', ')}`);
           }
-          // One event per share; its size is the largest structure in it
-          const atoms = Math.max(0, ...deserialized.structures.map((s) => s.molecule.atoms.length));
+          // One event per share, sized by the structure now active, which
+          // style switches made next are counted against
+          const { structures, activeStructureId } = store();
+          const atoms = structures.get(activeStructureId ?? '')?.molecule.atoms.length ?? 0;
           track('structure_loaded', { source: 'share', entry: entryKind(), atoms: roundAtoms(atoms) });
         } catch (err) {
           if (signal.aborted) return;

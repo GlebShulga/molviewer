@@ -17,10 +17,11 @@ export const EVENT_NAMES = [
   'link_copied',
   'embed_view',
   'representation_changed',
+  // measurement_added, label_added (from the atom menu) and atom_menu_opened
+  // (right-click on an atom): value = the style the picked atom is drawn in,
+  // format = 'gpu' or 'cpu', how it was picked (pickProps in moleculeStore.ts).
   'measurement_added',
-  // A 3D label added from the atom menu; value: the structure's style.
   'label_added',
-  // The atom menu opened (right-click on an atom); value: the structure's style.
   'atom_menu_opened',
   'onboarding_completed',
   // The chat app widget (src/widget). The MCP server writes its own
@@ -30,6 +31,13 @@ export const EVENT_NAMES = [
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
+
+/**
+ * The only events /api/event takes from another origin (the widget's sandbox,
+ * or anyone else's page). The site's own events must come from the site, so
+ * the widget doesn't send them either (track() in src/utils/track.ts).
+ */
+export const CROSS_ORIGIN_EVENTS: ReadonlySet<EventName> = new Set(['widget_view', 'widget_open_full']);
 
 /**
  * String fields, stored as Analytics Engine blobs in this order (blob2..).

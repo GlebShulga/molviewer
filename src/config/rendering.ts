@@ -151,6 +151,23 @@ export const PERFORMANCE_THRESHOLDS = {
 } as const;
 
 /**
+ * Atoms in one impostor instance (ImpostorAtoms) from which picking runs on
+ * the GPU. Below it the raycast tests every atom's sphere on the CPU
+ * (Spacefill's impostors from 2000 atoms); from it, one GPU pick per pointer
+ * event replaces that O(n) loop. A structure split into components draws each
+ * one as its own instance, so the count is the component's.
+ *
+ * Open question (parked 2026-11-05): whether picking on structures this large
+ * is used at all (hover, click to measure, the atom menu in Spacefill, Ball &
+ * Stick or Stick). `scripts/query-events.ts --styles` counts measurements,
+ * labels and atom menus picked on the GPU by structure size; decide from it
+ * whether to keep the GPU path or to replace it with the CPU loop for every
+ * size (likely a few ms per event even at 100k atoms, not measured). Hover
+ * isn't counted: it fires on every mouse move.
+ */
+export const GPU_PICKING_THRESHOLD = 5000;
+
+/**
  * Skip aromatic ring detection for molecules larger than this threshold.
  * Detection is O(n × depth!) and causes blocking on the main thread.
  * Aligned with PERFORMANCE_THRESHOLDS.medium where quality reduction begins.

@@ -11,7 +11,7 @@
  *   blob9   = country (from Cloudflare)
  *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms)
  */
-import { isEventName, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
+import { CROSS_ORIGIN_EVENTS, isEventName, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
 
 interface Env {
   EVENTS?: AnalyticsEngineDataset;
@@ -26,14 +26,7 @@ const MAX_BODY = 2048;
  */
 const CORS = { 'access-control-allow-origin': '*' };
 
-/**
- * Posts from another origin (the widget's sandbox, or anyone else's page)
- * may only send the widget's events. The site's own events must come from
- * the site. (A missing Origin header counts as same-origin: older browsers
- * omit it on same-origin beacons.)
- */
-const CROSS_ORIGIN_EVENTS = new Set(['widget_view', 'widget_open_full']);
-
+/** A missing Origin header counts as same-origin: older browsers omit it on same-origin beacons. */
 function isCrossOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
   return !!origin && origin !== new URL(request.url).origin;
