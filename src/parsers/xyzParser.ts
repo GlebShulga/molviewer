@@ -67,6 +67,12 @@ export function parseXYZ(
     });
   }
 
+  // A truncated file still loads the atoms it has, but a header with no atom
+  // lines at all ("5\n") is not a molecule.
+  if (atomCount > 0 && atoms.length === 0) {
+    throw new Error("Invalid XYZ format: no atoms after the header");
+  }
+
   const bonds = opts.inferBonds
     ? inferBondsFromDistance(atoms, opts.bondTolerance!)
     : [];

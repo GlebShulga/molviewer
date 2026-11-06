@@ -42,6 +42,18 @@ H    -0.24000   0.93000   0.00000`;
     expect(() => parseXYZ('1')).toThrow('Invalid XYZ format: file too short');
   });
 
+  it.each(['5\n', '5\n\n', '5\r\ncomment\r\n\r\n'])('throws when no atom line follows the header (%j)', (xyz) => {
+    expect(() => parseXYZ(xyz)).toThrow('Invalid XYZ format: no atoms');
+  });
+
+  it('loads an empty molecule when the count is 0', () => {
+    expect(parseXYZ('0\nempty').atoms).toEqual([]);
+  });
+
+  it('loads the atoms a truncated file has', () => {
+    expect(parseXYZ('3\ncut short\nO 0 0 0\nH 0.96 0 0', { inferBonds: false }).atoms).toHaveLength(2);
+  });
+
   it('throws on invalid atom count', () => {
     expect(() => parseXYZ('abc\ncomment\nC 0 0 0')).toThrow('Invalid XYZ format: cannot parse atom count');
   });
