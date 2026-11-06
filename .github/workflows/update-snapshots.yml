@@ -20,6 +20,8 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm exec playwright install --with-deps chromium webkit
+        # Usually 1-2 minutes; an apt mirror stall once held it for the whole job timeout
+        timeout-minutes: 10
 
       - name: Generate Linux snapshots
         run: pnpm test:e2e --project=chromium-visual --project=webkit --update-snapshots
