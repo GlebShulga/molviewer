@@ -1,4 +1,5 @@
 import type { Molecule, SecondaryStructure } from '../types';
+import { dihedralAngle } from './measurements';
 
 interface BackboneAtoms {
   residueNumber: number;
@@ -6,54 +7,6 @@ interface BackboneAtoms {
   n?: { x: number; y: number; z: number };
   ca?: { x: number; y: number; z: number };
   c?: { x: number; y: number; z: number };
-}
-
-/**
- * Calculate dihedral angle (in degrees) between four points
- */
-function calculateDihedral(
-  p1: { x: number; y: number; z: number },
-  p2: { x: number; y: number; z: number },
-  p3: { x: number; y: number; z: number },
-  p4: { x: number; y: number; z: number }
-): number {
-  // Vectors
-  const b1 = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z };
-  const b2 = { x: p3.x - p2.x, y: p3.y - p2.y, z: p3.z - p2.z };
-  const b3 = { x: p4.x - p3.x, y: p4.y - p3.y, z: p4.z - p3.z };
-
-  // Cross products
-  const n1 = {
-    x: b1.y * b2.z - b1.z * b2.y,
-    y: b1.z * b2.x - b1.x * b2.z,
-    z: b1.x * b2.y - b1.y * b2.x,
-  };
-  const n2 = {
-    x: b2.y * b3.z - b2.z * b3.y,
-    y: b2.z * b3.x - b2.x * b3.z,
-    z: b2.x * b3.y - b2.y * b3.x,
-  };
-
-  // Normalize
-  const n1Len = Math.sqrt(n1.x * n1.x + n1.y * n1.y + n1.z * n1.z);
-  const n2Len = Math.sqrt(n2.x * n2.x + n2.y * n2.y + n2.z * n2.z);
-
-  if (n1Len < 0.0001 || n2Len < 0.0001) return 0;
-
-  n1.x /= n1Len; n1.y /= n1Len; n1.z /= n1Len;
-  n2.x /= n2Len; n2.y /= n2Len; n2.z /= n2Len;
-
-  // Dot product for cos(angle)
-  const cosAngle = n1.x * n2.x + n1.y * n2.y + n1.z * n2.z;
-
-  // Calculate sign using cross product
-  const b2Len = Math.sqrt(b2.x * b2.x + b2.y * b2.y + b2.z * b2.z);
-  const b2Norm = { x: b2.x / b2Len, y: b2.y / b2Len, z: b2.z / b2Len };
-  const m = n1.y * b2Norm.z - n1.z * b2Norm.y;
-  const sinSign = n2.x * m + n2.y * (n1.z * b2Norm.x - n1.x * b2Norm.z) + n2.z * (n1.x * b2Norm.y - n1.y * b2Norm.x);
-
-  const angle = Math.atan2(sinSign, cosAngle);
-  return angle * (180 / Math.PI);
 }
 
 /**
@@ -173,12 +126,12 @@ export function detectSecondaryStructure(molecule: Molecule): void {
 
     // Calculate phi if we have previous residue C
     if (prev?.c) {
-      phi = calculateDihedral(prev.c, curr.n, curr.ca, curr.c);
+      phi = dihedralAngle(prev.c, curr.n, curr.ca, curr.c);
     }
 
     // Calculate psi if we have next residue N
     if (next?.n) {
-      psi = calculateDihedral(curr.n, curr.ca, curr.c, next.n);
+      psi = dihedralAngle(curr.n, curr.ca, curr.c, next.n);
     }
 
     // Classify based on angles

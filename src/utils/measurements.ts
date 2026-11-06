@@ -51,57 +51,40 @@ export function calculateAngle(atom1: Atom, atom2: Atom, atom3: Atom): number {
   return (Math.acos(clampedCos) * 180) / Math.PI;
 }
 
+type Point = { x: number; y: number; z: number };
+
+/**
+ * Dihedral angle p1-p2-p3-p4 in degrees, in (-180, 180], with the IUPAC sign:
+ * looking along p2→p3, a clockwise turn from the front bond to the back bond
+ * is positive. Collinear atoms (no defined plane) give 0.
+ */
+export function dihedralAngle(p1: Point, p2: Point, p3: Point, p4: Point): number {
+  const b1 = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z };
+  const b2 = { x: p3.x - p2.x, y: p3.y - p2.y, z: p3.z - p2.z };
+  const b3 = { x: p4.x - p3.x, y: p4.y - p3.y, z: p4.z - p3.z };
+
+  const n1 = cross(b1, b2);
+  const n2 = cross(b2, b3);
+  if (Math.hypot(n1.x, n1.y, n1.z) < 1e-8 || Math.hypot(n2.x, n2.y, n2.z) < 1e-8) {
+    return 0;
+  }
+
+  const b2Length = Math.hypot(b2.x, b2.y, b2.z);
+  const y = b2Length * dot(b1, n2);
+  const x = dot(n1, n2);
+  return (Math.atan2(y, x) * 180) / Math.PI;
+}
+
 export function calculateDihedral(
   atom1: Atom,
   atom2: Atom,
   atom3: Atom,
   atom4: Atom
 ): number {
-  // Vectors along the bonds
-  const b1 = {
-    x: atom2.x - atom1.x,
-    y: atom2.y - atom1.y,
-    z: atom2.z - atom1.z,
-  };
-
-  const b2 = {
-    x: atom3.x - atom2.x,
-    y: atom3.y - atom2.y,
-    z: atom3.z - atom2.z,
-  };
-
-  const b3 = {
-    x: atom4.x - atom3.x,
-    y: atom4.y - atom3.y,
-    z: atom4.z - atom3.z,
-  };
-
-  // Cross products
-  const n1 = cross(b1, b2);
-  const n2 = cross(b2, b3);
-
-  // Normalize b2 for reference
-  const b2Mag = Math.sqrt(b2.x * b2.x + b2.y * b2.y + b2.z * b2.z);
-  const b2Norm = {
-    x: b2.x / b2Mag,
-    y: b2.y / b2Mag,
-    z: b2.z / b2Mag,
-  };
-
-  // m1 = n1 x b2_normalized
-  const m1 = cross(n1, b2Norm);
-
-  // Calculate dihedral
-  const x = dot(n1, n2);
-  const y = dot(m1, n2);
-
-  return (Math.atan2(y, x) * 180) / Math.PI;
+  return dihedralAngle(atom1, atom2, atom3, atom4);
 }
 
-function cross(
-  a: { x: number; y: number; z: number },
-  b: { x: number; y: number; z: number }
-) {
+function cross(a: Point, b: Point) {
   return {
     x: a.y * b.z - a.z * b.y,
     y: a.z * b.x - a.x * b.z,
@@ -109,10 +92,7 @@ function cross(
   };
 }
 
-function dot(
-  a: { x: number; y: number; z: number },
-  b: { x: number; y: number; z: number }
-) {
+function dot(a: Point, b: Point) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
