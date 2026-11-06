@@ -979,8 +979,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedMolecule: async (id) => {
-    // Async: entries of 50,000+ atoms live in IndexedDB, which the
-    // synchronous loader can't read
+    // Async: entries of 50,000+ atoms live in IndexedDB
     const load = startSavedLoad(id);
     const data = await loadMoleculeAsync(id);
     // Something the user did since (see latestSavedLoad) wins over this load
@@ -997,9 +996,10 @@ export const useMoleculeStore = create<MoleculeState>()(
     // Older saves also kept measurements taken on other structures: those
     // would land on unrelated atoms, so a measurement is kept only if its
     // stored value matches these atoms.
-    const { activeStructureId } = get();
+    // loadedMoleculeId stays null (setMolecule cleared it): it only drives the
+    // Update button, which these entries never get.
+    const { activeStructureId, structures } = get();
     if (activeStructureId && data.measurements.length > 0) {
-      const { structures } = get();
       const migratedMeasurements = data.measurements
         .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
         .map(m => ({
@@ -1010,12 +1010,7 @@ export const useMoleculeStore = create<MoleculeState>()(
           })),
         }))
         .filter(m => matchesStoredValue(m, structures));
-      set({
-        measurements: refreshDihedrals(migratedMeasurements, structures),
-        loadedMoleculeId: id,
-      });
-    } else {
-      set({ loadedMoleculeId: id });
+      set({ measurements: refreshDihedrals(migratedMeasurements, structures) });
     }
   },
 

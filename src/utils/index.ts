@@ -9,14 +9,12 @@ export { extractBackbone, hasBackboneData, type BackboneResidue, type BackboneCh
 export { generateBackboneSpline, segmentSplineByStructure, type SplinePoint, type SplineSegment } from './splineGeneration';
 export { generateHelixGeometry, generateSheetGeometry, generateCoilGeometry, mergeGeometries } from './cartoonGeometry';
 export {
-  loadMolecule,
   loadMoleculeAsync,
   getSavedMolecules,
   deleteMolecule,
   clearAllMolecules,
   renameMolecule,
   getStorageUsage,
-  getStorageInfoAsync,
   type SavedMoleculeEntry,
 } from './moleculeStorage';
 export { GPUPickingManager } from './gpuPicking';

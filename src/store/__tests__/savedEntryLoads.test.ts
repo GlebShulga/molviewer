@@ -3,8 +3,7 @@ import type { Molecule } from '../../types';
 import type { MolViewerSession } from '../../types/session';
 
 // Loading entries from the Saved panel. jsdom has no indexedDB, so the async
-// storage loaders are stubbed: an IndexedDB entry is one the synchronous
-// loader can't read, and a failed read comes back as null.
+// storage loaders are stubbed; a failed read comes back as null.
 const storage = vi.hoisted(() => ({
   loadMoleculeAsync: vi.fn(),
   loadSessionAsync: vi.fn(),
@@ -12,7 +11,6 @@ const storage = vi.hoisted(() => ({
 
 vi.mock('../../utils/moleculeStorage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../utils/moleculeStorage')>()),
-  loadMolecule: () => null,
   loadMoleculeAsync: storage.loadMoleculeAsync,
   loadSessionAsync: storage.loadSessionAsync,
 }));
@@ -55,9 +53,19 @@ describe('loadSavedMolecule', () => {
 
     await useMoleculeStore.getState().loadSavedMolecule('idb-entry');
 
-    const state = useMoleculeStore.getState();
     expect(shownNames()).toEqual(['Large legacy molecule']);
-    expect(state.loadedMoleculeId).toBe('idb-entry');
+  });
+
+  it("leaves no saved entry marked as loaded, so a session's Update button goes away", async () => {
+    // loadedMoleculeId drives the Update button, shown only for sessions
+    storage.loadSessionAsync.mockResolvedValue(session('Saved session'));
+    await useMoleculeStore.getState().loadSavedSession('s1');
+    expect(useMoleculeStore.getState().loadedMoleculeId).toBe('s1');
+    storage.loadMoleculeAsync.mockResolvedValue({ molecule: molecule('Legacy molecule'), measurements: [] });
+
+    await useMoleculeStore.getState().loadSavedMolecule('legacy');
+
+    expect(useMoleculeStore.getState().loadedMoleculeId).toBeNull();
   });
 
   it('throws when the entry cannot be read, leaving the scene as it was', async () => {

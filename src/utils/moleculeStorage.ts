@@ -5,16 +5,13 @@ import { logError } from './errorReporter';
 import { countAromaticRings } from './aromaticDetection';
 
 /**
- * Molecule storage with IndexedDB support for large molecules.
+ * Storage behind the Saved Sessions panel.
  *
- * - Small molecules (<5MB): Use localStorage for compatibility
- * - Large molecules (>5MB): Use IndexedDB with chunked storage
- *
- * IndexedDB benefits:
- * - No size limit (quota-based, typically 50%+ of disk)
- * - Async API doesn't block UI
- * - Structured data (no JSON serialization overhead for reading)
- * - Chunk-based loading for progressive restore
+ * - Sessions are saved to localStorage, or to IndexedDB when over 1 MB or
+ *   50,000 atoms.
+ * - Single-molecule entries were saved by older versions (localStorage, or
+ *   IndexedDB in chunks for 50,000+ atoms). They are still listed, loaded,
+ *   renamed and deleted here, but never written.
  */
 
 const STORAGE_PREFIX = 'mol3d_';
@@ -259,19 +256,8 @@ async function deleteMoleculeFromIndexedDB(id: string): Promise<void> {
   }
 }
 
-export function loadMolecule(id: string): { molecule: Molecule; measurements: Measurement[] } | null {
-  const index = getIndex();
-  const entry = index.entries.find((e) => e.id === id);
-
-  // Try IndexedDB first if entry indicates it
-  if (entry?.storage === 'indexedDB') {
-    // Return a promise-like sync wrapper that triggers async load
-    // For now, return null and let caller use loadMoleculeAsync
-    console.log('[MoleculeStorage] Use loadMoleculeAsync for IndexedDB entries');
-    return null;
-  }
-
-  // Try localStorage
+/** A single-molecule entry from localStorage, in either format older versions wrote. */
+function loadMoleculeFromLocalStorage(id: string): { molecule: Molecule; measurements: Measurement[] } | null {
   try {
     const data = localStorage.getItem(`${MOLECULE_PREFIX}${id}`);
     if (data) {
@@ -290,7 +276,8 @@ export function loadMolecule(id: string): { molecule: Molecule; measurements: Me
 }
 
 /**
- * Async version of loadMolecule that supports IndexedDB.
+ * Reads a single-molecule entry saved by an older version, from IndexedDB
+ * (50,000+ atoms) or localStorage. Null when it is missing or unreadable.
  */
 export async function loadMoleculeAsync(
   id: string
@@ -298,13 +285,10 @@ export async function loadMoleculeAsync(
   const index = getIndex();
   const entry = index.entries.find((e) => e.id === id);
 
-  // Try IndexedDB if entry indicates it
-  if (entry?.storage === 'indexedDB' && isIndexedDBAvailable()) {
-    return loadMoleculeFromIndexedDB(id);
+  if (entry?.storage === 'indexedDB') {
+    return isIndexedDBAvailable() ? loadMoleculeFromIndexedDB(id) : null;
   }
-
-  // Fallback to localStorage
-  return loadMolecule(id);
+  return loadMoleculeFromLocalStorage(id);
 }
 
 export function getSavedMolecules(): SavedMoleculeEntry[] {
@@ -578,48 +562,3 @@ export async function loadSessionAsync(id: string): Promise<MolViewerSession | n
   return null;
 }
 
-/**
- * Get detailed storage info including IndexedDB (async).
- */
-export async function getStorageInfoAsync(): Promise<{
-  localStorage: { used: number; max: number };
-  indexedDB: { used: number; available: boolean; moleculeCount: number };
-}> {
-  const localStorageUsed = getStorageUsage().used;
-
-  const indexedDBInfo = {
-    used: 0,
-    available: isIndexedDBAvailable(),
-    moleculeCount: 0,
-  };
-
-  if (isIndexedDBAvailable()) {
-    try {
-      const db = await openDatabase();
-
-      // Count molecules
-      const count = await new Promise<number>((resolve, reject) => {
-        const tx = db.transaction('molecules', 'readonly');
-        const request = tx.objectStore('molecules').count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-
-      indexedDBInfo.moleculeCount = count;
-
-      // Estimate usage (rough)
-      if (navigator.storage?.estimate) {
-        const estimate = await navigator.storage.estimate();
-        indexedDBInfo.used = estimate.usage ?? 0;
-      }
-    } catch (error) {
-      console.error('[MoleculeStorage] Failed to get IndexedDB info:', error);
-      logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'storage-info' });
-    }
-  }
-
-  return {
-    localStorage: { used: localStorageUsed, max: MAX_LOCALSTORAGE_BYTES },
-    indexedDB: indexedDBInfo,
-  };
-}
