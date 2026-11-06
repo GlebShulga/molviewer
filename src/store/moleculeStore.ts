@@ -975,17 +975,20 @@ export const useMoleculeStore = create<MoleculeState>()(
     if (data) {
       // Use setMolecule to clear and load single structure
       get().setMolecule(data.molecule);
-      // Then restore measurements (need to migrate old format)
-      // Old measurements use atomIndices, need to convert to atomRefs
+      // Then restore measurements. A saved molecule is one structure with a new
+      // ID, so every ref points at it. Old saves carry only atomIndices; a
+      // measurement that spanned several structures lost the others and is dropped.
       const { activeStructureId } = get();
       if (activeStructureId && data.measurements.length > 0) {
-        const migratedMeasurements = data.measurements.map(m => ({
-          ...m,
-          atomRefs: m.atomRefs || m.atomIndices.map(idx => ({
-            structureId: activeStructureId,
-            atomIndex: idx,
-          })),
-        }));
+        const migratedMeasurements = data.measurements
+          .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
+          .map(m => ({
+            ...m,
+            atomRefs: (m.atomRefs?.map(ref => ref.atomIndex) ?? m.atomIndices).map(idx => ({
+              structureId: activeStructureId,
+              atomIndex: idx,
+            })),
+          }));
         set({
           measurements: migratedMeasurements,
           loadedMoleculeId: id,

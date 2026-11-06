@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import type { Molecule } from '../../types';
 import type { Structure } from '../../types/multiStructure';
+import type { Measurement } from '../../utils/measurements';
+import { saveMolecule } from '../../utils/moleculeStorage';
 
 function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -343,5 +345,61 @@ describe('applyShareableSession with skipped structures', () => {
     const state = useMoleculeStore.getState();
     expect(state.measurements.map((m) => m.id)).toEqual(['m1']);
     expect(state.structures.has(state.measurements[0].atomRefs[0].structureId)).toBe(true);
+  });
+});
+
+describe('loadSavedMolecule', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  const savedMeasurement = (id: string, refs: [string, number][]): Measurement => ({
+    id,
+    type: 'distance',
+    atomIndices: refs.map(([, atomIndex]) => atomIndex),
+    atomRefs: refs.map(([structureId, atomIndex]) => ({ structureId, atomIndex })),
+    value: 1.5,
+    unit: 'Å',
+  });
+
+  it('points saved measurements at the loaded structure, not the structure they were saved from', () => {
+    const entry = saveMolecule(createMockMolecule('Saved', 4), [
+      savedMeasurement('m1', [['old-id', 0], ['old-id', 1]]),
+    ]);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    const state = useMoleculeStore.getState();
+    expect(state.measurements).toHaveLength(1);
+    expect(state.measurements[0].atomRefs).toEqual([
+      { structureId: state.activeStructureId, atomIndex: 0 },
+      { structureId: state.activeStructureId, atomIndex: 1 },
+    ]);
+  });
+
+  it('migrates measurements saved with atom indices only', () => {
+    const legacy = { ...savedMeasurement('m1', [['', 1], ['', 2]]), atomRefs: undefined };
+    const entry = saveMolecule(createMockMolecule('Saved', 4), [legacy as unknown as Measurement]);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    const state = useMoleculeStore.getState();
+    expect(state.measurements[0].atomRefs).toEqual([
+      { structureId: state.activeStructureId, atomIndex: 1 },
+      { structureId: state.activeStructureId, atomIndex: 2 },
+    ]);
+  });
+
+  it('drops measurements that spanned several structures, since only one was saved', () => {
+    const entry = saveMolecule(createMockMolecule('Saved', 4), [
+      savedMeasurement('same', [['a', 0], ['a', 1]]),
+      savedMeasurement('cross', [['a', 0], ['b', 1]]),
+    ]);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['same']);
   });
 });
