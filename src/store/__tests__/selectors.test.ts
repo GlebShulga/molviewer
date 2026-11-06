@@ -139,5 +139,17 @@ describe('selectors', () => {
 
       expect(select(useMoleculeStore.getState())?.molecule.aromaticRings).toHaveLength(1);
     });
+
+    it('keeps the same render data when detection finds no ring', () => {
+      // Single bonds only, like a protein from a PDB file
+      const id = useMoleculeStore.getState().addStructure(createMockMolecule('chain', 6), 'chain');
+      const select = selectStructureRenderData(id);
+      const before = select(useMoleculeStore.getState());
+
+      useMoleculeStore.getState().detectAromaticRingsIfNeeded(id);
+
+      expect(useMoleculeStore.getState().structures.get(id)?.aromaticRingsDetected).toBe(true);
+      expect(select(useMoleculeStore.getState())).toBe(before);
+    });
   });
 });

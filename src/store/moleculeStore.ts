@@ -1225,14 +1225,18 @@ export const useMoleculeStore = create<MoleculeState>()(
       return;
     }
 
-    // Detect aromatic rings
+    // Detect aromatic rings. The molecule is replaced only when rings were
+    // found: a new molecule object makes every view of the structure rebuild
+    // (Cartoon, surface), which is wasted when there is nothing to draw.
     const aromaticRings = detectAromaticRings(structure.molecule);
-    const updatedMolecule = { ...structure.molecule, aromaticRings };
+    const molecule = aromaticRings.length > 0
+      ? { ...structure.molecule, aromaticRings }
+      : structure.molecule;
 
     const newStructures = new Map(structures);
     newStructures.set(targetId, {
       ...structure,
-      molecule: updatedMolecule,
+      molecule,
       aromaticRingsDetected: true,
     });
     set({ structures: newStructures });

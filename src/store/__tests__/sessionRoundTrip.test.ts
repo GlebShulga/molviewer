@@ -145,7 +145,9 @@ describe('session save/load round-trip', () => {
     store.loadSession(session);
     useMoleculeStore.getState().detectAromaticRingsIfNeeded(id);
 
-    expect(useMoleculeStore.getState().structures.get(id)?.molecule.aromaticRings).toEqual([]);
+    const loaded = useMoleculeStore.getState().structures.get(id);
+    expect(loaded?.aromaticRingsDetected).toBe(true);
+    expect(loaded?.molecule.aromaticRings ?? []).toEqual([]);
   });
 
   it('shows rings for a session saved before detection ran', () => {
