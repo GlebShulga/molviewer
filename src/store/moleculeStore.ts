@@ -213,11 +213,33 @@ export function styleSafeStructure(structure: Structure): { structure: Structure
 }
 
 /**
- * Numbers loads from the Saved panel (sessions and saved molecules). Their
- * reads are async, so a slow read could finish after a later click; only the
- * latest load is applied.
+ * Loads from the Saved panel (sessions and saved molecules) read their entry
+ * asynchronously, so a slow read could finish after the user asked for
+ * something else. Each such load takes a number; when its read finishes it is
+ * applied only if nothing has superseded it since: a later saved load, any
+ * other scene load (file, sample, fetch, share link, URL), deleting the entry
+ * being loaded, or clearing all entries.
  */
 let latestSavedLoad = 0;
+let pendingSavedLoadId: string | null = null;
+
+function startSavedLoad(id: string): number {
+  pendingSavedLoadId = id;
+  return ++latestSavedLoad;
+}
+
+/** Whether a saved load is still the one to apply; if so it is no longer pending. */
+function isCurrentSavedLoad(load: number): boolean {
+  if (load !== latestSavedLoad) return false;
+  pendingSavedLoadId = null;
+  return true;
+}
+
+function cancelPendingSavedLoad(): void {
+  if (pendingSavedLoadId === null) return;
+  latestSavedLoad++;
+  pendingSavedLoadId = null;
+}
 
 /**
  * A session's structures as they can be shown here: through styleSafeStructure,
@@ -614,6 +636,8 @@ export const useMoleculeStore = create<MoleculeState>()(
       set({ error: `Maximum of ${MAX_STRUCTURES} structures allowed` });
       return '';
     }
+    // The user asked for this structure after any pending saved load
+    cancelPendingSavedLoad();
 
     // Generate name from molecule if not provided
     const structureName = name || molecule.name || `Structure ${structures.size + 1}`;
@@ -780,6 +804,7 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   // ===== Legacy actions (backward compatibility) =====
   setMolecule: (molecule, source) => {
+    cancelPendingSavedLoad();
     if (!molecule) {
       set({
         structures: new Map(),
@@ -955,10 +980,10 @@ export const useMoleculeStore = create<MoleculeState>()(
   loadSavedMolecule: async (id) => {
     // Async: entries of 50,000+ atoms live in IndexedDB, which the
     // synchronous loader can't read
-    const load = ++latestSavedLoad;
+    const load = startSavedLoad(id);
     const data = await loadMoleculeAsync(id);
-    // A later click from the Saved panel wins, even if its read finished first
-    if (load !== latestSavedLoad) return;
+    // Something the user did since (see latestSavedLoad) wins over this load
+    if (!isCurrentSavedLoad(load)) return;
     // The storage loaders log a failed read and return null; tell the user
     if (!data) throw new Error('This saved molecule could not be read.');
 
@@ -995,6 +1020,8 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   deleteSavedMolecule: (id) => {
     const { loadedMoleculeId } = get();
+    // A load of this entry still reading would find it gone; drop it quietly
+    if (pendingSavedLoadId === id) cancelPendingSavedLoad();
     deleteMolecule(id);
     set({
       savedMolecules: get().savedMolecules.filter((e) => e.id !== id),
@@ -1012,6 +1039,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   clearAllSavedMolecules: () => {
+    cancelPendingSavedLoad();
     clearAllMolecules();
     set({
       savedMolecules: [],
@@ -1062,6 +1090,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSession: (session) => {
+    cancelPendingSavedLoad();
     const data = deserializeSession(session);
 
     // Pause undo/redo tracking during the swap so the load is not undoable
@@ -1097,10 +1126,10 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedSession: async (id) => {
-    const load = ++latestSavedLoad;
+    const load = startSavedLoad(id);
     const session = await loadSessionAsync(id);
-    // A later click from the Saved panel wins, even if its read finished first
-    if (load !== latestSavedLoad) return null;
+    // Something the user did since (see latestSavedLoad) wins over this load
+    if (!isCurrentSavedLoad(load)) return null;
     // The storage loaders log a failed read and return null; tell the user
     if (!session) throw new Error('This saved session could not be read.');
     const camera = get().loadSession(session);
@@ -1109,6 +1138,7 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   applyShareableSession: (payload) => {
+    cancelPendingSavedLoad();
     const temporal = useMoleculeStore.temporal.getState();
     temporal.pause();
     try {

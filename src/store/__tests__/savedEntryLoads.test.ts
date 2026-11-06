@@ -143,3 +143,74 @@ describe('two loads from the Saved panel in quick succession', () => {
     expect(shownNames()).toEqual(['B']);
   });
 });
+
+describe('a pending saved load and other actions', () => {
+  // Built before each test sets up its scene: session() resets the store
+  let pendingSession: MolViewerSession;
+  beforeEach(() => {
+    pendingSession = session('Old session');
+  });
+
+  /** Starts loading saved session 'pending' whose read finishes only when told to. */
+  function startSlowSessionLoad() {
+    const read = deferred<MolViewerSession | null>();
+    storage.loadSessionAsync.mockReturnValueOnce(read.promise);
+    const load = useMoleculeStore.getState().loadSavedSession('pending');
+    return { load, finish: () => read.resolve(pendingSession), fail: () => read.resolve(null) };
+  }
+
+  it('a file loaded in Replace mode wins over it', async () => {
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().setMolecule(molecule('Dropped file'));
+    pending.finish();
+    await pending.load;
+
+    expect(shownNames()).toEqual(['Dropped file']);
+  });
+
+  it('a file added in Add mode wins over it', async () => {
+    useMoleculeStore.getState().addStructure(molecule('On screen'), 'On screen');
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().addStructure(molecule('Added file'), 'Added file');
+    pending.finish();
+    await pending.load;
+
+    expect(shownNames()).toEqual(['On screen', 'Added file']);
+  });
+
+  it('a session loaded directly (share link, URL) wins over it', async () => {
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().loadSession(session('Direct session'));
+    pending.finish();
+    await pending.load;
+
+    expect(shownNames()).toEqual(['Direct session']);
+  });
+
+  it('deleting the entry being loaded cancels the load without an error', async () => {
+    useMoleculeStore.getState().addStructure(molecule('On screen'), 'On screen');
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().deleteSavedMolecule('pending');
+    pending.fail();
+
+    await expect(pending.load).resolves.toBeNull();
+    expect(shownNames()).toEqual(['On screen']);
+  });
+
+  it('clearing all entries cancels the load without an error', async () => {
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().clearAllSavedMolecules();
+    pending.fail();
+
+    await expect(pending.load).resolves.toBeNull();
+  });
+
+  it('deleting another entry leaves the load running', async () => {
+    const pending = startSlowSessionLoad();
+    useMoleculeStore.getState().deleteSavedMolecule('some-other-entry');
+    pending.finish();
+    await pending.load;
+
+    expect(shownNames()).toEqual(['Old session']);
+  });
+});
