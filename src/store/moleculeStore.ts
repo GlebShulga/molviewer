@@ -42,6 +42,7 @@ import {
   saveSession as saveSessionToStorage,
   updateSession as updateSessionInStorage,
   loadSessionAsync,
+  SavedEntryReadError,
   type SavedMoleculeEntry,
 } from '../utils/moleculeStorage';
 import {
@@ -984,8 +985,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     const data = await loadMoleculeAsync(id);
     // Something the user did since (see latestSavedLoad) wins over this load
     if (!isCurrentSavedLoad(load)) return;
-    // The storage loaders log a failed read and return null; tell the user
-    if (!data) throw new Error('This saved molecule could not be read.');
+    // null: the data is missing, or the read failed (the loader logged that)
+    if (!data) throw new SavedEntryReadError('This saved molecule could not be read.');
 
     // Use setMolecule to clear and load single structure. Stored rings are
     // dropped so they are detected again, as for a session.
@@ -1130,8 +1131,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     const session = await loadSessionAsync(id);
     // Something the user did since (see latestSavedLoad) wins over this load
     if (!isCurrentSavedLoad(load)) return null;
-    // The storage loaders log a failed read and return null; tell the user
-    if (!session) throw new Error('This saved session could not be read.');
+    // null: the data is missing, or the read failed (the loader logged that)
+    if (!session) throw new SavedEntryReadError('This saved session could not be read.');
     const camera = get().loadSession(session);
     set({ loadedMoleculeId: id });
     return camera;

@@ -29,6 +29,15 @@ const DB_VERSION = 2;
 const SESSION_PREFIX = `${STORAGE_PREFIX}session_`;
 const LARGE_SESSION_BYTES = 1 * 1024 * 1024; // 1MB threshold for IndexedDB
 
+/**
+ * A saved entry could not be read: its data is missing, or reading it failed.
+ * A failed read has already been logged here, so callers show the message
+ * without reporting it again.
+ */
+export class SavedEntryReadError extends Error {
+  name = 'SavedEntryReadError';
+}
+
 export interface SavedMoleculeEntry {
   id: string;
   name: string;

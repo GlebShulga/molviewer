@@ -6,7 +6,7 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { ShareButton } from './ShareButton';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { useActiveStructure } from '../../hooks';
-import { getStorageUsage } from '../../utils/moleculeStorage';
+import { getStorageUsage, SavedEntryReadError } from '../../utils/moleculeStorage';
 import { viewerHandle } from '../../utils/viewerHandle';
 import { logError } from '../../utils/errorReporter';
 import styles from './SavedMoleculesPanel.module.css';
@@ -88,6 +88,15 @@ export function SavedMoleculesPanel() {
     }
   };
 
+  /** Shows a failed load; reports it unless storage already logged it (SavedEntryReadError). */
+  const showLoadFailure = (err: unknown, op: string, fallback: string) => {
+    if (!(err instanceof SavedEntryReadError)) {
+      console.error(`[SavedMoleculesPanel] ${fallback}:`, err);
+      logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op });
+    }
+    alert(err instanceof Error ? err.message : fallback);
+  };
+
   const handleLoad = async (id: string) => {
     const entry = savedMolecules.find((e) => e.id === id);
     if (!entry) return;
@@ -97,19 +106,14 @@ export function SavedMoleculesPanel() {
         // scene is mounted (gated on controlsReady + boundingBoxData).
         await loadSavedSession(id);
       } catch (err) {
-        console.error('[SavedMoleculesPanel] Failed to load session:', err);
-        logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'load-session' });
-        const message = err instanceof Error ? err.message : 'Failed to load session';
-        alert(message);
+        showLoadFailure(err, 'load-session', 'Failed to load session');
       }
     } else {
       // Legacy single-molecule entry (large ones are read from IndexedDB)
       try {
         await loadSavedMolecule(id);
       } catch (err) {
-        console.error('[SavedMoleculesPanel] Failed to load molecule:', err);
-        logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'load-molecule' });
-        alert(err instanceof Error ? err.message : 'Failed to load molecule');
+        showLoadFailure(err, 'load-molecule', 'Failed to load molecule');
       }
     }
   };
