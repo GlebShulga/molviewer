@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 import { molecules } from '../../fixtures';
@@ -54,24 +54,24 @@ async function showOverlays(page: Page) {
   });
 }
 
-/** The overlays with these test ids and the error are visible, on screen and apart. */
-async function expectApart(page: Page, testIds: string[]) {
-  for (const id of testIds) await expect(page.getByTestId(id)).toBeVisible();
+/** Overlays found by test id, named after it. */
+const byTestId = (page: Page, ids: string[]) => Object.fromEntries(ids.map((id) => [id, page.getByTestId(id)]));
 
-  const m = await page.evaluate((ids) => {
-    const els: [string, Element | null][] = ids.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]);
-    els.push(['error', document.querySelector('[role="alert"]')]);
-    return {
-      vw: window.innerWidth,
-      vh: window.innerHeight,
-      boxes: els.map(([name, el]) => ({ name, ...el!.getBoundingClientRect().toJSON() })),
-    };
-  }, testIds);
+/** These overlays and the error are visible, on screen and apart. */
+async function expectApart(page: Page, overlays: Record<string, Locator>) {
+  for (const overlay of Object.values(overlays)) await expect(overlay).toBeVisible();
 
-  for (const b of m.boxes) expect(insideViewport(b, m.vw, m.vh), `${b.name} on screen`).toBe(true);
-  for (let i = 0; i < m.boxes.length; i++) {
-    for (let j = i + 1; j < m.boxes.length; j++) {
-      expect(overlaps(m.boxes[i], m.boxes[j]), `${m.boxes[i].name} overlaps ${m.boxes[j].name}`).toBe(false);
+  const all = { ...overlays, error: page.locator('[role="alert"]').first() };
+  const { vw, vh } = await page.evaluate(() => ({ vw: window.innerWidth, vh: window.innerHeight }));
+  const boxes = await Promise.all(Object.entries(all).map(async ([name, el]) => ({
+    name,
+    ...(await el.evaluate((e) => e.getBoundingClientRect().toJSON())),
+  })));
+
+  for (const b of boxes) expect(insideViewport(b, vw, vh), `${b.name} on screen`).toBe(true);
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      expect(overlaps(boxes[i], boxes[j]), `${boxes[i].name} overlaps ${boxes[j].name}`).toBe(false);
     }
   }
 }
@@ -118,17 +118,23 @@ test.describe('Viewer overlays on wide screens', () => {
     await withCrambinSample(page);
     await showOverlays(page);
 
-    await expectApart(page, ['toolbar', 'measurement-hint', 'color-legend', 'structure-title']);
+    await expectApart(page, byTestId(page, ['toolbar', 'measurement-hint', 'color-legend', 'structure-title']));
     await expect(page.getByTestId('measurement-hint')).toContainText('Click 2 atoms');
   });
 
   test('on a landing page, the Details link takes the title\'s place and overlaps nothing', async ({ page }) => {
+    // No BASE_URL means the dev server, which serves no landing pages. Anywhere
+    // else (production, `pnpm pages:preview`) a missing landing page must fail.
+    test.skip(!process.env.BASE_URL, 'the dev server serves no landing pages');
     await withCrambin(page);
-    test.skip(await page.locator('#landing-data').count() === 0, 'the dev server serves no landing pages; production does');
+    await expect(page.locator('#landing-data'), '/pdb/1CRN is a landing page').toHaveCount(1);
     await showOverlays(page);
 
     await expect(page.getByTestId('structure-title')).toHaveCount(0);
-    await expectApart(page, ['toolbar', 'measurement-hint', 'color-legend', 'page-info-link']);
+    await expectApart(page, {
+      ...byTestId(page, ['toolbar', 'measurement-hint', 'color-legend']),
+      'details-link': page.getByRole('link', { name: /^Details about/ }),
+    });
   });
 
   test('a phone-width window docks the atom card even with a mouse', async ({ page }) => {
