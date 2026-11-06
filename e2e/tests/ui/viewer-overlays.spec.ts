@@ -43,6 +43,39 @@ async function withCrambinSample(page: Page) {
   await viewer.loadSampleMolecule('crambin');
 }
 
+/** Structure colors (for the legend), distance mode (for the hint) and an error. */
+async function showOverlays(page: Page) {
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).__mol3d_store.getState();
+    s.setColorScheme('secondaryStructure');
+    s.setMeasurementMode('distance');
+    s.setError('Something went wrong while loading the second structure');
+  });
+}
+
+/** The overlays with these test ids and the error are visible, on screen and apart. */
+async function expectApart(page: Page, testIds: string[]) {
+  for (const id of testIds) await expect(page.getByTestId(id)).toBeVisible();
+
+  const m = await page.evaluate((ids) => {
+    const els: [string, Element | null][] = ids.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]);
+    els.push(['error', document.querySelector('[role="alert"]')]);
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      boxes: els.map(([name, el]) => ({ name, ...el!.getBoundingClientRect().toJSON() })),
+    };
+  }, testIds);
+
+  for (const b of m.boxes) expect(insideViewport(b, m.vw, m.vh), `${b.name} on screen`).toBe(true);
+  for (let i = 0; i < m.boxes.length; i++) {
+    for (let j = i + 1; j < m.boxes.length; j++) {
+      expect(overlaps(m.boxes[i], m.boxes[j]), `${m.boxes[i].name} overlaps ${m.boxes[j].name}`).toBe(false);
+    }
+  }
+}
+
 /** Shows the tooltip for 1CRN's first atom as if the pointer were at (x, y). */
 async function hoverAtomAt(page: Page, x: number, y: number) {
   await page.evaluate(({ x, y }) => {
@@ -83,34 +116,19 @@ test.describe('Viewer overlays on wide screens', () => {
 
   test('error, hint, title, legend and toolbar never overlap', async ({ page }) => {
     await withCrambinSample(page);
-    await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const s = (window as any).__mol3d_store.getState();
-      s.setColorScheme('secondaryStructure');
-      s.setMeasurementMode('distance');
-      s.setError('Something went wrong while loading the second structure');
-    });
+    await showOverlays(page);
 
-    const testIds = ['toolbar', 'measurement-hint', 'color-legend', 'structure-title'];
-    for (const id of testIds) await expect(page.getByTestId(id)).toBeVisible();
+    await expectApart(page, ['toolbar', 'measurement-hint', 'color-legend', 'structure-title']);
     await expect(page.getByTestId('measurement-hint')).toContainText('Click 2 atoms');
+  });
 
-    const m = await page.evaluate((ids) => {
-      const els: [string, Element | null][] = ids.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]);
-      els.push(['error', document.querySelector('[role="alert"]')]);
-      return {
-        vw: window.innerWidth,
-        vh: window.innerHeight,
-        boxes: els.map(([name, el]) => ({ name, ...el!.getBoundingClientRect().toJSON() })),
-      };
-    }, testIds);
+  test('on a landing page, the Details link takes the title\'s place and overlaps nothing', async ({ page }) => {
+    await withCrambin(page);
+    test.skip(await page.locator('#landing-data').count() === 0, 'the dev server serves no landing pages; production does');
+    await showOverlays(page);
 
-    for (const b of m.boxes) expect(insideViewport(b, m.vw, m.vh), `${b.name} on screen`).toBe(true);
-    for (let i = 0; i < m.boxes.length; i++) {
-      for (let j = i + 1; j < m.boxes.length; j++) {
-        expect(overlaps(m.boxes[i], m.boxes[j]), `${m.boxes[i].name} overlaps ${m.boxes[j].name}`).toBe(false);
-      }
-    }
+    await expect(page.getByTestId('structure-title')).toHaveCount(0);
+    await expectApart(page, ['toolbar', 'measurement-hint', 'color-legend', 'page-info-link']);
   });
 
   test('a phone-width window docks the atom card even with a mouse', async ({ page }) => {

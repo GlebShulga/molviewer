@@ -58,6 +58,45 @@ async function withCrambinSample(page: Page) {
   return viewer;
 }
 
+/**
+ * Structure colors (for the legend), distance mode (for the hint), a tap near
+ * the right edge (for the atom card) and an error.
+ */
+async function showOverlays(page: Page) {
+  await page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = (window as any).__mol3d_store.getState();
+    const id = s.structureOrder[0];
+    s.setColorScheme('secondaryStructure');
+    s.setMeasurementMode('distance');
+    s.setHoveredAtom(s.structures.get(id).molecule.atoms[0], 0, id, { x: window.innerWidth - 5, y: window.innerHeight / 2 });
+    s.setError('Something went wrong while loading the second structure');
+  });
+}
+
+/** The overlays with these test ids and the error are visible, on screen and apart. */
+async function expectApart(page: Page, testIds: string[]) {
+  for (const id of testIds) await expect(page.getByTestId(id)).toBeVisible();
+  await expect(page.getByRole('alert')).toBeVisible();
+
+  const m = await page.evaluate((ids) => {
+    const els: [string, Element | null][] = ids.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]);
+    els.push(['error', document.querySelector('[role="alert"]')]);
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      boxes: els.map(([name, el]) => ({ name, ...el!.getBoundingClientRect().toJSON() })),
+    };
+  }, testIds);
+
+  for (const b of m.boxes) expect(insideViewport(b, m.vw, m.vh), `${b.name} on screen`).toBe(true);
+  for (let i = 0; i < m.boxes.length; i++) {
+    for (let j = i + 1; j < m.boxes.length; j++) {
+      expect(overlaps(m.boxes[i], m.boxes[j]), `${m.boxes[i].name} overlaps ${m.boxes[j].name}`).toBe(false);
+    }
+  }
+}
+
 async function openMoreMenu(page: Page) {
   await page.getByRole('button', { name: 'More', exact: true }).click({ force: true });
   await expect(page.getByRole('menu', { name: 'More actions' })).toBeVisible();
@@ -356,42 +395,20 @@ test.describe('Ways in and touch targets', () => {
 test.describe('Viewer overlays', () => {
   test('error, hint, atom card, title, legend and toolbar never overlap', async ({ page }) => {
     await withCrambinSample(page);
-    await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__mol3d_store;
-      const s = store.getState();
-      const id = s.structureOrder[0];
-      s.setColorScheme('secondaryStructure');
-      s.setMeasurementMode('distance');
-      // A tap near the right edge
-      s.setHoveredAtom(s.structures.get(id).molecule.atoms[0], 0, id, { x: window.innerWidth - 5, y: window.innerHeight / 2 });
-      s.setError('Something went wrong while loading the second structure');
-    });
+    await showOverlays(page);
 
-    const testIds = ['toolbar', 'measurement-hint', 'atom-card', 'color-legend', 'structure-title'];
-    for (const id of testIds) await expect(page.getByTestId(id)).toBeVisible();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expectApart(page, ['toolbar', 'measurement-hint', 'atom-card', 'color-legend', 'structure-title']);
     await test.info().attach('overlays', { body: await page.screenshot(), contentType: 'image/png' });
+  });
 
-    const boxes = await page.evaluate((ids) => {
-      const els: [string, Element | null][] = ids.map((id) => [id, document.querySelector(`[data-testid="${id}"]`)]);
-      els.push(['error', document.querySelector('[role="alert"]')]);
-      return {
-        vw: window.innerWidth,
-        vh: window.innerHeight,
-        boxes: els.map(([name, el]) => ({ name, ...el!.getBoundingClientRect().toJSON() })),
-      };
-    }, testIds);
+  test('on a landing page, the Details link takes the title\'s place and overlaps nothing', async ({ page }) => {
+    await withCrambin(page);
+    test.skip(await page.locator('#landing-data').count() === 0, 'the dev server serves no landing pages; production does');
+    await showOverlays(page);
 
-    for (const b of boxes.boxes) {
-      expect(insideViewport(b, boxes.vw, boxes.vh), `${b.name} on screen`).toBe(true);
-    }
-    for (let i = 0; i < boxes.boxes.length; i++) {
-      for (let j = i + 1; j < boxes.boxes.length; j++) {
-        const [a, b] = [boxes.boxes[i], boxes.boxes[j]];
-        expect(overlaps(a, b), `${a.name} overlaps ${b.name}`).toBe(false);
-      }
-    }
+    await expect(page.getByTestId('structure-title')).toHaveCount(0);
+    await expectApart(page, ['toolbar', 'measurement-hint', 'atom-card', 'color-legend', 'page-info-link']);
+    await test.info().attach('overlays', { body: await page.screenshot(), contentType: 'image/png' });
   });
 
   test('every tap on an atom counts while the atom card is showing, and the hint shows the result', async ({ page }) => {

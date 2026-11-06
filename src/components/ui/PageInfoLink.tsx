@@ -14,6 +14,7 @@ export function PageInfoLink() {
   return (
     <a
       className={styles.link}
+      data-testid="page-info-link"
       href="#page-info"
       onClick={(e) => {
         e.preventDefault();
