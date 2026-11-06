@@ -170,6 +170,45 @@ describe('detectAromaticRings', () => {
     ]);
   });
 
+  describe('fused rings: a double bond into the partner ring counts only if that ring is aromatic', () => {
+    // 0 X1, 1 X2, 2 X3, 3 X3a, 4 C4, 5 C5, 6 C6, 7 C7, 8 X7a. The six-ring is
+    // drawn o-quinoid: its shared atoms 3 and 8 have their double bonds in the five-ring.
+    const quinoid = (elements: string[]) =>
+      molecule(
+        atomsAt([], elements),
+        bonds([
+          [0, 1, 1], [1, 2, 1], [2, 3, 2], [3, 8, 1], [8, 0, 2],
+          [3, 4, 1], [4, 5, 2], [5, 6, 1], [6, 7, 2], [7, 8, 1],
+        ])
+      );
+
+    it('2H-indene: the five-ring has a CH2, so the o-quinoid six-ring is not aromatic', () => {
+      expect(ringSets(quinoid(['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']))).toEqual([]);
+    });
+
+    it('2H-isoindole: the five-ring is aromatic, so the six-ring is too', () => {
+      expect(ringSets(quinoid(['C', 'N', 'C', 'C', 'C', 'C', 'C', 'C', 'C']))).toEqual([
+        [0, 1, 2, 3, 8],
+        [3, 4, 5, 6, 7, 8],
+      ]);
+    });
+
+    it('indole drawn with the shared bond single: the five-ring counts the six-ring', () => {
+      // 0 N1, 1 C2, 2 C3, 3 C3a, 4 C4, 5 C5, 6 C6, 7 C7, 8 C7a
+      const indole = molecule(
+        atomsAt([], ['N', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']),
+        bonds([
+          [0, 1, 1], [1, 2, 2], [2, 3, 1], [3, 8, 1], [8, 0, 1],
+          [3, 4, 2], [4, 5, 1], [5, 6, 2], [6, 7, 1], [7, 8, 2],
+        ])
+      );
+      expect(ringSets(indole)).toEqual([
+        [0, 1, 2, 3, 8],
+        [3, 4, 5, 6, 7, 8],
+      ]);
+    });
+  });
+
   it('finds both rings of caffeine, with its methyls and C=O groups', () => {
     // 0 N1, 1 C2, 2 N3, 3 C4, 4 C5, 5 C6, 6 N7, 7 C8, 8 N9,
     // 9 O on C2, 10 O on C6, 11-13 methyls on N1, N3, N7

@@ -92,12 +92,13 @@ function otherAtom(bond: Bond, atom: number): number {
  * A ring whose bonds are all flagged aromatic (SDF bond type 4) is aromatic.
  * Otherwise each ring atom contributes π electrons by the first rule that applies:
  * 1. a double (or flagged) bond to a ring partner, meaning an atom of this
- *    ring or of a ring fused to it: 1
+ *    ring or of a fused ring already found aromatic: 1
  * 2. any other double bond (C=O, exocyclic C=C, S(=O)2): 0
  * 3. N, O or S with single bonds only (lone pair): 2
  * 4. a carbon with single bonds only: the ring is not aromatic.
- * The ring is aromatic when the total is exactly 6. Counting fused partners
- * lets either Kekulé form of naphthalene or indole pass for both rings.
+ * The ring is aromatic when the total is exactly 6. Counting aromatic fused
+ * partners lets either Kekulé form of naphthalene or indole pass for both
+ * rings, while an o-quinoid ring next to a non-aromatic one (2H-indene) fails.
  */
 function isAromaticRing(
   ring: RingCandidate,
@@ -201,31 +202,41 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
     }
   }
 
-  // Ring partners: the ring's own atoms plus those of candidates sharing a bond with it
+  // Candidates fused to each one (sharing a bond with it)
   const candidateBonds = candidates.map(c => new Set(ringBondKeys(c)));
-  const partnersOf = (i: number): Set<number> => {
-    const partners = new Set(candidates[i].atomIndices);
-    candidates.forEach((other, j) => {
-      if (j !== i && [...candidateBonds[j]].some(key => candidateBonds[i].has(key))) {
-        other.atomIndices.forEach(idx => partners.add(idx));
+  const fused = candidates.map((_, i) =>
+    candidates
+      .map((__, j) => j)
+      .filter(j => j !== i && [...candidateBonds[j]].some(key => candidateBonds[i].has(key)))
+  );
+
+  // Ring partners are the ring's own atoms plus those of fused rings already
+  // found aromatic, so passes repeat until nothing changes: the first finds
+  // rings that are aromatic on their own bonds, later ones the rings that need
+  // a double bond into such a neighbour (naphthalene's second ring).
+  const aromatic = candidates.map(() => false);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [i, candidate] of candidates.entries()) {
+      if (aromatic[i]) continue;
+      const partners = new Set(candidate.atomIndices);
+      for (const j of fused[i]) {
+        if (aromatic[j]) candidates[j].atomIndices.forEach(idx => partners.add(idx));
       }
-    });
-    return partners;
-  };
-
-  // Filter to aromatic rings only
-  const aromaticRings: AromaticRing[] = [];
-
-  for (const [i, candidate] of candidates.entries()) {
-    if (isAromaticRing(candidate, atoms, bondByKey, bondsOfAtom, partnersOf(i))) {
-      aromaticRings.push({
-        atomIndices: candidate.atomIndices,
-        ...calculateRingGeometry(candidate.atomIndices, atoms),
-      });
+      if (isAromaticRing(candidate, atoms, bondByKey, bondsOfAtom, partners)) {
+        aromatic[i] = true;
+        changed = true;
+      }
     }
   }
 
-  return aromaticRings;
+  return candidates
+    .filter((_, i) => aromatic[i])
+    .map(candidate => ({
+      atomIndices: candidate.atomIndices,
+      ...calculateRingGeometry(candidate.atomIndices, atoms),
+    }));
 }
 
 /**
