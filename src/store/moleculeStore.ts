@@ -56,16 +56,34 @@ interface TemporalState {
 }
 
 /**
+ * Keys left out of the undo comparison. zundo compares the previous and next
+ * state on every store write (hover included), and serializing these took
+ * 90-106 ms per write on 4V6X:
+ * - 'molecule': large, and doesn't change for representation/colorScheme/visibility operations.
+ * - 'aromaticRingsDetected': computed lazily and mutates the structure in place.
+ * - 'classification' and 'source' (an uploaded file's whole text): set only when a
+ *   structure is created; share and session loads clear the history.
+ * - 'atomIndices': componentSettings[].atomIndices (1.55 MB on 4V6X) never changes
+ *   by a user action (setStructureComponentSettings and updateStructureComponentSetting
+ *   could, but have no callers outside tests). This also drops the deprecated
+ *   Measurement.atomIndices, whose atoms atomRefs still carries into the comparison.
+ */
+const SKIPPED_IN_COMPARISON = new Set([
+  'molecule',
+  'aromaticRingsDetected',
+  'classification',
+  'source',
+  'atomIndices',
+]);
+
+/**
  * Serialize a TemporalState for comparison.
- * Handles Map objects by converting them to sorted arrays.
- * Excludes certain properties from comparison:
- * - 'molecule': Large object that doesn't change for representation/colorScheme/visibility operations
- * - 'aromaticRingsDetected': Computed lazily and mutates the structure in place
+ * Handles Map objects by converting them to sorted arrays, and leaves out
+ * SKIPPED_IN_COMPARISON.
  */
 function serializeForComparison(state: TemporalState): string {
   return JSON.stringify(state, (key, value) => {
-    // Exclude properties that shouldn't affect equality comparison
-    if (key === 'molecule' || key === 'aromaticRingsDetected') {
+    if (SKIPPED_IN_COMPARISON.has(key)) {
       return undefined;
     }
 

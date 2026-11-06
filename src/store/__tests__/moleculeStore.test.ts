@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import type { Molecule } from '../../types';
+import type { Structure } from '../../types/multiStructure';
 
 function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -224,6 +225,84 @@ describe('moleculeStore', () => {
 
       temporalStore.getState().undo();
       expect(useMoleculeStore.getState().labels.length).toBe(0);
+    });
+
+    describe('steps', () => {
+      const store = () => useMoleculeStore.getState();
+      const steps = () => temporalStore.getState().pastStates.length;
+
+      /** Write one structure through setState, as an action would (zundo wraps setState too). */
+      function replaceStructure(id: string, update: (s: Structure) => Structure) {
+        const structures = new Map(store().structures);
+        structures.set(id, update(structures.get(id)!));
+        useMoleculeStore.setState({ structures });
+      }
+
+      it('adds one step per representation, colour scheme, visibility and component change', () => {
+        const id = store().addStructure(createMockMolecule(), 'A');
+        const structure = () => store().structures.get(id)!;
+        let before = steps();
+
+        const rep = structure().representation === 'stick' ? 'spacefill' : 'stick';
+        store().setStructureRepresentation(id, rep);
+        expect(steps()).toBe(before + 1);
+        before = steps();
+
+        const scheme = structure().colorScheme === 'chain' ? 'cpk' : 'chain';
+        store().setStructureColorScheme(id, scheme);
+        expect(steps()).toBe(before + 1);
+        before = steps();
+
+        store().setStructureVisibility(id, false);
+        expect(steps()).toBe(before + 1);
+        before = steps();
+
+        const component = structure().componentSettings[0];
+        store().updateStructureComponentSetting(id, component.type, { visible: !component.visible });
+        expect(steps()).toBe(before + 1);
+        before = steps();
+
+        store().updateStructureComponentSetting(id, component.type, { representation: 'spacefill' });
+        expect(steps()).toBe(before + 1);
+      });
+
+      it('adds no step for a repeat of the same value', () => {
+        const id = store().addStructure(createMockMolecule(), 'A');
+        store().setStructureRepresentation(id, 'stick');
+        const before = steps();
+        store().setStructureRepresentation(id, 'stick');
+        store().setStructureVisibility(id, store().structures.get(id)!.visible);
+        expect(steps()).toBe(before);
+      });
+
+      it('adds no step when only componentSettings atomIndices change', () => {
+        const id = store().addStructure(createMockMolecule(), 'A');
+        const before = steps();
+        replaceStructure(id, (s) => ({
+          ...s,
+          componentSettings: s.componentSettings.map((cs) => ({ ...cs, atomIndices: [2, 1, 0, 99] })),
+        }));
+        expect(store().structures.get(id)!.componentSettings[0].atomIndices).toEqual([2, 1, 0, 99]);
+        expect(steps()).toBe(before);
+      });
+
+      it('leaves an uploaded file text out of the comparison', () => {
+        const source = { type: 'inline' as const, format: 'pdb' as const, data: 'ATOM  '.repeat(200_000) };
+        const id = store().addStructure(createMockMolecule(), 'A', source);
+        let before = steps();
+
+        replaceStructure(id, (s) => ({ ...s, source: { ...source, data: 'HETATM'.repeat(200_000) } }));
+        expect(steps()).toBe(before);
+
+        const rep = store().structures.get(id)!.representation === 'stick' ? 'spacefill' : 'stick';
+        store().setStructureRepresentation(id, rep);
+        expect(steps()).toBe(before + 1);
+        before = steps();
+
+        // A transient write (hover) still adds nothing
+        store().setHoveredAtom(null, null, null, null);
+        expect(steps()).toBe(before);
+      });
     });
   });
 });
