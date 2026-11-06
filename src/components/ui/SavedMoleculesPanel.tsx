@@ -103,8 +103,14 @@ export function SavedMoleculesPanel() {
         alert(message);
       }
     } else {
-      // Legacy single-molecule entry
-      loadSavedMolecule(id);
+      // Legacy single-molecule entry (large ones are read from IndexedDB)
+      try {
+        await loadSavedMolecule(id);
+      } catch (err) {
+        console.error('[SavedMoleculesPanel] Failed to load molecule:', err);
+        logError(err instanceof Error ? err : new Error(String(err)), { source: 'SavedMoleculesPanel', op: 'load-molecule' });
+        alert(err instanceof Error ? err.message : 'Failed to load molecule');
+      }
     }
   };
 

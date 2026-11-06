@@ -36,7 +36,7 @@ import { DEFAULT_SURFACE_COLOR } from '../colors';
 import {
   saveMolecule,
   updateMolecule,
-  loadMolecule,
+  loadMoleculeAsync,
   getSavedMolecules,
   deleteMolecule,
   clearAllMolecules,
@@ -376,7 +376,7 @@ interface MoleculeState {
   loadSavedMoleculesIndex: () => void;
   saveMoleculeToStorage: (name?: string) => void;
   updateSavedMolecule: () => void;
-  loadSavedMolecule: (id: string) => void;
+  loadSavedMolecule: (id: string) => Promise<void>;
   deleteSavedMolecule: (id: string) => void;
   renameSavedMolecule: (id: string, newName: string) => void;
   clearAllSavedMolecules: () => void;
@@ -985,8 +985,10 @@ export const useMoleculeStore = create<MoleculeState>()(
     }
   },
 
-  loadSavedMolecule: (id) => {
-    const data = loadMolecule(id);
+  loadSavedMolecule: async (id) => {
+    // Async: entries of 50,000+ atoms live in IndexedDB, which the
+    // synchronous loader can't read
+    const data = await loadMoleculeAsync(id);
     if (data) {
       // Use setMolecule to clear and load single structure. Stored rings are
       // dropped so they are detected again, as for a session.

@@ -364,12 +364,12 @@ describe('loadSavedMolecule', () => {
     unit: 'Å',
   });
 
-  it('points saved measurements at the loaded structure, not the structure they were saved from', () => {
+  it('points saved measurements at the loaded structure, not the structure they were saved from', async () => {
     const entry = saveMolecule(createMockMolecule('Saved', 4), [
       savedMeasurement('m1', [['old-id', 0], ['old-id', 1]]),
     ]);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     const state = useMoleculeStore.getState();
     expect(state.measurements).toHaveLength(1);
@@ -379,11 +379,11 @@ describe('loadSavedMolecule', () => {
     ]);
   });
 
-  it('migrates measurements saved with atom indices only', () => {
+  it('migrates measurements saved with atom indices only', async () => {
     const legacy = { ...savedMeasurement('m1', [['', 1], ['', 2]]), atomRefs: undefined };
     const entry = saveMolecule(createMockMolecule('Saved', 4), [legacy as unknown as Measurement]);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     const state = useMoleculeStore.getState();
     expect(state.measurements[0].atomRefs).toEqual([
@@ -392,25 +392,25 @@ describe('loadSavedMolecule', () => {
     ]);
   });
 
-  it('drops measurements that spanned several structures, since only one was saved', () => {
+  it('drops measurements that spanned several structures, since only one was saved', async () => {
     const entry = saveMolecule(createMockMolecule('Saved', 4), [
       savedMeasurement('same', [['a', 0], ['a', 1]]),
       savedMeasurement('cross', [['a', 0], ['b', 1]]),
     ]);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['same']);
   });
 
-  it('drops stored aromatic rings so they are detected again', () => {
+  it('drops stored aromatic rings so they are detected again', async () => {
     const stale = {
       ...createMockMolecule('Saved', 4),
       aromaticRings: [{ atomIndices: [0, 1, 2, 3], center: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 }, radius: 1 }],
     };
     const entry = saveMolecule(stale);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     const { structures, activeStructureId } = useMoleculeStore.getState();
     const loaded = structures.get(activeStructureId!);
@@ -418,20 +418,20 @@ describe('loadSavedMolecule', () => {
     expect(loaded?.molecule.aromaticRings).toBeUndefined();
   });
 
-  it('recomputes a dihedral stored with the old sign and keeps matching distances', () => {
+  it('recomputes a dihedral stored with the old sign and keeps matching distances', async () => {
     const entry = saveMolecule(createDihedralMolecule(), [
       { ...savedMeasurement('dih', [['old-id', 0], ['old-id', 1], ['old-id', 2], ['old-id', 3]]), type: 'dihedral', value: 90, unit: '°' },
       { ...savedMeasurement('dist', [['old-id', 0], ['old-id', 1]]), value: 1 },
     ]);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     const values = Object.fromEntries(useMoleculeStore.getState().measurements.map((m) => [m.id, m.value]));
     expect(values.dih).toBeCloseTo(-90, 6);
     expect(values.dist).toBe(1);
   });
 
-  it('drops measurements taken on another structure, whose values do not match these atoms', () => {
+  it('drops measurements taken on another structure, whose values do not match these atoms', async () => {
     // Older saves kept every measurement in the scene, not only the saved structure's.
     // Atoms 0 and 1 of the saved molecule are 1.5 Å apart; 'other' was measured elsewhere.
     const entry = saveMolecule(createMockMolecule('Saved', 4), [
@@ -439,7 +439,7 @@ describe('loadSavedMolecule', () => {
       { ...savedMeasurement('other', [['b', 0], ['b', 1]]), value: 2.4 },
     ]);
 
-    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+    await useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['own']);
   });
