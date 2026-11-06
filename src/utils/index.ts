@@ -9,8 +9,6 @@ export { extractBackbone, hasBackboneData, type BackboneResidue, type BackboneCh
 export { generateBackboneSpline, segmentSplineByStructure, type SplinePoint, type SplineSegment } from './splineGeneration';
 export { generateHelixGeometry, generateSheetGeometry, generateCoilGeometry, mergeGeometries } from './cartoonGeometry';
 export {
-  saveMolecule,
-  updateMolecule,
   loadMolecule,
   loadMoleculeAsync,
   getSavedMolecules,

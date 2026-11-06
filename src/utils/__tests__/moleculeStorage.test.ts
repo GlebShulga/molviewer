@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getSavedMolecules, saveMolecule, saveSession } from '../moleculeStorage';
+import { getSavedMolecules, saveSession } from '../moleculeStorage';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { AROMATIC_DETECTION_THRESHOLD } from '../../config/rendering';
 import type { Molecule } from '../../types';
@@ -55,15 +55,13 @@ describe('saved ring count', () => {
     expect(entry.aromaticRingCount).toBe(0);
   });
 
-  it('counts rings for a molecule saved without stored rings', () => {
-    expect(saveMolecule(benzene()).aromaticRingCount).toBe(1);
-  });
-
-  it('counts 0 above the detection threshold', () => {
+  it('counts 0 above the detection threshold', async () => {
     const big = benzene();
     for (let i = big.atoms.length; i <= AROMATIC_DETECTION_THRESHOLD; i++) {
       big.atoms.push({ id: i, element: 'C', x: i * 10, y: 0, z: 0 });
     }
-    expect(saveMolecule(big).aromaticRingCount).toBe(0);
+    useMoleculeStore.getState().addStructure(big, 'big');
+    const entry = await saveSession(useMoleculeStore.getState().buildSession('big', null));
+    expect(entry.aromaticRingCount).toBe(0);
   });
 });

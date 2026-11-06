@@ -34,8 +34,6 @@ import { AROMATIC_DETECTION_THRESHOLD, GPU_PICKING_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
 import {
-  saveMolecule,
-  updateMolecule,
   loadMoleculeAsync,
   getSavedMolecules,
   deleteMolecule,
@@ -221,11 +219,6 @@ export function styleSafeStructure(structure: Structure): { structure: Structure
  */
 let latestSavedLoad = 0;
 
-/** Measurements whose atoms all belong to one structure, for saving that structure alone. */
-function measurementsOn(measurements: Measurement[], structureId: string): Measurement[] {
-  return measurements.filter((m) => m.atomRefs.every((ref) => ref.structureId === structureId));
-}
-
 /**
  * A session's structures as they can be shown here: through styleSafeStructure,
  * with one toast if any fell back, and withValidColor, for sessions saved with
@@ -381,8 +374,7 @@ interface MoleculeState {
 
   // Saved molecules actions
   loadSavedMoleculesIndex: () => void;
-  saveMoleculeToStorage: (name?: string) => void;
-  updateSavedMolecule: () => void;
+  /** Loads a single-molecule entry saved by older versions (new saves are sessions). */
   loadSavedMolecule: (id: string) => Promise<void>;
   deleteSavedMolecule: (id: string) => void;
   renameSavedMolecule: (id: string, newName: string) => void;
@@ -958,38 +950,6 @@ export const useMoleculeStore = create<MoleculeState>()(
   // Saved molecules actions
   loadSavedMoleculesIndex: () => {
     set({ savedMolecules: getSavedMolecules() });
-  },
-
-  saveMoleculeToStorage: (name) => {
-    const { structures, activeStructureId, measurements } = get();
-    const activeStructure = activeStructureId ? structures.get(activeStructureId) : null;
-    if (!activeStructure) return;
-
-    // Save the active structure's molecule with only its own measurements
-    const entry = saveMolecule(activeStructure.molecule, measurementsOn(measurements, activeStructure.id), name);
-    set({
-      savedMolecules: [entry, ...get().savedMolecules],
-      loadedMoleculeId: entry.id,
-    });
-  },
-
-  updateSavedMolecule: () => {
-    const { structures, activeStructureId, measurements, loadedMoleculeId, savedMolecules } = get();
-    const activeStructure = activeStructureId ? structures.get(activeStructureId) : null;
-    if (!activeStructure || !loadedMoleculeId) return;
-
-    const updatedEntry = updateMolecule(
-      loadedMoleculeId,
-      activeStructure.molecule,
-      measurementsOn(measurements, activeStructure.id)
-    );
-    if (updatedEntry) {
-      set({
-        savedMolecules: savedMolecules.map((e) =>
-          e.id === loadedMoleculeId ? updatedEntry : e
-        ),
-      });
-    }
   },
 
   loadSavedMolecule: async (id) => {

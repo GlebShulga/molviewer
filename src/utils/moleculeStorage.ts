@@ -23,7 +23,6 @@ const MOLECULE_PREFIX = `${STORAGE_PREFIX}molecule_`;
 const STORAGE_VERSION = 2; // Bumped for IndexedDB support
 const MAX_LOCALSTORAGE_BYTES = 5 * 1024 * 1024; // 5MB localStorage limit
 const LARGE_MOLECULE_THRESHOLD = 50000; // Atoms - use IndexedDB above this
-const CHUNK_SIZE = 100000; // Atoms per chunk for IndexedDB
 
 const DB_NAME = 'mol3d-storage';
 const DB_VERSION = 2;
@@ -159,54 +158,6 @@ function saveIndex(index: StorageIndex): void {
 }
 
 /**
- * Save molecule to IndexedDB in chunks.
- */
-async function saveMoleculeToIndexedDB(
-  id: string,
-  molecule: Molecule,
-  measurements: Measurement[]
-): Promise<number> {
-  const db = await openDatabase();
-  const chunkCount = Math.ceil(molecule.atoms.length / CHUNK_SIZE);
-
-  // Save metadata
-  const metadata: MoleculeMetadata = {
-    id,
-    name: molecule.name,
-    bonds: molecule.bonds,
-    aromaticRings: molecule.aromaticRings,
-    assemblies: molecule.assemblies,
-    measurements,
-    chunkCount,
-  };
-
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(['molecules', 'chunks'], 'readwrite');
-    const moleculeStore = tx.objectStore('molecules');
-    const chunkStore = tx.objectStore('chunks');
-
-    moleculeStore.put(metadata);
-
-    // Save atoms in chunks
-    for (let i = 0; i < chunkCount; i++) {
-      const start = i * CHUNK_SIZE;
-      const end = Math.min(start + CHUNK_SIZE, molecule.atoms.length);
-      const chunk: MoleculeChunk = {
-        moleculeId: id,
-        chunkIndex: i,
-        atoms: molecule.atoms.slice(start, end),
-      };
-      chunkStore.put(chunk);
-    }
-
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-
-  return chunkCount;
-}
-
-/**
  * Load molecule from IndexedDB.
  */
 async function loadMoleculeFromIndexedDB(
@@ -297,130 +248,6 @@ async function deleteMoleculeFromIndexedDB(id: string): Promise<void> {
     console.error('[MoleculeStorage] Failed to delete from IndexedDB:', error);
     logError(error instanceof Error ? error : new Error(String(error)), { source: 'moleculeStorage', op: 'delete-molecule' });
   }
-}
-
-export function saveMolecule(
-  molecule: Molecule,
-  measurements: Measurement[] = [],
-  customName?: string
-): SavedMoleculeEntry {
-  const id = generateId();
-  const useIndexedDB =
-    isIndexedDBAvailable() && molecule.atoms.length >= LARGE_MOLECULE_THRESHOLD;
-
-  const entry: SavedMoleculeEntry = {
-    id,
-    name: customName || molecule.name,
-    savedAt: Date.now(),
-    atomCount: molecule.atoms.length,
-    bondCount: molecule.bonds.length,
-    aromaticRingCount: countAromaticRings(molecule),
-    measurementCount: measurements.length,
-    storage: useIndexedDB ? 'indexedDB' : 'localStorage',
-  };
-
-  if (useIndexedDB) {
-    // Save to IndexedDB asynchronously
-    saveMoleculeToIndexedDB(id, molecule, measurements)
-      .then((chunkCount) => {
-        entry.chunkCount = chunkCount;
-        // Update index with chunk count
-        const index = getIndex();
-        const existingEntry = index.entries.find((e) => e.id === id);
-        if (existingEntry) {
-          existingEntry.chunkCount = chunkCount;
-          saveIndex(index);
-        }
-        console.log(`[MoleculeStorage] Saved ${molecule.atoms.length} atoms to IndexedDB in ${chunkCount} chunks`);
-      })
-      .catch((error) => {
-        console.error('[MoleculeStorage] Failed to save to IndexedDB:', error);
-        logError(error instanceof Error ? error : new Error(String(error)), {
-          source: 'moleculeStorage',
-          op: 'save-molecule',
-          atomCount: molecule.atoms.length,
-        });
-      });
-  } else {
-    // Save to localStorage
-    const moleculeKey = `${MOLECULE_PREFIX}${id}`;
-    const storedData: StoredMoleculeData = { molecule, measurements };
-    try {
-      localStorage.setItem(moleculeKey, JSON.stringify(storedData));
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        throw new Error('Storage is full. Please delete some saved molecules.');
-      }
-      throw e;
-    }
-  }
-
-  // Update index
-  const index = getIndex();
-  index.entries.unshift(entry);
-  saveIndex(index);
-
-  return entry;
-}
-
-export function updateMolecule(
-  id: string,
-  molecule: Molecule,
-  measurements: Measurement[] = []
-): SavedMoleculeEntry | null {
-  const index = getIndex();
-  const entry = index.entries.find((e) => e.id === id);
-  if (!entry) return null;
-
-  const useIndexedDB =
-    isIndexedDBAvailable() && molecule.atoms.length >= LARGE_MOLECULE_THRESHOLD;
-
-  // Update entry metadata
-  entry.savedAt = Date.now();
-  entry.atomCount = molecule.atoms.length;
-  entry.bondCount = molecule.bonds.length;
-  entry.aromaticRingCount = countAromaticRings(molecule);
-  entry.measurementCount = measurements.length;
-  entry.storage = useIndexedDB ? 'indexedDB' : 'localStorage';
-
-  if (useIndexedDB) {
-    // If switching from localStorage to IndexedDB, delete old data
-    if (entry.storage === 'localStorage') {
-      localStorage.removeItem(`${MOLECULE_PREFIX}${id}`);
-    }
-
-    saveMoleculeToIndexedDB(id, molecule, measurements)
-      .then((chunkCount) => {
-        entry.chunkCount = chunkCount;
-        saveIndex(index);
-      })
-      .catch((err) => {
-        console.error('[MoleculeStorage] Background save to IndexedDB failed:', err);
-        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'save-molecule-bg' });
-      });
-  } else {
-    // If switching from IndexedDB to localStorage, delete old data
-    if (entry.storage === 'indexedDB') {
-      deleteMoleculeFromIndexedDB(id).catch((err) => {
-        console.error('[MoleculeStorage] Background delete of orphan IndexedDB molecule failed:', err);
-        logError(err instanceof Error ? err : new Error(String(err)), { source: 'moleculeStorage', op: 'delete-orphan-molecule' });
-      });
-    }
-
-    const moleculeKey = `${MOLECULE_PREFIX}${id}`;
-    const storedData: StoredMoleculeData = { molecule, measurements };
-    try {
-      localStorage.setItem(moleculeKey, JSON.stringify(storedData));
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        throw new Error('Storage is full. Please delete some saved molecules.');
-      }
-      throw e;
-    }
-  }
-
-  saveIndex(index);
-  return entry;
 }
 
 export function loadMolecule(id: string): { molecule: Molecule; measurements: Measurement[] } | null {

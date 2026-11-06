@@ -3,7 +3,6 @@ import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import type { Molecule } from '../../types';
 import type { Structure } from '../../types/multiStructure';
 import type { Measurement } from '../../utils/measurements';
-import { loadMolecule, saveMolecule } from '../../utils/moleculeStorage';
 
 function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -445,36 +444,28 @@ describe('loadSavedMolecule', () => {
   });
 });
 
-describe('saveMoleculeToStorage', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    useMoleculeStore.getState().reset();
-    temporalStore.getState().clear();
+/**
+ * Writes a single-molecule entry the way older versions saved one to
+ * localStorage (an index entry plus the molecule and its measurements).
+ * The app no longer saves these; it only loads them.
+ */
+function saveMolecule(molecule: Molecule, measurements: Measurement[] = []): { id: string } {
+  const id = `legacy-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(`mol3d_molecule_${id}`, JSON.stringify({ molecule, measurements }));
+  const index = JSON.parse(localStorage.getItem('mol3d_index') ?? '{"version":2,"entries":[]}');
+  index.entries.unshift({
+    id,
+    name: molecule.name,
+    savedAt: Date.now(),
+    atomCount: molecule.atoms.length,
+    bondCount: molecule.bonds.length,
+    aromaticRingCount: 0,
+    measurementCount: measurements.length,
+    storage: 'localStorage',
   });
-
-  it("saves only the active structure's measurements", () => {
-    const store = useMoleculeStore.getState();
-    const a = store.addStructure(createMockMolecule('A', 4), 'A');
-    const b = store.addStructure(createMockMolecule('B', 4), 'B');
-    const distance = (id: string, refs: [string, number][]): Measurement => ({
-      id,
-      type: 'distance',
-      atomIndices: refs.map(([, i]) => i),
-      atomRefs: refs.map(([structureId, atomIndex]) => ({ structureId, atomIndex })),
-      value: 1.5,
-      unit: 'Å',
-    });
-    store.addMeasurement(distance('on-a', [[a, 0], [a, 1]]));
-    store.addMeasurement(distance('on-b', [[b, 0], [b, 1]]));
-    store.addMeasurement(distance('across', [[a, 0], [b, 1]]));
-    store.setActiveStructure(a);
-
-    useMoleculeStore.getState().saveMoleculeToStorage('A only');
-
-    const { loadedMoleculeId } = useMoleculeStore.getState();
-    expect(loadMolecule(loadedMoleculeId!)?.measurements.map((m) => m.id)).toEqual(['on-a']);
-  });
-});
+  localStorage.setItem('mol3d_index', JSON.stringify(index));
+  return { id };
+}
 
 /** Four atoms whose dihedral is -90° (IUPAC sign). */
 function createDihedralMolecule(): Molecule {
