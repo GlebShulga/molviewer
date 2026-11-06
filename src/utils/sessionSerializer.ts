@@ -42,13 +42,15 @@ function serializeStructure(s: Structure): SerializedStructure {
   return {
     id: s.id,
     name: s.name,
-    molecule: s.molecule,
+    // Aromatic rings are derived data: loads detect them again, so they are
+    // not stored. The flag stays in the schema, always false.
+    molecule: { ...s.molecule, aromaticRings: undefined },
     visible: s.visible,
     representation: s.representation,
     colorScheme: s.colorScheme,
     componentSettings: s.componentSettings.map(serializeComponentSettings),
     classification: s.classification,
-    aromaticRingsDetected: s.aromaticRingsDetected,
+    aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
   };
@@ -58,9 +60,9 @@ function deserializeStructure(s: SerializedStructure): Structure {
   return {
     id: s.id,
     name: s.name,
-    // Stored rings come from whatever detection the saving version ran (or
-    // none, if Ball & Stick and Stick were never shown), so they are dropped
-    // and detected again when a style that draws them is shown.
+    // Sessions saved by older versions stored rings from whatever detection
+    // that version ran (or none, if Ball & Stick and Stick were never shown),
+    // so they are dropped and detected again when a style that draws them is shown.
     molecule: { ...s.molecule, aromaticRings: undefined },
     visible: s.visible,
     representation: s.representation,

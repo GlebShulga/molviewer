@@ -115,13 +115,18 @@ describe('session save/load round-trip', () => {
     expect(() => deserializeSession(session)).toThrow(SessionVersionError);
   });
 
-  // Checklist item 5: stored aromatic rings are dropped and detected again lazily
-  it('drops stored aromatic rings on load so they are detected again', () => {
+  // Checklist item 5: aromatic rings are derived data, detected again lazily after a load
+  it('does not store detected aromatic rings in the session', () => {
     const store = useMoleculeStore.getState();
     const id = store.addStructure(hexagonMolecule([2, 1, 2, 1, 2, 1]), 'benzene');
     store.detectAromaticRingsIfNeeded(id);
     const session = store.buildSession('rings', null);
-    expect(session.state.structures[0].molecule.aromaticRings).toHaveLength(1);
+
+    const stored = JSON.parse(JSON.stringify(session)).state.structures[0];
+    expect(stored.molecule).not.toHaveProperty('aromaticRings');
+    expect(stored.aromaticRingsDetected).toBe(false);
+    // The structure on screen keeps its rings
+    expect(useMoleculeStore.getState().structures.get(id)?.molecule.aromaticRings).toHaveLength(1);
 
     store.reset();
     store.loadSession(session);
