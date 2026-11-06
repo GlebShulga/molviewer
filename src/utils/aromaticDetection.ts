@@ -259,7 +259,8 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
  * component, or drawing the rings of a hidden component.
  */
 export function ringsWithin(rings: AromaticRing[], atomIndices: number[] | undefined): AromaticRing[] {
-  if (!atomIndices) return rings;
+  // No subset, or nothing to filter (every protein): skip building the atom set
+  if (!atomIndices || rings.length === 0) return rings;
   const subset = new Set(atomIndices);
   return rings.filter(ring => ring.atomIndices.every(idx => subset.has(idx)));
 }

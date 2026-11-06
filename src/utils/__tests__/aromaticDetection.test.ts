@@ -343,6 +343,12 @@ describe('ringsWithin', () => {
     expect(ringsWithin(rings, undefined)).toBe(rings);
   });
 
+  it('returns an empty ring list as is, without looking at the atoms', () => {
+    // A protein component: no rings, many atoms
+    const none: typeof rings = [];
+    expect(ringsWithin(none, Array.from({ length: 50000 }, (_, i) => i))).toBe(none);
+  });
+
   it("keeps only rings whose atoms are all in a component's atoms", () => {
     expect(rings).toHaveLength(2);
     expect(firstAtoms(ringsWithin(rings, [0, 1, 2, 3, 4, 5]))).toEqual([0]);
