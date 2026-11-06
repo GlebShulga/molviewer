@@ -246,6 +246,18 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
 }
 
 /**
+ * The rings a representation drawing only some atoms should show: those whose
+ * atoms are all among them. Without a subset every ring is kept. This keeps a
+ * structure drawn as several components from drawing each ring once per
+ * component, or drawing the rings of a hidden component.
+ */
+export function ringsWithin(rings: AromaticRing[], atomIndices: number[] | undefined): AromaticRing[] {
+  if (!atomIndices) return rings;
+  const subset = new Set(atomIndices);
+  return rings.filter(ring => ring.atomIndices.every(idx => subset.has(idx)));
+}
+
+/**
  * Number of aromatic rings, for the Saved panel's count. A stored list is
  * used as is (loads drop stored lists, so one present was detected in this
  * session); otherwise detection runs, unless the molecule is over the size

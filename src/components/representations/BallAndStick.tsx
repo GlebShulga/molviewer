@@ -7,6 +7,7 @@ import { selectDetectAromaticRingsIfNeeded } from "../../store/selectors";
 import { useRepresentationSetup } from "../../hooks";
 import { SCALES, COLORS, getQualityPreset, PERFORMANCE_THRESHOLDS } from "../../config";
 import { getAtomColor } from "../../utils";
+import { ringsWithin } from "../../utils/aromaticDetection";
 import { SelectableAtom } from "./SelectableAtom";
 import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
 import { AromaticRings } from "./AromaticRings";
@@ -55,6 +56,12 @@ export function BallAndStick({
       detectAromaticRingsIfNeeded(effectiveStructureId);
     }
   }, [showAromaticRings, detectAromaticRingsIfNeeded, effectiveStructureId]);
+
+  // Only this component's rings, so a structure split into components draws each once
+  const rings = useMemo(
+    () => ringsWithin(molecule.aromaticRings ?? [], atomIndices),
+    [molecule.aromaticRings, atomIndices]
+  );
 
   // Filter atoms and bonds if atomIndices is provided
   const { filteredAtoms, filteredBonds } = useMemo(() => {
@@ -182,9 +189,7 @@ export function BallAndStick({
 
       <InstancedBonds matrices={bondMatrices} geometry={bondGeometry} material={bondMaterial} />
 
-      {showAromaticRings && molecule.aromaticRings && (
-        <AromaticRings rings={molecule.aromaticRings} />
-      )}
+      {showAromaticRings && rings.length > 0 && <AromaticRings rings={rings} />}
     </group>
   );
 }

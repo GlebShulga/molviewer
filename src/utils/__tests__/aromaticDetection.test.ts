@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { countAromaticRings, detectAromaticRings } from '../aromaticDetection';
+import { countAromaticRings, detectAromaticRings, ringsWithin } from '../aromaticDetection';
 import { AROMATIC_DETECTION_THRESHOLD } from '../../config/rendering';
 import { parseSDF } from '../../parsers/sdfParser';
 import { parsePDB } from '../../parsers/pdbParser';
@@ -307,5 +307,31 @@ describe('countAromaticRings', () => {
     }
     expect(big.atoms.length).toBe(AROMATIC_DETECTION_THRESHOLD + 1);
     expect(countAromaticRings(big)).toBe(0);
+  });
+});
+
+describe('ringsWithin', () => {
+  const rings = detectAromaticRings(
+    molecule(
+      atomsAt([...polygon(6, [-3, 0]), ...polygon(6, [3, 0])], Array(12).fill('C')),
+      bonds([
+        [0, 1, 2], [1, 2, 1], [2, 3, 2], [3, 4, 1], [4, 5, 2], [5, 0, 1],
+        [6, 7, 2], [7, 8, 1], [8, 9, 2], [9, 10, 1], [10, 11, 2], [11, 6, 1],
+      ])
+    )
+  );
+  const firstAtoms = (list: typeof rings) => list.map((r) => Math.min(...r.atomIndices));
+
+  it('keeps every ring when no atom subset is given', () => {
+    expect(ringsWithin(rings, undefined)).toBe(rings);
+  });
+
+  it("keeps only rings whose atoms are all in a component's atoms", () => {
+    expect(rings).toHaveLength(2);
+    expect(firstAtoms(ringsWithin(rings, [0, 1, 2, 3, 4, 5]))).toEqual([0]);
+    expect(firstAtoms(ringsWithin(rings, [6, 7, 8, 9, 10, 11, 12]))).toEqual([6]);
+    // A component holding only part of a ring draws none of it
+    expect(ringsWithin(rings, [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11])).toHaveLength(1);
+    expect(ringsWithin(rings, [])).toEqual([]);
   });
 });
