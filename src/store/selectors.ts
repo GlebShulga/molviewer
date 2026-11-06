@@ -399,9 +399,9 @@ export const selectStructureRenderData = (structureId: string) =>
       return null;
     }
 
-    // Version key includes only render-relevant properties
-    // Note: molecule is excluded because it's immutable after parsing.
-    // If molecule re-parsing is ever supported, add molecule reference to version key.
+    // Version key includes only render-relevant properties. The molecule is
+    // compared by reference below: aromatic ring detection replaces it with a
+    // copy that carries the rings, and the ring markers must see that copy.
     const version = [
       structure.representation,
       structure.colorScheme,
@@ -412,7 +412,7 @@ export const selectStructureRenderData = (structureId: string) =>
     ].join(':');
 
     const cached = structureRenderDataCache.get(structureId);
-    if (cached && cached.version === version) {
+    if (cached && cached.version === version && cached.data?.molecule === structure.molecule) {
       return cached.data;
     }
 

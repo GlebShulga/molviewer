@@ -6,6 +6,7 @@ import {
   selectVisibleStructuresBoundingBox,
   selectHasStructures,
   selectVisibleStructures,
+  selectStructureRenderData,
 } from '../selectors';
 import type { Molecule } from '../../types';
 import { getVdwRadius } from '../../constants';
@@ -110,6 +111,33 @@ describe('selectors', () => {
       const visible = selectVisibleStructures(useMoleculeStore.getState());
       expect(visible.length).toBe(1);
       expect(visible[0].name).toBe('B');
+    });
+  });
+
+  describe('selectStructureRenderData', () => {
+    it('hands out the molecule with its aromatic rings once detection has run', () => {
+      const benzene: Molecule = {
+        name: 'benzene',
+        atoms: Array.from({ length: 6 }, (_, i) => ({
+          id: i,
+          element: 'C',
+          x: 1.39 * Math.cos((i * Math.PI) / 3),
+          y: 1.39 * Math.sin((i * Math.PI) / 3),
+          z: 0,
+        })),
+        bonds: Array.from({ length: 6 }, (_, i) => ({
+          atom1Index: i,
+          atom2Index: (i + 1) % 6,
+          order: (i % 2 === 0 ? 2 : 1) as 1 | 2,
+        })),
+      };
+      const id = useMoleculeStore.getState().addStructure(benzene, 'benzene');
+      const select = selectStructureRenderData(id);
+      expect(select(useMoleculeStore.getState())?.molecule.aromaticRings).toBeUndefined();
+
+      useMoleculeStore.getState().detectAromaticRingsIfNeeded(id);
+
+      expect(select(useMoleculeStore.getState())?.molecule.aromaticRings).toHaveLength(1);
     });
   });
 });
