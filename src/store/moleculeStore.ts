@@ -16,7 +16,7 @@ import {
 
 /** Maximum number of undo/redo history states to prevent memory issues */
 const UNDO_HISTORY_LIMIT = 50;
-import { createMeasurementFromAtomRefs, type Measurement, type MeasurementType } from '../utils/measurements';
+import { createMeasurementFromAtomRefs, refreshDihedrals, type Measurement, type MeasurementType } from '../utils/measurements';
 import { detectAromaticRings } from '../utils/aromaticDetection';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
@@ -990,7 +990,7 @@ export const useMoleculeStore = create<MoleculeState>()(
             })),
           }));
         set({
-          measurements: migratedMeasurements,
+          measurements: refreshDihedrals(migratedMeasurements, get().structures),
           loadedMoleculeId: id,
         });
       } else {
@@ -1076,13 +1076,14 @@ export const useMoleculeStore = create<MoleculeState>()(
     temporal.pause();
     try {
       clearSelectorCaches();
+      const structures = sessionStructures(data.structures);
       set({
         ...initialState,
-        structures: sessionStructures(data.structures),
+        structures,
         structureOrder: data.structureOrder,
         activeStructureId: data.activeStructureId,
         layoutMode: data.layoutMode,
-        measurements: data.measurements,
+        measurements: refreshDihedrals(data.measurements, structures),
         labels: data.labels,
         surfaceSettings: data.surfaceSettings,
         autoRotate: data.autoRotate,
@@ -1165,14 +1166,15 @@ export const useMoleculeStore = create<MoleculeState>()(
         })
         .filter((l): l is Label3D => l !== null);
 
+      // After representation and componentSettings are restored above
+      const structures = sessionStructures(newStructures);
       set({
         ...initialState,
-        // After representation and componentSettings are restored above
-        structures: sessionStructures(newStructures),
+        structures,
         structureOrder: newOrder,
         activeStructureId: newOrder[0] ?? null,
         layoutMode: payload.layoutMode,
-        measurements: remappedMeasurements,
+        measurements: refreshDihedrals(remappedMeasurements, structures),
         labels: remappedLabels,
         surfaceSettings: payload.surfaceSettings,
         autoRotate: payload.autoRotate,

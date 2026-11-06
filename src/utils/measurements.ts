@@ -142,6 +142,22 @@ export function createMeasurement(
 }
 
 /**
+ * Dihedral values recomputed from the atoms, for measurements read back from
+ * storage: versions before the IUPAC sign fix stored the opposite sign.
+ * Other types and dihedrals whose atoms are gone keep their stored value.
+ */
+export function refreshDihedrals(
+  measurements: Measurement[],
+  structures: Map<string, Structure>
+): Measurement[] {
+  return measurements.map((m) => {
+    if (m.type !== 'dihedral') return m;
+    const fresh = createMeasurementFromAtomRefs(m.type, m.atomRefs, structures);
+    return fresh ? { ...m, value: fresh.value } : m;
+  });
+}
+
+/**
  * Create a measurement from qualified atom references (supports cross-structure measurements)
  */
 export function createMeasurementFromAtomRefs(

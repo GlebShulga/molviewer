@@ -4,6 +4,7 @@ import { serializeSession, deserializeSession } from '../../utils/sessionSeriali
 import { SessionVersionError, SCHEMA_VERSION } from '../../types/session';
 import type { Molecule } from '../../types';
 import type { CameraSnapshot } from '../../types/session';
+import type { Measurement } from '../../utils/measurements';
 
 function createMockMolecule(name: string, atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -182,5 +183,64 @@ describe('session save/load round-trip', () => {
     const restoredFilter = restored.structures.get(id)?.componentSettings[0].residueFilter;
     expect(restoredFilter).toBeInstanceOf(Set);
     expect(restoredFilter?.has('A:2')).toBe(true);
+  });
+});
+
+/** Four atoms whose dihedral is -90° (IUPAC sign). */
+function createDihedralMolecule(): Molecule {
+  const points = [[1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 1]];
+  return {
+    name: 'dihedral',
+    atoms: points.map(([x, y, z], id) => ({ id, element: 'C', x, y, z })),
+    bonds: [
+      { atom1Index: 0, atom2Index: 1, order: 1 },
+      { atom1Index: 1, atom2Index: 2, order: 1 },
+      { atom1Index: 2, atom2Index: 3, order: 1 },
+    ],
+  };
+}
+
+function storedMeasurement(
+  id: string,
+  type: Measurement['type'],
+  structureId: string,
+  atomIndices: number[],
+  value: number
+): Measurement {
+  return {
+    id,
+    type,
+    atomIndices,
+    atomRefs: atomIndices.map((atomIndex) => ({ structureId, atomIndex })),
+    value,
+    unit: type === 'distance' ? 'Å' : '°',
+  };
+}
+
+describe('measurement values when a session loads', () => {
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  it('recomputes dihedrals and leaves distances and unresolvable dihedrals as stored', () => {
+    const store = useMoleculeStore.getState();
+    const id = store.addStructure(createDihedralMolecule(), 'D');
+    // Values as an older version stored them: the dihedral with the old sign,
+    // the distance deliberately wrong to show it is not recomputed.
+    store.addMeasurement(storedMeasurement('dih', 'dihedral', id, [0, 1, 2, 3], 90));
+    store.addMeasurement(storedMeasurement('dist', 'distance', id, [0, 1], 9.99));
+    store.addMeasurement(storedMeasurement('lost', 'dihedral', id, [0, 1, 2, 40], 12.5));
+    const session = store.buildSession('old', null);
+
+    store.reset();
+    store.loadSession(session);
+
+    const values = Object.fromEntries(
+      useMoleculeStore.getState().measurements.map((m) => [m.id, m.value])
+    );
+    expect(values.dih).toBeCloseTo(-90, 6);
+    expect(values.dist).toBe(9.99);
+    expect(values.lost).toBe(12.5);
   });
 });

@@ -402,4 +402,78 @@ describe('loadSavedMolecule', () => {
 
     expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['same']);
   });
+
+  it('recomputes stored dihedral values and keeps distances', () => {
+    const entry = saveMolecule(createDihedralMolecule(), [
+      { ...savedMeasurement('dih', [['old-id', 0], ['old-id', 1], ['old-id', 2], ['old-id', 3]]), type: 'dihedral', value: 90, unit: '°' },
+      { ...savedMeasurement('dist', [['old-id', 0], ['old-id', 1]]), value: 9.99 },
+    ]);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    const values = Object.fromEntries(useMoleculeStore.getState().measurements.map((m) => [m.id, m.value]));
+    expect(values.dih).toBeCloseTo(-90, 6);
+    expect(values.dist).toBe(9.99);
+  });
+});
+
+/** Four atoms whose dihedral is -90° (IUPAC sign). */
+function createDihedralMolecule(): Molecule {
+  const points = [[1, 0, 0], [0, 0, 0], [0, 1, 0], [0, 1, 1]];
+  return {
+    name: 'dihedral',
+    atoms: points.map(([x, y, z], id) => ({ id, element: 'C', x, y, z })),
+    bonds: [
+      { atom1Index: 0, atom2Index: 1, order: 1 },
+      { atom1Index: 1, atom2Index: 2, order: 1 },
+      { atom1Index: 2, atom2Index: 3, order: 1 },
+    ],
+  };
+}
+
+describe('applyShareableSession measurement values', () => {
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  it('recomputes dihedrals, keeps distances and keeps dihedrals whose atoms are missing', () => {
+    const shared = {
+      id: 'orig-a',
+      source: { type: 'rcsb' as const, id: '1CRN' },
+      name: 'D',
+      representation: 'ball-and-stick' as const,
+      colorScheme: 'cpk' as const,
+      componentSettings: [],
+      visible: true,
+    };
+    const measurement = (id: string, type: string, atomIndices: number[], value: number) => ({
+      id,
+      type,
+      atomRefs: atomIndices.map((atomIndex) => ({ structureId: 'orig-a', atomIndex })),
+      atomIndices,
+      value,
+      unit: type === 'distance' ? 'Å' : '°',
+    });
+    useMoleculeStore.getState().applyShareableSession({
+      structures: [{ molecule: createDihedralMolecule(), source: shared.source, shareableStructure: shared }],
+      skipped: [],
+      layoutMode: 'overlay',
+      camera: null,
+      measurements: [
+        measurement('dih', 'dihedral', [0, 1, 2, 3], 90),
+        measurement('dist', 'distance', [0, 1], 9.99),
+        measurement('lost', 'dihedral', [0, 1, 2, 40], 12.5),
+      ] as never,
+      labels: [],
+      surfaceSettings: { type: 'vdw', opacity: 0.7, probeRadius: 1.4, wireframe: false, visible: false, color: '#ffffff' },
+      autoRotate: false,
+      sourceStructures: [shared],
+    });
+
+    const values = Object.fromEntries(useMoleculeStore.getState().measurements.map((m) => [m.id, m.value]));
+    expect(values.dih).toBeCloseTo(-90, 6);
+    expect(values.dist).toBe(9.99);
+    expect(values.lost).toBe(12.5);
+  });
 });
