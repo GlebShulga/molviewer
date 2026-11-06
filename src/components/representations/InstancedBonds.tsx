@@ -41,8 +41,11 @@ export function createBondMesh(
   geometry: THREE.BufferGeometry,
   material: THREE.Material,
 ): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(geometry, material, matrices.length / 16);
+  // Built with count 0, then given our matrices: with a count, the constructor
+  // would allocate its own n * 16 floats and write an identity into each.
+  const mesh = new THREE.InstancedMesh(geometry, material, 0);
   mesh.instanceMatrix = new THREE.InstancedBufferAttribute(matrices, 16);
+  mesh.count = matrices.length / 16;
   if (colors) mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
   // Frustum culling uses the instances' bounding sphere: compute it from all of them.
   mesh.computeBoundingSphere();

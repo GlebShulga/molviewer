@@ -8,7 +8,6 @@ import {
   SCALES,
   COLORS,
   getQualityPreset,
-  AROMATIC_DETECTION_THRESHOLD,
   PERFORMANCE_THRESHOLDS,
 } from "../../config";
 import { getAtomColor } from "../../utils";
@@ -88,9 +87,9 @@ export function Stick({
     [molecule.atoms.length]
   );
   const useImpostors = qualityPreset.useImpostors;
-  // Fewer sphere segments only from 2,000 atoms (16x8); smaller structures keep 32x16
-  const atomSegments =
-    molecule.atoms.length >= PERFORMANCE_THRESHOLDS.medium ? qualityPreset.sphereSegments : undefined;
+  // From 2,000 atoms: 16x8 spheres, and one grey bond instead of two coloured half-bonds
+  const largeMolecule = molecule.atoms.length >= PERFORMANCE_THRESHOLDS.medium;
+  const atomSegments = largeMolecule ? qualityPreset.sphereSegments : undefined;
 
   // Small spheres for atom selection (tuple positions)
   const atomsData = useMemo<AtomRenderData[]>(() => {
@@ -115,15 +114,12 @@ export function Stick({
     }));
   }, [filteredAtoms, colorScheme, colorContext, useImpostors, bondRadius]);
 
-  // Matrices (16 floats) and colours (3 floats) per drawn bond, for InstancedBonds
-  const bondArrays = useMemo(() => {
-    const isLargeMolecule = molecule.atoms.length > AROMATIC_DETECTION_THRESHOLD;
-    // Large molecules: one bond in a uniform colour. Small: two half-bonds in the atoms' colours.
-    const perBond = isLargeMolecule ? 1 : 2;
+  // One matrix (16 floats) per drawn bond, for InstancedBonds. Large molecules
+  // get one bond per pair of atoms, small ones two half-bonds. Separate from
+  // the colours, so a colour change leaves the matrices alone.
+  const bondMatrices = useMemo(() => {
+    const perBond = largeMolecule ? 1 : 2;
     const matrices = new Float32Array(filteredBonds.length * perBond * 16);
-    const colors = new Float32Array(filteredBonds.length * perBond * 3);
-    const color = new THREE.Color();
-    const defaultColor = new THREE.Color(COLORS.defaultBond);
     let n = 0;
 
     for (const bond of filteredBonds) {
@@ -131,29 +127,44 @@ export function Stick({
       const atom2 = molecule.atoms[bond.atom2Index];
       if (!atom1 || !atom2) continue;
 
-      if (isLargeMolecule) {
-        writeSegmentMatrix(matrices, n, atom1.x, atom1.y, atom1.z, atom2.x, atom2.y, atom2.z);
-        defaultColor.toArray(colors, n * 3);
-        n++;
+      if (largeMolecule) {
+        writeSegmentMatrix(matrices, n++, atom1.x, atom1.y, atom1.z, atom2.x, atom2.y, atom2.z);
       } else {
         const mx = (atom1.x + atom2.x) / 2;
         const my = (atom1.y + atom2.y) / 2;
         const mz = (atom1.z + atom2.z) / 2;
-        writeSegmentMatrix(matrices, n, atom1.x, atom1.y, atom1.z, mx, my, mz);
-        color.set(getAtomColor(atom1, colorScheme, colorContext)).toArray(colors, n * 3);
-        n++;
-        writeSegmentMatrix(matrices, n, mx, my, mz, atom2.x, atom2.y, atom2.z);
-        color.set(getAtomColor(atom2, colorScheme, colorContext)).toArray(colors, n * 3);
-        n++;
+        writeSegmentMatrix(matrices, n++, atom1.x, atom1.y, atom1.z, mx, my, mz);
+        writeSegmentMatrix(matrices, n++, mx, my, mz, atom2.x, atom2.y, atom2.z);
       }
     }
 
-    if (n * 16 === matrices.length) return { matrices, colors };
-    return { matrices: matrices.slice(0, n * 16), colors: colors.slice(0, n * 3) };
-  }, [molecule.atoms, filteredBonds, colorScheme, colorContext]);
+    return n * 16 === matrices.length ? matrices : matrices.slice(0, n * 16);
+  }, [molecule.atoms, filteredBonds, largeMolecule]);
 
-  // White, so the instance colours show as they are
-  const bondMaterial = useMemo(() => new THREE.MeshStandardMaterial(), []);
+  // Half-bond colours (3 floats each), in the order of bondMatrices. Large
+  // molecules draw every bond in one colour, which goes on the material instead.
+  const bondColors = useMemo(() => {
+    if (largeMolecule) return undefined;
+    const colors = new Float32Array(filteredBonds.length * 2 * 3);
+    const color = new THREE.Color();
+    let n = 0;
+
+    for (const bond of filteredBonds) {
+      const atom1 = molecule.atoms[bond.atom1Index];
+      const atom2 = molecule.atoms[bond.atom2Index];
+      if (!atom1 || !atom2) continue;
+      color.set(getAtomColor(atom1, colorScheme, colorContext)).toArray(colors, n++ * 3);
+      color.set(getAtomColor(atom2, colorScheme, colorContext)).toArray(colors, n++ * 3);
+    }
+
+    return n * 3 === colors.length ? colors : colors.slice(0, n * 3);
+  }, [molecule.atoms, filteredBonds, largeMolecule, colorScheme, colorContext]);
+
+  // White under per-instance colours; the uniform bond colour for large molecules
+  const bondMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: largeMolecule ? COLORS.defaultBond : 0xffffff }),
+    [largeMolecule]
+  );
   useEffect(() => () => {
     bondMaterial.dispose();
   }, [bondMaterial]);
@@ -198,8 +209,8 @@ export function Stick({
       )}
 
       <InstancedBonds
-        matrices={bondArrays.matrices}
-        colors={bondArrays.colors}
+        matrices={bondMatrices}
+        colors={bondColors}
         geometry={bondGeometry}
         material={bondMaterial}
       />
