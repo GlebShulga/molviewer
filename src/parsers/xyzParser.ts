@@ -17,28 +17,36 @@ export function parseXYZ(
   options: XYZParserOptions = {}
 ): Molecule {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const lines = xyzString.split(/\r?\n/).filter((line) => line.trim());
+  // Not filtered: the comment line (line 2) may be blank, and dropping it
+  // would turn the first atom into the comment.
+  const lines = xyzString.split(/\r?\n/);
 
-  if (lines.length < 2) {
+  let countLine = 0;
+  while (countLine < lines.length && !lines[countLine].trim()) countLine++;
+
+  if (lines.length - countLine < 2) {
     throw new Error("Invalid XYZ format: file too short");
   }
 
-  const atomCount = parseInt(lines[0].trim(), 10);
+  const atomCount = parseInt(lines[countLine].trim(), 10);
   if (isNaN(atomCount)) {
     throw new Error("Invalid XYZ format: cannot parse atom count");
   }
 
-  const comment = lines[1].trim();
+  const comment = lines[countLine + 1].trim();
   const moleculeName = comment || "Molecule";
 
   const atoms: Atom[] = [];
 
-  for (let i = 2; i < Math.min(2 + atomCount, lines.length); i++) {
+  // The next atomCount non-blank lines; anything after them (further frames
+  // of a trajectory) is ignored. Messages give 1-based line numbers in the file.
+  for (let i = countLine + 2; i < lines.length && atoms.length < atomCount; i++) {
     const line = lines[i].trim();
+    if (!line) continue;
     const parts = line.split(/\s+/);
 
     if (parts.length < 4) {
-      throw new Error(`Invalid XYZ format: malformed atom line at ${i + 1}`);
+      throw new Error(`Invalid XYZ format: malformed atom line at line ${i + 1}`);
     }
 
     const element = parts[0];
@@ -51,7 +59,7 @@ export function parseXYZ(
     }
 
     atoms.push({
-      id: i - 2,
+      id: atoms.length,
       element,
       x,
       y,

@@ -47,9 +47,6 @@ H    -0.24000   0.93000   0.00000`;
   });
 
   it('uses comment line as molecule name', () => {
-    // Note: XYZ parser filters empty lines, so an empty comment line
-    // causes the atom line to be treated as comment. This test verifies
-    // the parser uses the comment line (line 2) as the molecule name.
     const xyz = `1
 My Molecule
 C     0.00000   0.00000   0.00000`;
@@ -67,5 +64,36 @@ C     1.23456   -2.34567   3.45678`;
     expect(molecule.atoms[0].x).toBeCloseTo(1.23456);
     expect(molecule.atoms[0].y).toBeCloseTo(-2.34567);
     expect(molecule.atoms[0].z).toBeCloseTo(3.45678);
+  });
+
+  it('keeps the first atom when the comment line is blank', () => {
+    const molecule = parseXYZ('3\n\nO 0 0 0\nH 0.96 0 0\nH -0.24 0.93 0', { inferBonds: false });
+    expect(molecule.name).toBe('Molecule');
+    expect(molecule.atoms.map((a) => a.element)).toEqual(['O', 'H', 'H']);
+    expect(molecule.atoms.map((a) => a.id)).toEqual([0, 1, 2]);
+  });
+
+  it('reads CRLF line endings', () => {
+    const molecule = parseXYZ('2\r\nPair\r\nC 0 0 0\r\nO 1.2 0 0\r\n', { inferBonds: false });
+    expect(molecule.name).toBe('Pair');
+    expect(molecule.atoms.map((a) => a.element)).toEqual(['C', 'O']);
+  });
+
+  it('ignores blank lines before the count line and after the atoms', () => {
+    const molecule = parseXYZ('\n\n2\nPair\nC 0 0 0\nO 1.2 0 0\n\n\n', { inferBonds: false });
+    expect(molecule.name).toBe('Pair');
+    expect(molecule.atoms).toHaveLength(2);
+  });
+
+  it('loads only the first frame of a trajectory', () => {
+    const frame = (x: number) => `2\nframe\nC ${x} 0 0\nO ${x + 1.2} 0 0`;
+    const molecule = parseXYZ(`${frame(0)}\n${frame(5)}`, { inferBonds: false });
+    expect(molecule.atoms).toHaveLength(2);
+    expect(molecule.atoms[0].x).toBe(0);
+  });
+
+  it('reports the real line number of a malformed atom line', () => {
+    // Line 5 is the bad one: the blank comment line counts
+    expect(() => parseXYZ('3\n\nO 0 0 0\nH 0.96 0 0\nH oops')).toThrow('line 5');
   });
 });
