@@ -20,13 +20,27 @@ interface Box {
 const insideViewport = (b: Box, vw: number, vh: number) => b.top >= 0 && b.left >= 0 && b.bottom <= vh && b.right <= vw;
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-async function withCrambin(page: Page) {
+/** 1CRN from disk, so nothing depends on RCSB. */
+async function mockCrambin(page: Page) {
   await page.route('**/files.rcsb.org/download/1CRN.cif', (route) =>
     route.fulfill({ path: molecules.crambinCif, contentType: 'text/plain', headers: { 'access-control-allow-origin': '*' } })
   );
+}
+
+/** 1CRN through its readable address, which production serves as a landing page. */
+async function withCrambin(page: Page) {
+  await mockCrambin(page);
   await page.addInitScript(() => localStorage.setItem('mol3d-onboarding-completed', 'true'));
   await page.goto('/pdb/1CRN');
   await waitForMoleculeLoaded(page);
+}
+
+/** 1CRN from the samples on `/`, which is never a landing page, so the title chip shows everywhere. */
+async function withCrambinSample(page: Page) {
+  await mockCrambin(page);
+  const viewer = new MoleculeViewerPage(page);
+  await viewer.goto();
+  await viewer.loadSampleMolecule('crambin');
 }
 
 /** Shows the tooltip for 1CRN's first atom as if the pointer were at (x, y). */
@@ -68,7 +82,7 @@ test.describe('Viewer overlays on wide screens', () => {
   });
 
   test('error, hint, title, legend and toolbar never overlap', async ({ page }) => {
-    await withCrambin(page);
+    await withCrambinSample(page);
     await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const s = (window as any).__mol3d_store.getState();

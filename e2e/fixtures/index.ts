@@ -33,6 +33,7 @@ export const sampleMolecules = {
   caffeine: 'Caffeine',
   aspirin: 'Aspirin',
   water: 'Water',
+  crambin: 'Crambin', // fetched as rcsb:1CRN
 } as const;
 
 /**

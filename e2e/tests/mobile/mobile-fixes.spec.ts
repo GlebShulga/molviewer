@@ -45,6 +45,19 @@ async function withCrambin(page: Page) {
   await waitForMoleculeLoaded(page);
 }
 
+/**
+ * 1CRN from the sheet's samples on `/`, which is never a landing page, so the
+ * title chip shows everywhere. The sheet is closed before anything is measured.
+ */
+async function withCrambinSample(page: Page) {
+  const viewer = new MoleculeViewerPage(page);
+  await viewer.goto();
+  await viewer.openSidebar();
+  await viewer.loadSampleMolecule('crambin');
+  await expect.poll(() => viewer.isSidebarOpen()).toBe(false);
+  return viewer;
+}
+
 async function openMoreMenu(page: Page) {
   await page.getByRole('button', { name: 'More', exact: true }).click({ force: true });
   await expect(page.getByRole('menu', { name: 'More actions' })).toBeVisible();
@@ -342,7 +355,7 @@ test.describe('Ways in and touch targets', () => {
 
 test.describe('Viewer overlays', () => {
   test('error, hint, atom card, title, legend and toolbar never overlap', async ({ page }) => {
-    await withCrambin(page);
+    await withCrambinSample(page);
     await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const store = (window as any).__mol3d_store;
