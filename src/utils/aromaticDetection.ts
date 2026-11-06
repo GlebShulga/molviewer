@@ -1,4 +1,5 @@
 import type { Atom, Bond, AromaticRing, Molecule } from '../types';
+import { AROMATIC_DETECTION_THRESHOLD } from '../config/rendering';
 
 interface RingCandidate {
   atomIndices: number[];
@@ -225,4 +226,16 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
   }
 
   return aromaticRings;
+}
+
+/**
+ * Number of aromatic rings, for the Saved panel's count. A stored list is
+ * used as is (loads drop stored lists, so one present was detected in this
+ * session); otherwise detection runs, unless the molecule is over the size
+ * where the viewer skips it too.
+ */
+export function countAromaticRings(molecule: Molecule): number {
+  if (molecule.aromaticRings !== undefined) return molecule.aromaticRings.length;
+  if (molecule.atoms.length > AROMATIC_DETECTION_THRESHOLD) return 0;
+  return detectAromaticRings(molecule).length;
 }

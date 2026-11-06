@@ -164,14 +164,15 @@ interface MoleculeStateShapeWithHover extends MoleculeStateShape {
 
 // Extended state shape for selectors that need actions
 interface MoleculeStateShapeWithActions extends MoleculeStateShape {
-  detectAromaticRingsIfNeeded: () => void;
+  detectAromaticRingsIfNeeded: (structureId?: string) => void;
 }
 
 /**
  * Select the detectAromaticRingsIfNeeded action (stable function reference)
  */
-export const selectDetectAromaticRingsIfNeeded = (state: MoleculeStateShapeWithActions): (() => void) =>
-  state.detectAromaticRingsIfNeeded;
+export const selectDetectAromaticRingsIfNeeded = (
+  state: MoleculeStateShapeWithActions
+): ((structureId?: string) => void) => state.detectAromaticRingsIfNeeded;
 
 /**
  * Select molecule from the hovered structure (for AtomTooltip)

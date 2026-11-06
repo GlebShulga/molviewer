@@ -58,14 +58,16 @@ function deserializeStructure(s: SerializedStructure): Structure {
   return {
     id: s.id,
     name: s.name,
-    molecule: s.molecule,
+    // Stored rings come from whatever detection the saving version ran (or
+    // none, if Ball & Stick and Stick were never shown), so they are dropped
+    // and detected again when a style that draws them is shown.
+    molecule: { ...s.molecule, aromaticRings: undefined },
     visible: s.visible,
     representation: s.representation,
     colorScheme: s.colorScheme,
     componentSettings: s.componentSettings.map(deserializeComponentSettings),
     classification: s.classification,
-    // Force-skip re-detection on load; saved sessions already have rings (or were past threshold)
-    aromaticRingsDetected: true,
+    aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
   };

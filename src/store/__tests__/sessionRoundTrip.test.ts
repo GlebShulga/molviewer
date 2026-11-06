@@ -26,6 +26,21 @@ function createMockMolecule(name: string, atomCount = 3): Molecule {
   };
 }
 
+/** Six carbons on a hexagon, ring bonds with the given orders (benzene: 2,1,2,1,2,1). */
+function hexagonMolecule(orders: (1 | 2)[]): Molecule {
+  return {
+    name: 'ring',
+    atoms: orders.map((_, i) => ({
+      id: i,
+      element: 'C',
+      x: 1.39 * Math.cos((i * Math.PI) / 3),
+      y: 1.39 * Math.sin((i * Math.PI) / 3),
+      z: 0,
+    })),
+    bonds: orders.map((order, i) => ({ atom1Index: i, atom2Index: (i + 1) % 6, order })),
+  };
+}
+
 const SAMPLE_CAMERA: CameraSnapshot = {
   position: [10, 20, 30],
   target: [1, 2, 3],
@@ -100,18 +115,69 @@ describe('session save/load round-trip', () => {
     expect(() => deserializeSession(session)).toThrow(SessionVersionError);
   });
 
-  // Checklist item 5: Performance — aromatic ring detection skipped on load
-  it('forces aromaticRingsDetected=true on load to avoid re-detection', () => {
+  // Checklist item 5: stored aromatic rings are dropped and detected again lazily
+  it('drops stored aromatic rings on load so they are detected again', () => {
     const store = useMoleculeStore.getState();
-    const id = store.addStructure(createMockMolecule('A'), 'A');
-    // Simulate a saved session whose structure has not had detection run
-    const session = store.buildSession('perf', null);
-    session.state.structures[0].aromaticRingsDetected = false;
+    const id = store.addStructure(hexagonMolecule([2, 1, 2, 1, 2, 1]), 'benzene');
+    store.detectAromaticRingsIfNeeded(id);
+    const session = store.buildSession('rings', null);
+    expect(session.state.structures[0].molecule.aromaticRings).toHaveLength(1);
 
     store.reset();
     store.loadSession(session);
 
-    expect(useMoleculeStore.getState().structures.get(id)?.aromaticRingsDetected).toBe(true);
+    const loaded = useMoleculeStore.getState().structures.get(id);
+    expect(loaded?.aromaticRingsDetected).toBe(false);
+    expect(loaded?.molecule.aromaticRings).toBeUndefined();
+  });
+
+  it('replaces a stale stored ring list with what detection finds now', () => {
+    const store = useMoleculeStore.getState();
+    const id = store.addStructure(hexagonMolecule([2, 1, 1, 1, 1, 1]), 'cyclohexene');
+    const session = store.buildSession('stale', null);
+    // As an older version detected it: one double bond was enough
+    session.state.structures[0].molecule.aromaticRings = [
+      { atomIndices: [0, 1, 2, 3, 4, 5], center: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 }, radius: 1.39 },
+    ];
+    session.state.structures[0].aromaticRingsDetected = true;
+
+    store.reset();
+    store.loadSession(session);
+    useMoleculeStore.getState().detectAromaticRingsIfNeeded(id);
+
+    expect(useMoleculeStore.getState().structures.get(id)?.molecule.aromaticRings).toEqual([]);
+  });
+
+  it('shows rings for a session saved before detection ran', () => {
+    const store = useMoleculeStore.getState();
+    const id = store.addStructure(hexagonMolecule([2, 1, 2, 1, 2, 1]), 'benzene');
+    const session = store.buildSession('undetected', null);
+    expect(session.state.structures[0].molecule.aromaticRings).toBeUndefined();
+
+    store.reset();
+    store.loadSession(session);
+    useMoleculeStore.getState().detectAromaticRingsIfNeeded(id);
+
+    expect(useMoleculeStore.getState().structures.get(id)?.molecule.aromaticRings).toHaveLength(1);
+  });
+
+  it('detects rings for every structure of a session, not only the active one', () => {
+    const store = useMoleculeStore.getState();
+    const id1 = store.addStructure(hexagonMolecule([2, 1, 2, 1, 2, 1]), 'benzene 1');
+    const id2 = store.addStructure(hexagonMolecule([2, 1, 2, 1, 2, 1]), 'benzene 2');
+    store.detectAromaticRingsIfNeeded(id1);
+    store.detectAromaticRingsIfNeeded(id2);
+    const session = store.buildSession('two', null);
+
+    store.reset();
+    store.loadSession(session);
+    // What Ball & Stick and Stick do for each structure they draw
+    useMoleculeStore.getState().detectAromaticRingsIfNeeded(id1);
+    useMoleculeStore.getState().detectAromaticRingsIfNeeded(id2);
+
+    const { structures } = useMoleculeStore.getState();
+    expect(structures.get(id1)?.molecule.aromaticRings).toHaveLength(1);
+    expect(structures.get(id2)?.molecule.aromaticRings).toHaveLength(1);
   });
 
   // Checklist item 6: Undo isolation

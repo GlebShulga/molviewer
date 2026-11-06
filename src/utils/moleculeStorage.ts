@@ -2,6 +2,7 @@ import type { Molecule, Atom, Bond, AromaticRing, BiologicalAssembly } from '../
 import type { Measurement } from './measurements';
 import type { MolViewerSession } from '../types/session';
 import { logError } from './errorReporter';
+import { countAromaticRings } from './aromaticDetection';
 
 /**
  * Molecule storage with IndexedDB support for large molecules.
@@ -313,7 +314,7 @@ export function saveMolecule(
     savedAt: Date.now(),
     atomCount: molecule.atoms.length,
     bondCount: molecule.bonds.length,
-    aromaticRingCount: molecule.aromaticRings?.length ?? 0,
+    aromaticRingCount: countAromaticRings(molecule),
     measurementCount: measurements.length,
     storage: useIndexedDB ? 'indexedDB' : 'localStorage',
   };
@@ -378,7 +379,7 @@ export function updateMolecule(
   entry.savedAt = Date.now();
   entry.atomCount = molecule.atoms.length;
   entry.bondCount = molecule.bonds.length;
-  entry.aromaticRingCount = molecule.aromaticRings?.length ?? 0;
+  entry.aromaticRingCount = countAromaticRings(molecule);
   entry.measurementCount = measurements.length;
   entry.storage = useIndexedDB ? 'indexedDB' : 'localStorage';
 
@@ -610,7 +611,7 @@ function summarizeSession(session: MolViewerSession) {
   for (const s of session.state.structures) {
     totalAtoms += s.molecule.atoms.length;
     totalBonds += s.molecule.bonds.length;
-    totalAromaticRings += s.molecule.aromaticRings?.length ?? 0;
+    totalAromaticRings += countAromaticRings(s.molecule);
   }
   return { totalAtoms, totalBonds, totalAromaticRings };
 }

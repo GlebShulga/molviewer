@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { detectAromaticRings } from '../aromaticDetection';
+import { countAromaticRings, detectAromaticRings } from '../aromaticDetection';
+import { AROMATIC_DETECTION_THRESHOLD } from '../../config/rendering';
 import { parseSDF } from '../../parsers/sdfParser';
 import { parsePDB } from '../../parsers/pdbParser';
 import type { Atom, Bond, Molecule } from '../../types';
@@ -193,9 +194,32 @@ describe('detectAromaticRings', () => {
   });
 
   it('finds nothing in a protein whose bonds are all single (Crambin)', () => {
+    // Also the early exit: no double or flagged bond means no ring search
     const crambin = parsePDB(readFileSync(resolve(samples, '1crn.pdb'), 'utf8'));
     expect(crambin.bonds.length).toBeGreaterThan(0);
     expect(crambin.bonds.every((b) => b.order === 1 && !b.isAromatic)).toBe(true);
     expect(detectAromaticRings(crambin)).toEqual([]);
+  });
+});
+
+describe('countAromaticRings', () => {
+  it('uses a stored ring list as is, an empty one included', () => {
+    const stored = detectAromaticRings(benzene());
+    expect(countAromaticRings({ ...benzene(), aromaticRings: [...stored, ...stored] })).toBe(2);
+    expect(countAromaticRings({ ...benzene(), aromaticRings: [] })).toBe(0);
+  });
+
+  it('detects rings when none are stored', () => {
+    expect(countAromaticRings(benzene())).toBe(1);
+    expect(countAromaticRings(ring(['C', 'C', 'C', 'C', 'C', 'C'], [2, 1, 1, 1, 1, 1]))).toBe(0);
+  });
+
+  it('gives 0 above the detection threshold without detecting', () => {
+    const big = benzene();
+    for (let i = big.atoms.length; i <= AROMATIC_DETECTION_THRESHOLD; i++) {
+      big.atoms.push({ id: i, element: 'C', x: i * 10, y: 0, z: 0 });
+    }
+    expect(big.atoms.length).toBe(AROMATIC_DETECTION_THRESHOLD + 1);
+    expect(countAromaticRings(big)).toBe(0);
   });
 });

@@ -49,12 +49,12 @@ export function BallAndStick({
   // Aromatic ring detection is representation-specific
   const detectAromaticRingsIfNeeded = useMoleculeStore(selectDetectAromaticRingsIfNeeded);
 
-  // Trigger lazy aromatic ring detection when needed
+  // Trigger lazy aromatic ring detection for this structure (not just the active one)
   useEffect(() => {
     if (showAromaticRings) {
-      detectAromaticRingsIfNeeded();
+      detectAromaticRingsIfNeeded(effectiveStructureId);
     }
-  }, [showAromaticRings, detectAromaticRingsIfNeeded]);
+  }, [showAromaticRings, detectAromaticRingsIfNeeded, effectiveStructureId]);
 
   // Filter atoms and bonds if atomIndices is provided
   const { filteredAtoms, filteredBonds } = useMemo(() => {

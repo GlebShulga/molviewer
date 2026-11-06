@@ -973,8 +973,9 @@ export const useMoleculeStore = create<MoleculeState>()(
   loadSavedMolecule: (id) => {
     const data = loadMolecule(id);
     if (data) {
-      // Use setMolecule to clear and load single structure
-      get().setMolecule(data.molecule);
+      // Use setMolecule to clear and load single structure. Stored rings are
+      // dropped so they are detected again, as for a session.
+      get().setMolecule({ ...data.molecule, aromaticRings: undefined });
       // Then restore measurements. A saved molecule is one structure with a new
       // ID, so every ref points at it. Old saves carry only atomIndices; a
       // measurement that spanned several structures lost the others and is dropped.

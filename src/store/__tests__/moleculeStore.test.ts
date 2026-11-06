@@ -403,6 +403,21 @@ describe('loadSavedMolecule', () => {
     expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['same']);
   });
 
+  it('drops stored aromatic rings so they are detected again', () => {
+    const stale = {
+      ...createMockMolecule('Saved', 4),
+      aromaticRings: [{ atomIndices: [0, 1, 2, 3], center: { x: 0, y: 0, z: 0 }, normal: { x: 0, y: 0, z: 1 }, radius: 1 }],
+    };
+    const entry = saveMolecule(stale);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    const { structures, activeStructureId } = useMoleculeStore.getState();
+    const loaded = structures.get(activeStructureId!);
+    expect(loaded?.aromaticRingsDetected).toBe(false);
+    expect(loaded?.molecule.aromaticRings).toBeUndefined();
+  });
+
   it('recomputes stored dihedral values and keeps distances', () => {
     const entry = saveMolecule(createDihedralMolecule(), [
       { ...savedMeasurement('dih', [['old-id', 0], ['old-id', 1], ['old-id', 2], ['old-id', 3]]), type: 'dihedral', value: 90, unit: '°' },
