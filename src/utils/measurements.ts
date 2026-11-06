@@ -158,6 +158,23 @@ export function refreshDihedrals(
 }
 
 /**
+ * Whether recomputing a stored measurement on these atoms gives back its stored
+ * value. Dihedrals compare magnitudes, since versions before the IUPAC sign fix
+ * stored the opposite sign. Used to tell whether a stored measurement belongs
+ * to the atoms it now points at.
+ */
+export function matchesStoredValue(
+  measurement: Measurement,
+  structures: Map<string, Structure>
+): boolean {
+  const fresh = createMeasurementFromAtomRefs(measurement.type, measurement.atomRefs, structures);
+  if (!fresh) return false;
+  if (measurement.type === 'distance') return Math.abs(fresh.value - measurement.value) < 0.01;
+  if (measurement.type === 'angle') return Math.abs(fresh.value - measurement.value) < 0.1;
+  return Math.abs(Math.abs(fresh.value) - Math.abs(measurement.value)) < 0.1;
+}
+
+/**
  * Create a measurement from qualified atom references (supports cross-structure measurements)
  */
 export function createMeasurementFromAtomRefs(

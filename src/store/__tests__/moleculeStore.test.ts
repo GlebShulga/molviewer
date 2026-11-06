@@ -3,7 +3,7 @@ import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import type { Molecule } from '../../types';
 import type { Structure } from '../../types/multiStructure';
 import type { Measurement } from '../../utils/measurements';
-import { saveMolecule } from '../../utils/moleculeStorage';
+import { loadMolecule, saveMolecule } from '../../utils/moleculeStorage';
 
 function createMockMolecule(name = 'Test', atomCount = 3): Molecule {
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
@@ -418,17 +418,61 @@ describe('loadSavedMolecule', () => {
     expect(loaded?.molecule.aromaticRings).toBeUndefined();
   });
 
-  it('recomputes stored dihedral values and keeps distances', () => {
+  it('recomputes a dihedral stored with the old sign and keeps matching distances', () => {
     const entry = saveMolecule(createDihedralMolecule(), [
       { ...savedMeasurement('dih', [['old-id', 0], ['old-id', 1], ['old-id', 2], ['old-id', 3]]), type: 'dihedral', value: 90, unit: '°' },
-      { ...savedMeasurement('dist', [['old-id', 0], ['old-id', 1]]), value: 9.99 },
+      { ...savedMeasurement('dist', [['old-id', 0], ['old-id', 1]]), value: 1 },
     ]);
 
     useMoleculeStore.getState().loadSavedMolecule(entry.id);
 
     const values = Object.fromEntries(useMoleculeStore.getState().measurements.map((m) => [m.id, m.value]));
     expect(values.dih).toBeCloseTo(-90, 6);
-    expect(values.dist).toBe(9.99);
+    expect(values.dist).toBe(1);
+  });
+
+  it('drops measurements taken on another structure, whose values do not match these atoms', () => {
+    // Older saves kept every measurement in the scene, not only the saved structure's.
+    // Atoms 0 and 1 of the saved molecule are 1.5 Å apart; 'other' was measured elsewhere.
+    const entry = saveMolecule(createMockMolecule('Saved', 4), [
+      savedMeasurement('own', [['a', 0], ['a', 1]]),
+      { ...savedMeasurement('other', [['b', 0], ['b', 1]]), value: 2.4 },
+    ]);
+
+    useMoleculeStore.getState().loadSavedMolecule(entry.id);
+
+    expect(useMoleculeStore.getState().measurements.map((m) => m.id)).toEqual(['own']);
+  });
+});
+
+describe('saveMoleculeToStorage', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  it("saves only the active structure's measurements", () => {
+    const store = useMoleculeStore.getState();
+    const a = store.addStructure(createMockMolecule('A', 4), 'A');
+    const b = store.addStructure(createMockMolecule('B', 4), 'B');
+    const distance = (id: string, refs: [string, number][]): Measurement => ({
+      id,
+      type: 'distance',
+      atomIndices: refs.map(([, i]) => i),
+      atomRefs: refs.map(([structureId, atomIndex]) => ({ structureId, atomIndex })),
+      value: 1.5,
+      unit: 'Å',
+    });
+    store.addMeasurement(distance('on-a', [[a, 0], [a, 1]]));
+    store.addMeasurement(distance('on-b', [[b, 0], [b, 1]]));
+    store.addMeasurement(distance('across', [[a, 0], [b, 1]]));
+    store.setActiveStructure(a);
+
+    useMoleculeStore.getState().saveMoleculeToStorage('A only');
+
+    const { loadedMoleculeId } = useMoleculeStore.getState();
+    expect(loadMolecule(loadedMoleculeId!)?.measurements.map((m) => m.id)).toEqual(['on-a']);
   });
 });
 

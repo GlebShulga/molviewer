@@ -16,7 +16,13 @@ import {
 
 /** Maximum number of undo/redo history states to prevent memory issues */
 const UNDO_HISTORY_LIMIT = 50;
-import { createMeasurementFromAtomRefs, refreshDihedrals, type Measurement, type MeasurementType } from '../utils/measurements';
+import {
+  createMeasurementFromAtomRefs,
+  matchesStoredValue,
+  refreshDihedrals,
+  type Measurement,
+  type MeasurementType,
+} from '../utils/measurements';
 import { detectAromaticRings } from '../utils/aromaticDetection';
 import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
@@ -206,6 +212,11 @@ export function styleSafeStructure(structure: Structure): { structure: Structure
   ];
   const fellBackFrom = styles.find((rep) => isStyleLimited(rep, structure.molecule));
   return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
+}
+
+/** Measurements whose atoms all belong to one structure, for saving that structure alone. */
+function measurementsOn(measurements: Measurement[], structureId: string): Measurement[] {
+  return measurements.filter((m) => m.atomRefs.every((ref) => ref.structureId === structureId));
 }
 
 /**
@@ -947,8 +958,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     const activeStructure = activeStructureId ? structures.get(activeStructureId) : null;
     if (!activeStructure) return;
 
-    // Save the active structure's molecule
-    const entry = saveMolecule(activeStructure.molecule, measurements, name);
+    // Save the active structure's molecule with only its own measurements
+    const entry = saveMolecule(activeStructure.molecule, measurementsOn(measurements, activeStructure.id), name);
     set({
       savedMolecules: [entry, ...get().savedMolecules],
       loadedMoleculeId: entry.id,
@@ -960,7 +971,11 @@ export const useMoleculeStore = create<MoleculeState>()(
     const activeStructure = activeStructureId ? structures.get(activeStructureId) : null;
     if (!activeStructure || !loadedMoleculeId) return;
 
-    const updatedEntry = updateMolecule(loadedMoleculeId, activeStructure.molecule, measurements);
+    const updatedEntry = updateMolecule(
+      loadedMoleculeId,
+      activeStructure.molecule,
+      measurementsOn(measurements, activeStructure.id)
+    );
     if (updatedEntry) {
       set({
         savedMolecules: savedMolecules.map((e) =>
@@ -979,8 +994,12 @@ export const useMoleculeStore = create<MoleculeState>()(
       // Then restore measurements. A saved molecule is one structure with a new
       // ID, so every ref points at it. Old saves carry only atomIndices; a
       // measurement that spanned several structures lost the others and is dropped.
+      // Older saves also kept measurements taken on other structures: those
+      // would land on unrelated atoms, so a measurement is kept only if its
+      // stored value matches these atoms.
       const { activeStructureId } = get();
       if (activeStructureId && data.measurements.length > 0) {
+        const { structures } = get();
         const migratedMeasurements = data.measurements
           .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
           .map(m => ({
@@ -989,9 +1008,10 @@ export const useMoleculeStore = create<MoleculeState>()(
               structureId: activeStructureId,
               atomIndex: idx,
             })),
-          }));
+          }))
+          .filter(m => matchesStoredValue(m, structures));
         set({
-          measurements: refreshDihedrals(migratedMeasurements, get().structures),
+          measurements: refreshDihedrals(migratedMeasurements, structures),
           loadedMoleculeId: id,
         });
       } else {
