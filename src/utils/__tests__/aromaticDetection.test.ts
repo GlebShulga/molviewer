@@ -273,6 +273,24 @@ describe('detectAromaticRings', () => {
     });
   });
 
+  it('finds every ring of a ten-ring acene, each counting on the ring before it', () => {
+    // Shared vertical bonds t[k]-b[k] (k = 0..n), apexes a[k] on top and c[k]
+    // below. Only t[0]=b[0] is a vertical double bond; then a[k]=t[k+1] and
+    // c[k]=b[k+1], so ring k reaches 6 only through ring k-1.
+    const n = 10;
+    const t = (k: number) => k;
+    const b = (k: number) => n + 1 + k;
+    const a = (k: number) => 2 * (n + 1) + k;
+    const c = (k: number) => 2 * (n + 1) + n + k;
+    const list: [number, number, 1 | 2][] = [[t(0), b(0), 2]];
+    for (let k = 0; k < n; k++) {
+      list.push([t(k), a(k), 1], [a(k), t(k + 1), 2], [b(k), c(k), 1], [c(k), b(k + 1), 2]);
+      list.push([t(k + 1), b(k + 1), 1]);
+    }
+    const m = molecule(atomsAt([], Array(4 * n + 2).fill('C')), bonds(list));
+    expect(detectAromaticRings(m)).toHaveLength(n);
+  });
+
   it('finds both rings of caffeine, with its methyls and C=O groups', () => {
     // 0 N1, 1 C2, 2 N3, 3 C4, 4 C5, 5 C6, 6 N7, 7 C8, 8 N9,
     // 9 O on C2, 10 O on C6, 11-13 methyls on N1, N3, N7

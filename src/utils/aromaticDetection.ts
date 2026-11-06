@@ -215,13 +215,23 @@ export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
     }
   }
 
-  // Candidates fused to each one (sharing a bond with it)
-  const candidateBonds = candidates.map(c => new Set(ringBondKeys(c)));
-  const fused = candidates.map((_, i) =>
-    candidates
-      .map((__, j) => j)
-      .filter(j => j !== i && [...candidateBonds[j]].some(key => candidateBonds[i].has(key)))
-  );
+  // Candidates fused to each one (sharing a bond with it), found through the
+  // rings each bond belongs to rather than by comparing every pair of rings
+  const ringsOfBond = new Map<string, number[]>();
+  candidates.forEach((candidate, i) => {
+    for (const key of ringBondKeys(candidate)) {
+      const list = ringsOfBond.get(key);
+      if (list) list.push(i);
+      else ringsOfBond.set(key, [i]);
+    }
+  });
+  const fused = candidates.map((candidate, i) => {
+    const neighbours = new Set<number>();
+    for (const key of ringBondKeys(candidate)) {
+      for (const j of ringsOfBond.get(key)!) if (j !== i) neighbours.add(j);
+    }
+    return [...neighbours];
+  });
 
   // Ring partners are the ring's own atoms plus those of fused rings already
   // found aromatic, so passes repeat until nothing changes: the first finds
