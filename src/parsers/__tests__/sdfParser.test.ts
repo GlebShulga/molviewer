@@ -73,4 +73,20 @@ M  END`;
     const molecule = parseSDF(sdf);
     expect(molecule.bonds[0].order).toBe(3);
   });
+
+  it('flags type-4 bonds as aromatic', () => {
+    const sdf = `Aromatic
+  Test
+
+  2  2  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.4000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  4  0
+  1  2  1  0
+M  END`;
+
+    const molecule = parseSDF(sdf);
+    expect(molecule.bonds[0]).toMatchObject({ order: 1, isAromatic: true });
+    expect(molecule.bonds[1].isAromatic).toBeUndefined();
+  });
 });

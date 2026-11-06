@@ -89,6 +89,8 @@ export function parseSDF(
       atom1Index: atom1,
       atom2Index: atom2,
       order,
+      // Type 4 is aromatic: drawn as a single bond, flagged for ring detection
+      ...(bondType === 4 && { isAromatic: true }),
     });
   }
 
