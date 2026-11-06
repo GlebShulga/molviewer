@@ -33,6 +33,8 @@ export interface Collection {
   slug: string;
   title: string;
   intro: string;
+  /** ISO date of the last edit to this collection. */
+  updated: string;
   featured?: boolean;
   items: CollectionItem[];
 }

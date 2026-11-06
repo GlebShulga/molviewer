@@ -142,7 +142,7 @@ function collectionTitle(c: Collection): string {
   return full.length <= 70 ? full : `${c.title} in 3D | MolViewer`;
 }
 
-export function renderCollectionPage(c: Collection, all: Collection[], ctx: Ctx, lastmodById: Map<string, string>): GeneratedPage {
+export function renderCollectionPage(c: Collection, all: Collection[], ctx: Ctx): GeneratedPage {
   const items = c.items
     .map(
       (i) =>
@@ -155,11 +155,11 @@ export function renderCollectionPage(c: Collection, all: Collection[], ctx: Ctx,
     .join('');
   const first = c.items[0];
   const path = collectionHref(c);
-  const lastmod = c.items.map((i) => lastmodById.get(i.id)).filter((d): d is string => !!d).sort().pop();
 
   return {
     path,
-    lastmod,
+    // The page shows only the collection's own text, never a structure's revision date.
+    lastmod: c.updated,
     html: renderStaticDocument({
       path,
       title: collectionTitle(c),
@@ -205,6 +205,7 @@ export function renderCollectionsIndex(all: Collection[], ctx: Ctx): GeneratedPa
     .join('\n');
   return {
     path: '/collections',
+    lastmod: all.map((c) => c.updated).sort().pop(),
     html: renderStaticDocument({
       path: '/collections',
       title: 'Protein structure collections by topic | MolViewer',

@@ -14,6 +14,7 @@ import { dirname, join, relative } from 'node:path';
 import { pages as contentPages } from '../content/pages';
 import { SCREENSHOTS } from '../content/screenshots';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
+import { editDateProblem } from '../editDate';
 import type { AfSeed, Compound, PdbSeed } from '../dataTypes';
 import pdbData from '../../data/popularPdbs.json';
 import afData from '../../data/alphafold.json';
@@ -104,21 +105,22 @@ export async function generateSite(outDir: string, publicDir: string, cacheDir: 
   if (!cssHref) throw new Error('site generator: CSS bundle link not found in dist/index.html');
 
   const ctx = { cssHref, featured: FEATURED_COLLECTIONS };
-  // PDB IDs are 4 characters and UniProt accessions 6 or 10, so the two never collide.
-  const revisedById = new Map<string, string>();
-  for (const e of [...PDBS, ...AFS]) if (e.revised) revisedById.set(e.id, e.revised);
+
+  // The JSON is only cast to Collection[], and the sitemap writes any lastmod it gets.
+  const badDates = COLLECTIONS.flatMap((c) => {
+    const problem = editDateProblem(c.updated);
+    return problem ? [`collections[${c.slug}]: ${problem}`] : [];
+  });
+  if (badDates.length) {
+    throw new Error(`site generator: ${badDates.length} bad collection date(s) in data/collections.json:\n  ${badDates.join('\n  ')}`);
+  }
 
   const content = contentPages.map((p) => (SCREENSHOTS[p.path] ? { ...p, screenshot: SCREENSHOTS[p.path] } : p));
-  const collectionPages = COLLECTIONS.map((c) => renderCollectionPage(c, COLLECTIONS, ctx, revisedById));
-  const collectionsIndex: GeneratedPage = {
-    ...renderCollectionsIndex(COLLECTIONS, ctx),
-    lastmod: collectionPages.map((p) => p.lastmod).filter((d): d is string => !!d).sort().pop(),
-  };
   const staticPages: GeneratedPage[] = [
     ...content.map((p) => renderContentPage(p, ctx)),
     renderLearnIndex(content, ctx),
-    collectionsIndex,
-    ...collectionPages,
+    renderCollectionsIndex(COLLECTIONS, ctx),
+    ...COLLECTIONS.map((c) => renderCollectionPage(c, COLLECTIONS, ctx)),
     renderCompoundsIndex(COMPOUNDS, ctx),
   ];
 

@@ -34,6 +34,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpError, fetchJson, mapLimit } from './lib/http';
 import { missingOgArt } from './lib/ogArtCoverage';
+import { editDateProblem } from '../site/editDate';
 
 // ---------- types ----------
 
@@ -78,6 +79,7 @@ interface Collection {
   slug: string;
   title: string;
   intro: string;
+  updated: string;
   featured: boolean;
   items: CollectionItem[];
 }
@@ -339,6 +341,8 @@ function validateCollections(
     if (!col.title?.trim()) error(`${where}: missing title`);
     if (!col.intro?.trim()) error(`${where}: missing intro`);
     if (/<[a-z/][^>]*>/i.test(col.intro ?? '')) error(`${where}: intro must be plain text`);
+    const dateProblem = editDateProblem(col.updated);
+    if (dateProblem) error(`${where}: ${dateProblem}`);
     if (col.featured) featured.push(col.slug);
     if (!Array.isArray(col.items) || col.items.length === 0) {
       error(`${where}: has no items`);

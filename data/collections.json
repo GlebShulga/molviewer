@@ -1,10 +1,11 @@
 {
-  "_comment": "Topic collections for /collections/:slug hub pages. The 8 entries with featured=true fill the Topics column in the site footer (and the list on 404 PDB pages), in this order. Every pdb item must exist in popularPdbs.json and every af item in alphafold.json; run scripts/validate-ids.ts --check after editing.",
+  "_comment": "Topic collections for /collections/:slug hub pages. The 8 entries with featured=true fill the Topics column in the site footer (and the list on 404 PDB pages), in this order. Every pdb item must exist in popularPdbs.json and every af item in alphafold.json; run scripts/validate-ids.ts --check after editing. `updated` is the ISO date of the last edit to that collection (title, intro, items, notes); bump it when you edit one.",
   "collections": [
     {
       "slug": "hemoglobin-oxygen-transport",
       "title": "Hemoglobin and oxygen transport",
       "intro": "Hemoglobin carries oxygen from the lungs to every tissue, and myoglobin stores it inside muscle. Comparing the deoxy (T state) and oxy (R state) structures shows how binding oxygen at one heme makes the other hemes grab oxygen more easily, the classic example of cooperativity. The collection also includes sickle cell hemoglobin and oxygen carriers from other organisms.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "4HHB", "label": "Human deoxyhemoglobin", "note": "The classic T-state structure from Max Perutz's group, used in countless textbooks." },
@@ -33,6 +34,7 @@
       "slug": "insulin-hormones",
       "title": "Insulin and hormones",
       "intro": "Hormones are chemical messengers that travel through the blood and act on receptors in distant cells. Insulin, discovered in 1921, was one of the first proteins to be sequenced and crystallized, and its hexamers, analogs and receptor are shown here. The collection also covers growth hormone, leptin, erythropoietin, GLP-1 and the nuclear receptors that bind steroid hormones such as estrogen and testosterone.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "4INS", "label": "Pig insulin hexamer with two zinc ions", "note": "Dorothy Hodgkin's group solved the first insulin structure in 1969." },
@@ -69,6 +71,7 @@
       "slug": "sars-cov-2",
       "title": "SARS-CoV-2 and COVID-19",
       "intro": "Within months of the COVID-19 outbreak, scientists had solved structures of almost every SARS-CoV-2 protein. The spike protein binds the human ACE2 receptor and was the basis for the mRNA vaccines, while the main protease and RNA polymerase are targets of antiviral drugs such as nirmatrelvir (Paxlovid) and remdesivir. These structures show how structural biology guided the pandemic response.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "6VXX", "label": "Spike glycoprotein, closed state" },
@@ -104,6 +107,7 @@
       "slug": "dna-rna",
       "title": "DNA and RNA",
       "intro": "DNA stores genetic information in a double helix, and RNA copies, carries and even catalyzes with it. This collection starts with classic B-DNA, Z-DNA and RNA helices, then shows how proteins read DNA sequences, how DNA is packed into nucleosomes, and how polymerases copy it. It also includes folded RNAs such as transfer RNA, ribozymes and riboswitches.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "1BNA", "label": "B-DNA dodecamer (Dickerson dodecamer)", "note": "The first crystal structure of a full turn of B-DNA." },
@@ -138,6 +142,7 @@
       "slug": "enzymes",
       "title": "Enzymes: how proteins speed up chemistry",
       "intro": "Enzymes are proteins that speed up chemical reactions, often by millions of times, by holding their substrates in exactly the right position. These classic structures show active sites, catalytic triads, induced fit and large domain motions. Many of them, such as lysozyme, chymotrypsin and triosephosphate isomerase, are the standard examples in biochemistry courses.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "2LYZ", "label": "Hen egg-white lysozyme", "note": "The first enzyme structure ever solved (David Phillips, 1965)." },
@@ -172,6 +177,7 @@
       "slug": "antibodies-immunity",
       "title": "Antibodies and the immune system",
       "intro": "Antibodies are Y-shaped proteins that recognize foreign molecules with great precision using the loops at the tips of their arms. This collection shows whole antibodies, antibody fragments bound to their targets, and therapeutic antibodies used against cancer and autoimmune disease. It also includes the MHC molecules and T-cell receptors that let the immune system spot infected cells.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "1IGT", "label": "Intact mouse IgG2a antibody" },
@@ -209,6 +215,7 @@
       "slug": "membrane-proteins",
       "title": "Membrane proteins and transporters",
       "intro": "Membrane proteins sit in the fatty lipid bilayer that surrounds every cell, where they move nutrients, pump ions, sense signals and let water through. They are hard to crystallize, so each of these structures was a major achievement. About a third of all human proteins, and a large share of drug targets, are membrane proteins.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "pdb", "id": "1C3W", "label": "Bacteriorhodopsin, a light-driven proton pump" },
@@ -243,6 +250,7 @@
       "slug": "alphafold-highlights",
       "title": "AlphaFold highlights",
       "intro": "AlphaFold is an AI system that predicts a protein's 3D structure from its amino acid sequence, and its creators shared the 2024 Nobel Prize in Chemistry. These predicted models cover famous human proteins, including several that are hard to study experimentally because they are large, flexible or embedded in membranes. Color by confidence (pLDDT) to see which parts of each model are reliable and which are likely disordered.",
+      "updated": "2026-09-29",
       "featured": true,
       "items": [
         { "type": "af", "id": "P04637", "label": "p53 tumor suppressor", "note": "The most frequently mutated gene in human cancer." },
@@ -273,6 +281,7 @@
       "slug": "photosynthesis",
       "title": "Photosynthesis",
       "intro": "Photosynthesis turns sunlight into chemical energy and releases the oxygen we breathe. Light-harvesting complexes collect photons and pass the energy to reaction centers, where it drives electron transfer across a membrane. Photosystem II splits water, and the enzyme Rubisco then fixes carbon dioxide into sugar.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1PRC", "label": "Bacterial photosynthetic reaction center", "note": "The first membrane protein structure solved at atomic detail, recognized by the 1988 Nobel Prize in Chemistry." },
@@ -297,6 +306,7 @@
       "slug": "motor-proteins-cytoskeleton",
       "title": "Motor proteins and the cytoskeleton",
       "intro": "The cytoskeleton is a network of protein filaments that gives cells their shape and acts as tracks for transport. Motor proteins such as myosin, kinesin and dynein burn ATP to walk along these tracks, contracting muscles and carrying cargo. This collection shows actin, tubulin and the motors that move along them.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1ATN", "label": "Actin bound to DNase I", "note": "The first atomic structure of actin, solved as a complex with DNase I." },
@@ -324,6 +334,7 @@
       "slug": "ion-channels",
       "title": "Ion channels",
       "intro": "Ion channels are gated pores that let specific ions such as potassium, sodium or calcium cross the cell membrane. They generate nerve impulses, heartbeats and muscle contraction, and sense heat, touch and chemical signals. The KcsA potassium channel structure explained for the first time how a channel can be both fast and highly selective.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1BL8", "label": "KcsA potassium channel", "note": "Recognized by the 2003 Nobel Prize in Chemistry (Roderick MacKinnon)." },
@@ -358,6 +369,7 @@
       "slug": "gpcrs",
       "title": "GPCRs and cell signaling",
       "intro": "G protein-coupled receptors (GPCRs) are the largest family of membrane receptors and the targets of about a third of approved drugs. They detect light, smells, hormones and neurotransmitters, then switch on G proteins inside the cell. The beta-2 adrenergic receptor structures were recognized by the 2012 Nobel Prize in Chemistry.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1F88", "label": "Bovine rhodopsin", "note": "The first GPCR structure, solved in 2000." },
@@ -394,6 +406,7 @@
       "slug": "kinases-cancer",
       "title": "Kinases and cancer drug targets",
       "intro": "Protein kinases switch other proteins on and off by adding phosphate groups, and when they are stuck in the on position they can drive cancer. Imatinib (Gleevec), which blocks the BCR-ABL kinase in leukemia, showed that drugs designed against a specific kinase can work. This collection shows kinases with the drugs that target them, along with other famous cancer targets such as Ras, p53, MDM2, BCL-2 and PARP.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1ATP", "label": "Protein kinase A with ATP and a peptide inhibitor", "note": "PKA was the first protein kinase structure solved and became the model for the whole family." },
@@ -431,6 +444,7 @@
       "slug": "viruses",
       "title": "Viruses",
       "intro": "Viruses are tiny packages of genetic material wrapped in a protein shell, often with a membrane studded with glycoproteins. Many viral capsids are built from repeated copies of a few proteins arranged with beautiful icosahedral symmetry. This collection covers capsids and the surface proteins of influenza, HIV, Ebola, dengue, Zika, RSV and other viruses, many of which are vaccine and drug targets.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "2TMV", "label": "Tobacco mosaic virus", "note": "The first virus ever discovered." },
@@ -459,6 +473,7 @@
       "slug": "ribosome-translation",
       "title": "The ribosome and protein synthesis",
       "intro": "The ribosome is the molecular machine that reads messenger RNA and joins amino acids into proteins. It is made mostly of RNA, and its core chemistry is carried out by RNA rather than protein. Ribosome structures were recognized by the 2009 Nobel Prize in Chemistry and explain how many antibiotics work. Note that full ribosomes are very large and may take a while to load.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "4V6X", "label": "Human 80S ribosome" },
@@ -484,6 +499,7 @@
       "slug": "crispr-genome-editing",
       "title": "CRISPR and genome editing",
       "intro": "CRISPR systems began as a bacterial immune defense against viruses and became a precise tool for editing genes, recognized by the 2020 Nobel Prize in Chemistry. Cas9 uses a guide RNA to find a matching DNA sequence next to a short PAM motif and then cuts both strands. The collection also covers Cas12, Cas13, base editors and older programmable tools such as TALEs and zinc fingers.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "4OO8", "label": "Cas9 with guide RNA and target DNA" },
@@ -511,6 +527,7 @@
       "slug": "fluorescent-proteins",
       "title": "Fluorescent and glowing proteins",
       "intro": "Green fluorescent protein (GFP) from a jellyfish forms its own light-emitting chromophore inside a barrel of beta strands, which lets scientists tag and watch proteins in living cells. Its discovery and development won the 2008 Nobel Prize in Chemistry. Engineered variants and proteins from corals now cover every color, and some can be switched on and off with light.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1EMA", "label": "Green fluorescent protein (GFP)" },
@@ -539,6 +556,7 @@
       "slug": "neurotransmission",
       "title": "Neurotransmission and the synapse",
       "intro": "Nerve cells talk to each other at synapses by releasing neurotransmitters such as acetylcholine, glutamate, GABA, serotonin and dopamine. Receptors on the next cell open ion channels or trigger signaling, and transporters and enzymes then clear the signal. Many medicines, toxins and drugs of abuse act on the proteins shown here.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1EA5", "label": "Torpedo acetylcholinesterase" },
@@ -570,6 +588,7 @@
       "slug": "blood-clotting",
       "title": "Blood clotting",
       "intro": "When a blood vessel is damaged, a cascade of proteases activates one another and finally turns soluble fibrinogen into a fibrin mesh that seals the wound. Thrombin and factor Xa sit at the center of this cascade and are the targets of modern anticoagulants such as apixaban and rivaroxaban. Clot-busting enzymes such as tissue plasminogen activator later break the clot down.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1PPB", "label": "Human alpha-thrombin with PPACK inhibitor" },
@@ -597,6 +616,7 @@
       "slug": "drug-target-complexes",
       "title": "Drugs bound to their targets",
       "intro": "Seeing exactly how a drug sits in its target's binding pocket is the heart of structure-based drug design. The HIV protease inhibitors of the 1990s were among the first big successes of this approach. This collection pairs well-known medicines, from aspirin and statins to antivirals, with the proteins they block.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1HSG", "label": "HIV-1 protease with indinavir" },
@@ -635,6 +655,7 @@
       "slug": "classic-teaching-proteins",
       "title": "Classic small proteins for teaching",
       "intro": "Small, well-behaved proteins are ideal for learning how to read a structure: they load instantly and every helix and strand is easy to follow. Many of these, such as crambin, ubiquitin, BPTI and lysozyme, have been used for decades to test methods in crystallography, NMR, protein folding and computer simulation. Start here if you are new to molecular structures.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1CRN", "label": "Crambin", "note": "A tiny plant protein of 46 residues that forms exceptionally well-ordered crystals." },
@@ -668,6 +689,7 @@
       "slug": "metabolism-energy",
       "title": "Metabolism and cellular energy",
       "intro": "Cells break down glucose step by step to capture its energy as ATP. Glycolysis splits glucose into pyruvate, the citric acid cycle oxidizes the fragments, and the respiratory chain in mitochondria uses the electrons to pump protons. ATP synthase, a rotary motor, then uses that proton flow to make ATP.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "2YHX", "label": "Hexokinase (yeast)" },
@@ -700,6 +722,7 @@
       "slug": "protein-folding-misfolding",
       "title": "Protein folding, misfolding and amyloid",
       "intro": "Proteins must fold into the right shape to work, and cells use chaperones such as GroEL and Hsp90 to help, and the proteasome to destroy proteins that fail. When folding goes wrong, some proteins stack into long amyloid fibrils. Fibrils of amyloid-beta, tau and alpha-synuclein are hallmarks of Alzheimer's and Parkinson's disease, and misfolded prion proteins cause mad cow disease.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1AON", "label": "GroEL-GroES chaperonin complex", "note": "A folding chamber that gives a protein a protected space to fold." },
@@ -729,6 +752,7 @@
       "slug": "toxins",
       "title": "Toxins and how they work",
       "intro": "Bacteria and plants make some of the most potent poisons known, and their structures reveal how they get into cells and what they attack. Many toxins have two parts: one that binds and enters the cell, and one that carries out the damage. Some, such as botulinum toxin, are also used as medicines.",
+      "updated": "2026-09-29",
       "featured": false,
       "items": [
         { "type": "pdb", "id": "1XTC", "label": "Cholera toxin" },

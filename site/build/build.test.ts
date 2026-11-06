@@ -8,7 +8,7 @@ import compoundData from '../../data/compounds.json';
 import type { Collection, Compound } from '../dataTypes';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
 import { renderCompoundPage } from './compoundPage';
-import { renderCollectionPage } from './staticPages';
+import { renderCollectionPage, renderCollectionsIndex } from './staticPages';
 import { cardTree, compoundCardSpec, renderSquareFallback } from './ogCards';
 import { renderStaticDocument } from '../render/layout';
 import { SQUARE_FALLBACK } from '../ogImages';
@@ -60,22 +60,23 @@ describe('renderSitemaps', () => {
 
 describe('collection lastmod', () => {
   const ctx = { cssHref: '/assets/index.css', featured: FEATURED_COLLECTIONS };
-  const revised = new Map([['4HHB', '2024-05-22'], ['P69905', '2025-08-01'], ['P04637', '2025-07-03']]);
-  const afOnly: Collection = {
-    slug: 'af-only', title: 'AF only', intro: 'x',
+  const newer: Collection = {
+    slug: 'newer', title: 'Newer', intro: 'x', updated: '2026-11-01',
     items: [{ type: 'af', id: 'P69905', label: 'a' }, { type: 'af', id: 'P04637', label: 'b' }],
   };
-  const mixed: Collection = {
-    slug: 'mixed', title: 'Mixed', intro: 'x',
+  const older: Collection = {
+    slug: 'older', title: 'Older', intro: 'x', updated: '2026-10-20',
     items: [{ type: 'pdb', id: '4HHB', label: 'a' }, { type: 'af', id: 'P04637', label: 'b' }],
   };
 
-  it('uses AlphaFold model dates, not only PDB revisions', () => {
-    expect(renderCollectionPage(afOnly, [afOnly, mixed], ctx, revised).lastmod).toBe('2025-08-01');
+  it('is the collection’s own updated date, not a revision date of its structures', () => {
+    expect(renderCollectionPage(newer, [newer, older], ctx).lastmod).toBe('2026-11-01');
+    expect(renderCollectionPage(older, [newer, older], ctx).lastmod).toBe('2026-10-20');
   });
 
-  it('takes the latest date across PDB and AlphaFold items', () => {
-    expect(renderCollectionPage(mixed, [afOnly, mixed], ctx, revised).lastmod).toBe('2025-07-03');
+  it('gives /collections the newest updated date across collections', () => {
+    expect(renderCollectionsIndex([newer, older], ctx).lastmod).toBe('2026-11-01');
+    expect(renderCollectionsIndex([older, newer], ctx).lastmod).toBe('2026-11-01');
   });
 });
 
