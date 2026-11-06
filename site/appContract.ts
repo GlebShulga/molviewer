@@ -77,7 +77,9 @@ export function toViewerColor(color: AppColor): ViewerColorScheme {
  * (src/utils/representationAvailability.ts). Here because the server reports
  * the style the widget will show. Measured on production (Chrome, Intel Iris Xe
  * laptop, 2026-11-05): 59k atoms freeze 5-12 s and rotate at 27 fps, 99k
- * freeze 10-11 s at 22 fps, 238k freeze 48-56 s at 9 fps.
+ * freeze 10-11 s at 22 fps, 238k freeze 48-56 s at 9 fps. These were measured
+ * with one drei instance per bond, before bonds became one InstancedMesh
+ * (InstancedBonds.tsx); re-measuring could raise the limit.
  */
 export const DESKTOP_ATOM_STYLE_LIMIT = 100_000;
 

@@ -1,5 +1,4 @@
 import { useMemo, useEffect, useRef } from "react";
-import { createInstances } from "@react-three/drei";
 import * as THREE from "three";
 import type { Molecule, Atom } from "../../types";
 import { getVdwRadius } from "../../constants";
@@ -11,6 +10,7 @@ import { getAtomColor } from "../../utils";
 import { SelectableAtom } from "./SelectableAtom";
 import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
 import { AromaticRings } from "./AromaticRings";
+import { InstancedBonds, writeSegmentMatrix } from "./InstancedBonds";
 
 export interface BallAndStickProps {
   molecule: Molecule;
@@ -24,20 +24,12 @@ export interface BallAndStickProps {
   structureId?: string;
 }
 
-const [BondInstances, BondInstance] = createInstances();
-
 interface AtomRenderData {
   atom: Atom;
   index: number;
   position: [number, number, number];
   color: THREE.Color;
   radius: number;
-}
-
-interface BondRenderData {
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  length: number;
 }
 
 export function BallAndStick({
@@ -121,33 +113,17 @@ export function BallAndStick({
     }));
   }, [filteredAtoms, atomScale, colorScheme, colorContext, useImpostors]);
 
-  const bondsData = useMemo<BondRenderData[]>(() => {
-    const bonds: BondRenderData[] = [];
-    const up = new THREE.Vector3(0, 1, 0);
-
+  // One matrix per bond (16 floats), for InstancedBonds
+  const bondMatrices = useMemo(() => {
+    const matrices = new Float32Array(filteredBonds.length * 16);
+    let n = 0;
     for (const bond of filteredBonds) {
       const atom1 = molecule.atoms[bond.atom1Index];
       const atom2 = molecule.atoms[bond.atom2Index];
-
       if (!atom1 || !atom2) continue;
-
-      const start = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
-      const end = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
-      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-      const direction = new THREE.Vector3().subVectors(end, start);
-      const length = direction.length();
-
-      direction.normalize();
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
-
-      bonds.push({
-        position: mid,
-        quaternion,
-        length,
-      });
+      writeSegmentMatrix(matrices, n++, atom1.x, atom1.y, atom1.z, atom2.x, atom2.y, atom2.z);
     }
-
-    return bonds;
+    return n === filteredBonds.length ? matrices : matrices.slice(0, n * 16);
   }, [molecule.atoms, filteredBonds]);
 
   const bondGeometry = useMemo(() => {
@@ -200,21 +176,7 @@ export function BallAndStick({
         ))
       )}
 
-      <BondInstances
-        key={`${molecule.name}-${filteredBonds.length}`}
-        limit={filteredBonds.length}
-        geometry={bondGeometry}
-        material={bondMaterial}
-      >
-        {bondsData.map((bond, index) => (
-          <BondInstance
-            key={index}
-            position={bond.position}
-            quaternion={bond.quaternion}
-            scale={[1, bond.length, 1]}
-          />
-        ))}
-      </BondInstances>
+      <InstancedBonds matrices={bondMatrices} geometry={bondGeometry} material={bondMaterial} />
 
       {showAromaticRings && molecule.aromaticRings && (
         <AromaticRings rings={molecule.aromaticRings} />

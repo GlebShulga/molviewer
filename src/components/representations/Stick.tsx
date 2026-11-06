@@ -1,5 +1,4 @@
 import { useMemo, useEffect, useRef } from "react";
-import { createInstances } from "@react-three/drei";
 import * as THREE from "three";
 import type { Molecule, Atom } from "../../types";
 import { useMoleculeStore, type ColorScheme } from "../../store/moleculeStore";
@@ -10,6 +9,7 @@ import { getAtomColor } from "../../utils";
 import { SelectableAtom } from "./SelectableAtom";
 import { ImpostorAtoms, type AtomData } from "./ImpostorAtoms";
 import { AromaticRings } from "./AromaticRings";
+import { InstancedBonds, writeSegmentMatrix } from "./InstancedBonds";
 
 export interface StickProps {
   molecule: Molecule;
@@ -19,15 +19,6 @@ export interface StickProps {
   atomIndices?: number[]; // Filter to render only these atoms
   /** Structure ID for multi-structure support */
   structureId?: string;
-}
-
-const [BondInstances, BondInstance] = createInstances();
-
-interface HalfBondRenderData {
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  length: number;
-  color: THREE.Color;
 }
 
 interface AtomRenderData {
@@ -115,60 +106,48 @@ export function Stick({
     }));
   }, [filteredAtoms, colorScheme, colorContext, useImpostors, bondRadius]);
 
-  const bondsData = useMemo<HalfBondRenderData[]>(() => {
-    const halfBonds: HalfBondRenderData[] = [];
-    const up = new THREE.Vector3(0, 1, 0);
+  // Matrices (16 floats) and colours (3 floats) per drawn bond, for InstancedBonds
+  const bondArrays = useMemo(() => {
     const isLargeMolecule = molecule.atoms.length > AROMATIC_DETECTION_THRESHOLD;
+    // Large molecules: one bond in a uniform colour. Small: two half-bonds in the atoms' colours.
+    const perBond = isLargeMolecule ? 1 : 2;
+    const matrices = new Float32Array(filteredBonds.length * perBond * 16);
+    const colors = new Float32Array(filteredBonds.length * perBond * 3);
+    const color = new THREE.Color();
+    const defaultColor = new THREE.Color(COLORS.defaultBond);
+    let n = 0;
 
     for (const bond of filteredBonds) {
       const atom1 = molecule.atoms[bond.atom1Index];
       const atom2 = molecule.atoms[bond.atom2Index];
-
       if (!atom1 || !atom2) continue;
 
-      const start = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
-      const end = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
-      const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-      const direction = new THREE.Vector3().subVectors(end, start);
-      const fullLength = direction.length();
-
-      direction.normalize();
-      const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
-
       if (isLargeMolecule) {
-        // Large molecules: single bond with uniform color (1 bond instead of 2 half-bonds)
-        halfBonds.push({
-          position: mid,
-          quaternion,
-          length: fullLength,
-          color: new THREE.Color(COLORS.defaultBond),
-        });
+        writeSegmentMatrix(matrices, n, atom1.x, atom1.y, atom1.z, atom2.x, atom2.y, atom2.z);
+        defaultColor.toArray(colors, n * 3);
+        n++;
       } else {
-        // Small molecules: two half-bonds with per-atom colors
-        const halfLength = fullLength / 2;
-
-        // First half (atom1 color)
-        const firstHalfPos = new THREE.Vector3().addVectors(start, mid).multiplyScalar(0.5);
-        halfBonds.push({
-          position: firstHalfPos,
-          quaternion: quaternion.clone(),
-          length: halfLength,
-          color: new THREE.Color(getAtomColor(atom1, colorScheme, colorContext)),
-        });
-
-        // Second half (atom2 color)
-        const secondHalfPos = new THREE.Vector3().addVectors(mid, end).multiplyScalar(0.5);
-        halfBonds.push({
-          position: secondHalfPos,
-          quaternion: quaternion.clone(),
-          length: halfLength,
-          color: new THREE.Color(getAtomColor(atom2, colorScheme, colorContext)),
-        });
+        const mx = (atom1.x + atom2.x) / 2;
+        const my = (atom1.y + atom2.y) / 2;
+        const mz = (atom1.z + atom2.z) / 2;
+        writeSegmentMatrix(matrices, n, atom1.x, atom1.y, atom1.z, mx, my, mz);
+        color.set(getAtomColor(atom1, colorScheme, colorContext)).toArray(colors, n * 3);
+        n++;
+        writeSegmentMatrix(matrices, n, mx, my, mz, atom2.x, atom2.y, atom2.z);
+        color.set(getAtomColor(atom2, colorScheme, colorContext)).toArray(colors, n * 3);
+        n++;
       }
     }
 
-    return halfBonds;
+    if (n * 16 === matrices.length) return { matrices, colors };
+    return { matrices: matrices.slice(0, n * 16), colors: colors.slice(0, n * 3) };
   }, [molecule.atoms, filteredBonds, colorScheme, colorContext]);
+
+  // White, so the instance colours show as they are
+  const bondMaterial = useMemo(() => new THREE.MeshStandardMaterial(), []);
+  useEffect(() => () => {
+    bondMaterial.dispose();
+  }, [bondMaterial]);
 
   const bondGeometry = useMemo(() => {
     return new THREE.CylinderGeometry(bondRadius, bondRadius, 1, 8);
@@ -208,18 +187,12 @@ export function Stick({
         ))
       )}
 
-      <BondInstances key={`${molecule.name}-${bondsData.length}`} limit={bondsData.length} geometry={bondGeometry}>
-        <meshStandardMaterial />
-        {bondsData.map((bond, index) => (
-          <BondInstance
-            key={index}
-            position={bond.position}
-            quaternion={bond.quaternion}
-            scale={[1, bond.length, 1]}
-            color={bond.color}
-          />
-        ))}
-      </BondInstances>
+      <InstancedBonds
+        matrices={bondArrays.matrices}
+        colors={bondArrays.colors}
+        geometry={bondGeometry}
+        material={bondMaterial}
+      />
 
       {showAromaticRings && molecule.aromaticRings && (
         <AromaticRings rings={molecule.aromaticRings} />

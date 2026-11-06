@@ -39,6 +39,8 @@ export const SURFACE_MAX_ATOMS = 100_000;
  * Ball & Stick and Stick on a touch screen stop at this many atoms. Measured on
  * a production build (Pixel 5 emulation, CPU throttled 4x): 660 atoms rotate at
  * about 30 fps, 2.5k at 9 fps, 4.8k freeze for 7-10 s and 58k for 22-30 s.
+ * These were measured with one drei instance per bond, before bonds became one
+ * InstancedMesh (InstancedBonds.tsx); re-measuring could raise the limit.
  * Desktops stop much later (DESKTOP_ATOM_STYLE_LIMIT), and Spacefill stays
  * fast everywhere through impostors.
  */

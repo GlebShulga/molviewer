@@ -9,6 +9,7 @@ import {
   sphereTriangleCount,
   SPHERE_DETAIL_LEVELS,
 } from '../exportModel';
+import { createBondMesh, writeSegmentMatrix } from '../../components/representations/InstancedBonds';
 
 const BOX_TRIS = 12;
 const SPHERE_16_12 = sphereTriangleCount(16, 12);
@@ -227,6 +228,60 @@ describe('buildExportScene', () => {
     ) as THREE.Mesh;
     expect((translucent.material as THREE.Material).opacity).toBe(0.5);
     expect(geometryTriangleCount(translucent.geometry)).toBe(BOX_TRIS);
+  });
+});
+
+describe('buildExportScene with InstancedBonds meshes', () => {
+  const bondGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+  const vertsPerBond = bondGeometry.getAttribute('position').count;
+
+  function bondMatrices(): Float32Array {
+    const matrices = new Float32Array(2 * 16);
+    writeSegmentMatrix(matrices, 0, 0, 0, 0, 0, 2, 0);
+    writeSegmentMatrix(matrices, 1, 0, 2, 0, 2, 2, 0);
+    return matrices;
+  }
+
+  function colorAt(mesh: THREE.Mesh, vertex: number): number[] {
+    const color = mesh.geometry.getAttribute('color');
+    return [color.getX(vertex), color.getY(vertex), color.getZ(vertex)];
+  }
+
+  it('exports every bond in the material colour (Ball & Stick)', () => {
+    const scene = new THREE.Scene();
+    const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    scene.add(createBondMesh(bondMatrices(), undefined, bondGeometry, material));
+    const { group, triangles } = buildExportScene(scene, { center: false });
+    expect(triangles).toBe(2 * geometryTriangleCount(bondGeometry));
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(colorAt(mesh, 0)).toEqual([0, 1, 0]);
+    expect(colorAt(mesh, vertsPerBond)).toEqual([0, 1, 0]);
+  });
+
+  it('exports per-bond colours (Stick)', () => {
+    const scene = new THREE.Scene();
+    const colors = new Float32Array([1, 0, 0, 0, 0, 1]);
+    scene.add(createBondMesh(bondMatrices(), colors, bondGeometry, new THREE.MeshStandardMaterial()));
+    const { group, triangles } = buildExportScene(scene, { center: false });
+    expect(triangles).toBe(2 * geometryTriangleCount(bondGeometry));
+    const mesh = group.children[0] as THREE.Mesh;
+    expect(colorAt(mesh, 0)).toEqual([1, 0, 0]);
+    expect(colorAt(mesh, vertsPerBond)).toEqual([0, 0, 1]);
+  });
+
+  it('exports bonds at their parent group offset (side by side)', () => {
+    const scene = new THREE.Scene();
+    const structure = new THREE.Group();
+    structure.position.set(100, 0, 0);
+    structure.add(createBondMesh(bondMatrices(), undefined, bondGeometry, new THREE.MeshStandardMaterial()));
+    scene.add(structure);
+    const { group } = buildExportScene(scene, { center: false });
+    const mesh = group.children[0] as THREE.Mesh;
+    mesh.geometry.computeBoundingBox();
+    const box = mesh.geometry.boundingBox!;
+    expect(box.min.x).toBeCloseTo(99.9, 3);
+    expect(box.max.x).toBeCloseTo(102, 3);
+    expect(box.max.y).toBeCloseTo(2.1, 3);
   });
 });
 
