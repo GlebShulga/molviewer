@@ -209,6 +209,10 @@ export function ImpostorAtoms({
     const geo = new THREE.PlaneGeometry(1, 1);
     return geo;
   }, []);
+  // R3F disposes the instancedMesh on unmount, which leaves its geometry (passed in args)
+  useEffect(() => () => {
+    geometry.dispose();
+  }, [geometry]);
 
   // Create instance attributes
   const { colorArray, radiusArray, selectedArray, hoveredArray, indexArray, dummy } =
