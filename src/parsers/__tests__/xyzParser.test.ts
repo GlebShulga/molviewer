@@ -46,8 +46,8 @@ H    -0.24000   0.93000   0.00000`;
     expect(() => parseXYZ(xyz)).toThrow('Invalid XYZ format: no atoms');
   });
 
-  it('loads an empty molecule when the count is 0', () => {
-    expect(parseXYZ('0\nempty').atoms).toEqual([]);
+  it.each(['0\nempty', '-3\nnegative\nC 0 0 0'])('throws when the atom count is not positive (%j)', (xyz) => {
+    expect(() => parseXYZ(xyz)).toThrow('Invalid XYZ format: atom count must be positive');
   });
 
   it('loads the atoms a truncated file has', () => {

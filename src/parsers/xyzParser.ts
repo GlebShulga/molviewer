@@ -32,6 +32,9 @@ export function parseXYZ(
   if (isNaN(atomCount)) {
     throw new Error("Invalid XYZ format: cannot parse atom count");
   }
+  if (atomCount <= 0) {
+    throw new Error("Invalid XYZ format: atom count must be positive");
+  }
 
   const comment = lines[countLine + 1].trim();
   const moleculeName = comment || "Molecule";
@@ -69,7 +72,7 @@ export function parseXYZ(
 
   // A truncated file still loads the atoms it has, but a header with no atom
   // lines at all ("5\n") is not a molecule.
-  if (atomCount > 0 && atoms.length === 0) {
+  if (atoms.length === 0) {
     throw new Error("Invalid XYZ format: no atoms after the header");
   }
 
