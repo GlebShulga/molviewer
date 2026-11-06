@@ -2,9 +2,8 @@ import { useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { Molecule, Atom } from "../../types";
 import { getVdwRadius } from "../../constants";
-import { useMoleculeStore, type ColorScheme } from "../../store/moleculeStore";
-import { selectDetectAromaticRingsIfNeeded } from "../../store/selectors";
-import { useRepresentationSetup } from "../../hooks";
+import type { ColorScheme } from "../../store/moleculeStore";
+import { useAromaticRingDetection, useRepresentationSetup } from "../../hooks";
 import { SCALES, COLORS, getQualityPreset, PERFORMANCE_THRESHOLDS } from "../../config";
 import { getAtomColor } from "../../utils";
 import { ringsWithin } from "../../utils/aromaticDetection";
@@ -47,15 +46,8 @@ export function BallAndStick({
   const { effectiveStructureId, selectedAtomIndices, colorContext } =
     useRepresentationSetup(molecule, structureId);
 
-  // Aromatic ring detection is representation-specific
-  const detectAromaticRingsIfNeeded = useMoleculeStore(selectDetectAromaticRingsIfNeeded);
-
-  // Trigger lazy aromatic ring detection for this structure (not just the active one)
-  useEffect(() => {
-    if (showAromaticRings) {
-      detectAromaticRingsIfNeeded(effectiveStructureId);
-    }
-  }, [showAromaticRings, detectAromaticRingsIfNeeded, effectiveStructureId]);
+  // Lazy aromatic ring detection for this structure (not just the active one)
+  useAromaticRingDetection(effectiveStructureId, showAromaticRings);
 
   // Only this component's rings, so a structure split into components draws each once
   const rings = useMemo(
