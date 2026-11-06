@@ -94,11 +94,17 @@ function otherAtom(bond: Bond, atom: number): number {
  * 1. a double (or flagged) bond to a ring partner, meaning an atom of this
  *    ring or of a fused ring already found aromatic: 1
  * 2. any other double bond (C=O, exocyclic C=C, S(=O)2): 0
- * 3. N, O or S with single bonds only (lone pair): 2
+ * 3. N, O or S, or any atom with a -1 formal charge (the carbanion of
+ *    cyclopentadienide), with single bonds only (lone pair): 2
  * 4. a carbon with single bonds only: the ring is not aromatic.
  * The ring is aromatic when the total is exactly 6. Counting aromatic fused
  * partners lets either Kekulé form of naphthalene or indole pass for both
  * rings, while an o-quinoid ring next to a non-aromatic one (2H-indene) fails.
+ *
+ * Rule 4 is deliberately strict: Cp ligands drawn as radicals (PubChem's
+ * convention for ferrocene, CID 10219726) or as anions without their charge
+ * are not marked, since such a ring has 5 π electrons as drawn. Loosening
+ * rule 4 to catch them would mark cyclopentadiene and cyclohexadienes again.
  */
 function isAromaticRing(
   ring: RingCandidate,
@@ -120,7 +126,7 @@ function isAromaticRing(
       electrons += 1;
     } else if (own.some(b => b.order === 2)) {
       // A double bond out of the ring system gives this ring no π electrons
-    } else if (atoms[idx].element !== 'C') {
+    } else if (atoms[idx].element !== 'C' || atoms[idx].formalCharge === -1) {
       electrons += 2;
     } else {
       return false;
@@ -181,8 +187,8 @@ function calculateRingGeometry(
 export function detectAromaticRings(molecule: Molecule): AromaticRing[] {
   const { atoms, bonds } = molecule;
 
-  // Without a double or flagged bond no ring can pass (a ring with a carbon
-  // fails rule 4, an all-N/O/S ring counts 10 or 12), so skip the ring search.
+  // Without a double or flagged bond no ring can pass: every atom either fails
+  // rule 4 or gives 2 electrons, so a ring counts 10 or 12, never 6. Skip the ring search.
   // This covers proteins from PDB/mmCIF, whose bonds are all order 1.
   if (atoms.length === 0 || !bonds.some(b => b.order === 2 || b.isAromatic)) {
     return [];

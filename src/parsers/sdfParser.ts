@@ -8,6 +8,36 @@ const DEFAULT_OPTIONS: SDFParserOptions = {
   parseProperties: false,
 };
 
+/** Atom-block charge codes (columns 37-39). 4 is a doublet radical, not a charge. */
+const ATOM_BLOCK_CHARGES: Record<number, number> = { 1: 3, 2: 2, 3: 1, 5: -1, 6: -2, 7: -3 };
+
+/**
+ * Applies the property block's "M  CHG" lines. By the V2000 format, any CHG,
+ * RAD or ISO line replaces every charge and radical in the atom block, so
+ * those are cleared first.
+ */
+function applyPropertyCharges(lines: string[], start: number, atoms: Atom[]): void {
+  const properties: string[] = [];
+  for (let i = start; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('M  END') || line.startsWith('$$$$')) break;
+    if (line.startsWith('M  ')) properties.push(line);
+  }
+  if (!properties.some(line => /^M {2}(CHG|RAD|ISO)/.test(line))) return;
+
+  for (const atom of atoms) delete atom.formalCharge;
+  for (const line of properties) {
+    if (!line.startsWith('M  CHG')) continue;
+    // "M  CHGnn8 aaa vvv ...": an entry count, then atom number / charge pairs
+    const fields = line.substring(6).trim().split(/\s+/).map(Number);
+    for (let k = 1; k + 1 < fields.length && k < 1 + 2 * fields[0]; k += 2) {
+      const atom = atoms[fields[k] - 1];
+      const charge = fields[k + 1];
+      if (atom && Number.isInteger(charge) && charge !== 0) atom.formalCharge = charge;
+    }
+  }
+}
+
 export function parseSDF(
   sdfString: string,
   options: SDFParserOptions = {}
@@ -48,12 +78,15 @@ export function parseSDF(
       throw new Error(`Invalid SDF format: cannot parse coordinates at line ${i + 1}`);
     }
 
+    const formalCharge = ATOM_BLOCK_CHARGES[parseInt(line.substring(36, 39).trim(), 10)];
+
     atoms.push({
       id: i - atomBlockStart,
       element,
       x,
       y,
       z,
+      ...(formalCharge !== undefined && { formalCharge }),
     });
   }
 
@@ -93,6 +126,8 @@ export function parseSDF(
       ...(bondType === 4 && { isAromatic: true }),
     });
   }
+
+  applyPropertyCharges(lines, bondBlockEnd, atoms);
 
   return {
     name: moleculeName,

@@ -209,6 +209,53 @@ describe('detectAromaticRings', () => {
     });
   });
 
+  describe('charged ring atoms', () => {
+    const fixtures = resolve(__dirname, '../../parsers/__tests__/fixtures');
+
+    it('cyclopentadienide: the carbanion gives 2 electrons, so the ring has 6', () => {
+      // Atom 0 has single bonds only; the neutral drawing is cyclopentadiene
+      const cp = ring(['C', 'C', 'C', 'C', 'C'], [1, 2, 1, 2, 1]);
+      expect(ringSets(cp)).toEqual([]);
+      cp.atoms[0].formalCharge = -1;
+      expect(ringSets(cp)).toEqual([[0, 1, 2, 3, 4]]);
+    });
+
+    it('a -1 charge does not override a double bond on the same atom', () => {
+      // C1(-)=C2: still rule 1, 1 electron; the ring stays at 5 with the CH2 at 4 failing
+      const m = ring(['C', 'C', 'C', 'C', 'C'], [2, 1, 2, 1, 1]);
+      m.atoms[0].formalCharge = -1;
+      expect(ringSets(m)).toEqual([]);
+    });
+
+    it('finds both rings of PubChem ferrocene drawn with Cp⁻ anions (CID 7611)', () => {
+      const ferrocene = parseSDF(readFileSync(resolve(fixtures, 'ferrocene-cid7611.mol'), 'utf8'));
+      expect(detectAromaticRings(ferrocene)).toHaveLength(2);
+    });
+
+    // These two pin rule 4 on purpose. A Cp ring drawn without its charge has
+    // 5 π electrons as drawn, exactly like cyclopentadiene; marking it would
+    // need a looser rule 4, which brings back the old false positives.
+    it('does not mark ferrocene drawn with Cp radicals (CID 10219726), by design', () => {
+      // PubChem's name search for "ferrocene" returns this record
+      const ferrocene = parseSDF(readFileSync(resolve(fixtures, 'ferrocene-cid10219726.mol'), 'utf8'));
+      expect(ferrocene.atoms.some((a) => a.formalCharge !== undefined)).toBe(false);
+      expect(detectAromaticRings(ferrocene)).toEqual([]);
+    });
+
+    it('does not mark a Cp anion written without its charge, by design', () => {
+      // Ferrocene CID 7611 with the M  CHG line and atom-block charges removed
+      const text = readFileSync(resolve(fixtures, 'ferrocene-cid7611.mol'), 'utf8')
+        .split(/\r?\n/)
+        .filter((line) => !line.startsWith('M  CHG'))
+        // Atom lines start with three coordinates; zero their charge field (columns 37-39)
+        .map((line) => (/^(\s*-?\d+\.\d{4}){3} /.test(line) ? `${line.slice(0, 36)}  0${line.slice(39)}` : line))
+        .join('\n');
+      const uncharged = parseSDF(text);
+      expect(uncharged.atoms.every((a) => a.formalCharge === undefined)).toBe(true);
+      expect(detectAromaticRings(uncharged)).toEqual([]);
+    });
+  });
+
   it('finds both rings of caffeine, with its methyls and C=O groups', () => {
     // 0 N1, 1 C2, 2 N3, 3 C4, 4 C5, 5 C6, 6 N7, 7 C8, 8 N9,
     // 9 O on C2, 10 O on C6, 11-13 methyls on N1, N3, N7

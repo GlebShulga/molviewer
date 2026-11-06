@@ -14,6 +14,8 @@ export interface Atom {
   occupancy?: number;
   tempFactor?: number;
   secondaryStructure?: SecondaryStructure;
+  /** Formal charge from the file (SDF/MOL only); absent when neutral or unknown. */
+  formalCharge?: number;
 }
 
 export interface Bond {
