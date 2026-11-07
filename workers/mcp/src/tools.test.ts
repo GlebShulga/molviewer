@@ -494,6 +494,48 @@ describe('isDeniedCompound', () => {
     expect(isDeniedCompound({ names: ['Sulfur mustard'] })).toBe(true);
     expect(isDeniedCompound({ cid: 2519, names: ['Caffeine'] })).toBe(false);
   });
+
+  it('covers the other named Schedule 1 agents and precursors by CID', () => {
+    const cids = [
+      65568, 30800, // VE, VM
+      14557887, 522107, 522108, 518918, 22608774, 22608780, // sulfur mustards
+      160100773, 157299938, 146586254, // A-230, A-232, A-242
+      165365087, 165365088, 165365094, 165365095, // carbamates (2020)
+      69610, 170325, 102124, 145983, // DF, QL, chlorosarin, chlorosoman
+    ];
+    for (const cid of cids) expect(isDeniedCompound({ cid }), String(cid)).toBe(true);
+  });
+
+  it('covers them by name, in their usual punctuation', () => {
+    const names = [
+      'A-242',
+      'A242',
+      'Chlorosarin',
+      'chlorosoman',
+      'Agent QL',
+      '2-Chloroethyl chloromethyl sulfide',
+      '2-chloroethylchloromethylsulfide',
+      'Bis(2-chloroethylthio)methane',
+      '1,3-Bis(2-chloroethylthio)-n-propane',
+      '1,4-bis(2-chloroethylthio)butane',
+      '1,5-Bis(2-chloroethylthio)-n-pentane',
+      'bis(2-chloroethylthiomethyl) ether',
+      'S-[2-(diethylamino)ethyl] O-ethyl ethylphosphonothioate',
+      'S-(2-(Diethylamino)ethyl) O-ethyl P-methylphosphonothioate',
+      'Methylphosphonic difluoride',
+      'methylphosphonyl difluoride',
+      'O-ethyl O-2-diisopropylaminoethyl methylphosphonite',
+      'O-isopropyl methylphosphonochloridate',
+      'pinacolyl methylphosphonochloridate',
+    ];
+    for (const name of names) expect(isDeniedCompound({ names: [name] }), name).toBe(true);
+  });
+
+  it('leaves unrelated names alone', () => {
+    for (const name of ['VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine']) {
+      expect(isDeniedCompound({ names: [name] }), name).toBe(false);
+    }
+  });
 });
 
 describe('assemblyNote', () => {
