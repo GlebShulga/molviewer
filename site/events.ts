@@ -67,8 +67,16 @@ export function isEventName(value: unknown): value is EventName {
   return typeof value === 'string' && (EVENT_NAMES as readonly string[]).includes(value);
 }
 
+/** Page kinds an event can carry; /api/event stores anything else as ''. */
+export const PAGE_KINDS = ['home', 'pdb', 'af', 'compound', 'share', 'embed', 'widget', 'other'] as const;
+export type PageKind = (typeof PAGE_KINDS)[number];
+
+export function isPageKind(value: unknown): value is PageKind {
+  return typeof value === 'string' && (PAGE_KINDS as readonly string[]).includes(value);
+}
+
 /** Classify a pathname into a coarse page type (no ids, so no free-form data is stored). */
-export function pageKind(pathname: string): string {
+export function pageKind(pathname: string): PageKind {
   const route = parseRoute(pathname);
   switch (route.page) {
     case 'home':

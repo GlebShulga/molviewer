@@ -7,11 +7,11 @@
  *   index1  = event name
  *   blob1   = event name
  *   blob2.. = STRING_FIELDS in order (source, entry, format, kind, ref, value)
- *   blob8   = page kind (home, pdb, af, compound, share, embed, other)
+ *   blob8   = page kind (PAGE_KINDS: home, pdb, af, compound, share, embed, widget, other; '' otherwise)
  *   blob9   = country (from Cloudflare)
  *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms)
  */
-import { CROSS_ORIGIN_EVENTS, isEventName, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
+import { CROSS_ORIGIN_EVENTS, isEventName, isPageKind, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
 import { readLimited } from '../../site/http/readLimited';
 
 interface Env {
@@ -55,7 +55,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   env.EVENTS?.writeDataPoint({
     indexes: [payload.e],
-    blobs: [payload.e, ...STRING_FIELDS.map((k) => str(props[k])), str(payload.page), country],
+    // The page comes from the client: only a known kind is stored
+    blobs: [payload.e, ...STRING_FIELDS.map((k) => str(props[k])), isPageKind(payload.page) ? payload.page : '', country],
     doubles: NUMBER_FIELDS.map((k) => (typeof props[k] === 'number' && Number.isFinite(props[k]) ? (props[k] as number) : 0)),
   });
 

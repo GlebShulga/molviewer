@@ -66,6 +66,18 @@ describe('/api/event', () => {
     expect((await sameOrigin.res).status).toBe(204);
   });
 
+  it('stores only known page kinds, and an empty string for anything else', async () => {
+    const pageOf = async (page: string) => {
+      const { res, points } = post(JSON.stringify({ e: 'structure_loaded', page }));
+      await res;
+      return (points[0] as { blobs: string[] }).blobs[7];
+    };
+    expect(await pageOf('pdb')).toBe('pdb');
+    expect(await pageOf('widget')).toBe('widget');
+    expect(await pageOf('https://example.org/tracking-me?u=1')).toBe('');
+    expect(await pageOf('PDB')).toBe('');
+  });
+
   it('answers CORS preflights', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = (await (onRequestOptions as any)({})) as Response;
