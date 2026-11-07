@@ -8,6 +8,7 @@ import { formatMeasurement } from '../../utils/measurements';
 import { DEFAULT_MEASUREMENT_COLORS, type MeasurementColors } from '../../colors';
 import { DistanceMeasurement, AngleMeasurement, DihedralMeasurement } from './measurements';
 import { useMoleculeStore } from '../../store/moleculeStore';
+import { selectStructureOffsetsKey } from '../../store/selectors';
 
 export type { MeasurementColors };
 
@@ -105,6 +106,8 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
 
   // Get the stable getStructure method from store
   const getStructure = useMoleculeStore(state => state.getStructure);
+  // Atoms are drawn at position + structure offset: re-resolve when a layout change moves structures
+  const offsetsKey = useMoleculeStore(selectStructureOffsetsKey);
 
   // Determine preview line color based on measurement mode
   const previewColor = colors[measurementMode as MeasurementType] ?? colors.distance;
@@ -115,7 +118,8 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
     return selectedAtoms
       .map(ref => resolveAtomWithOffset(ref, getStructure))
       .filter((a): a is Atom => a !== null);
-  }, [selectedAtoms, getStructure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAtoms, getStructure, offsetsKey]);
 
   // Resolve hovered atom
   const resolvedHoveredAtom = useMemo(() => {
@@ -124,7 +128,8 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
       { structureId: hoveredStructureId, atomIndex: hoveredAtomIndex },
       getStructure
     );
-  }, [hoveredStructureId, hoveredAtomIndex, getStructure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredStructureId, hoveredAtomIndex, getStructure, offsetsKey]);
 
   // Check if hovered atom is already selected
   const isHoveredSelected = useMemo(() => {
@@ -151,7 +156,8 @@ export const MeasurementOverlay = memo(function MeasurementOverlay({
     }
     // Legacy fallback - measurements without atomRefs shouldn't exist anymore
     return [];
-  }, [getStructure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getStructure, offsetsKey]);
 
   return (
     <group>

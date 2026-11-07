@@ -35,6 +35,16 @@ interface MoleculeStateShape {
 }
 
 /**
+ * Every structure's layout offset, as one string ("0,0,0;30,0,0"). For
+ * components that place things at atom positions plus offsets (labels,
+ * measurements): they read structures through getStructure, so this is what
+ * tells them a layout change moved the atoms. A string, because a selector
+ * returning a new array each time makes zustand 5 loop forever.
+ */
+export const selectStructureOffsetsKey = (state: MoleculeStateShape): string =>
+  state.structureOrder.map((id) => state.structures.get(id)?.offset.join(',') ?? '').join(';');
+
+/**
  * Select the active structure ID (primitive value, stable reference)
  */
 export const selectActiveStructureId = (state: MoleculeStateShape): string | null =>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 import { useMoleculeStore, type Label3D as Label3DType } from '../../../store/moleculeStore';
+import { selectStructureOffsetsKey } from '../../../store/selectors';
 import type { Atom } from '../../../types';
 import styles from './Labels3D.module.css';
 
@@ -61,6 +62,8 @@ export function Labels3D() {
   const removeLabel = useMoleculeStore(state => state.removeLabel);
   // Get the stable getStructure method from store
   const getStructure = useMoleculeStore(state => state.getStructure);
+  // Labels sit at atom + structure offset: re-resolve when a layout change moves structures
+  const offsetsKey = useMoleculeStore(selectStructureOffsetsKey);
 
   // Resolve labels using getStructure instead of subscribing to structures Map
   const validLabels = useMemo(() => {
@@ -83,7 +86,9 @@ export function Labels3D() {
       });
     }
     return resolved;
-  }, [labels, getStructure]);
+    // offsetsKey: getStructure is stable, the offsets it returns are not
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labels, getStructure, offsetsKey]);
 
   if (validLabels.length === 0) {
     return null;

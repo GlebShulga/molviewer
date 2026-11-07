@@ -153,3 +153,18 @@ describe('selectors', () => {
     });
   });
 });
+
+describe('selectStructureOffsetsKey', () => {
+  it('changes when the layout moves structures, and is a string (a stable snapshot for zustand)', async () => {
+    const { selectStructureOffsetsKey } = await import('../selectors');
+    const { useMoleculeStore } = await import('../moleculeStore');
+    useMoleculeStore.getState().reset();
+    useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+    useMoleculeStore.getState().addStructure(createMockMolecule('B'), 'B');
+    const overlay = selectStructureOffsetsKey(useMoleculeStore.getState());
+    expect(typeof overlay).toBe('string');
+    expect(selectStructureOffsetsKey(useMoleculeStore.getState())).toBe(overlay);
+    useMoleculeStore.getState().setLayoutMode('side-by-side');
+    expect(selectStructureOffsetsKey(useMoleculeStore.getState())).not.toBe(overlay);
+  });
+});
