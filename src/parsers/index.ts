@@ -8,6 +8,9 @@ import { parseSDF } from './sdfParser';
 import { parseXYZ } from './xyzParser';
 import { parseMMCIF } from './mmcifParser';
 import { getFileExtension, detectFormat } from '../utils/fileValidation';
+import { UnsupportedFormatError } from './errors';
+
+export { UnsupportedFormatError } from './errors';
 import type { Molecule } from '../types';
 
 /**
@@ -40,7 +43,9 @@ export function parseByFilename(content: string, filename: string): Molecule {
 
   try {
     return parseByFormat(content, extension);
-  } catch {
+  } catch (err) {
+    // The parser knows why it can't read this file: say so
+    if (err instanceof UnsupportedFormatError) throw err;
     const detected = detectFormat(content);
     if (detected && detected !== extension) {
       return parseByFormat(content, detected);

@@ -137,3 +137,17 @@ M  END`;
     });
   });
 });
+
+describe('parseSDF unsupported and empty files', () => {
+  it('refuses V3000 molfiles with a reason', async () => {
+    const { UnsupportedFormatError } = await import('../errors');
+    const v3000 = 'x\n  MolViewer\n\n  0  0  0     0  0            999 V3000\nM  V30 BEGIN CTAB\nM  END\n';
+    expect(() => parseSDF(v3000)).toThrow(UnsupportedFormatError);
+    expect(() => parseSDF(v3000)).toThrow('V3000 molfiles are not supported yet; save as V2000');
+  });
+
+  it('refuses a molfile with no atoms', () => {
+    const empty = 'x\n  MolViewer\n\n  0  0  0     0  0            999 V2000\nM  END\n';
+    expect(() => parseSDF(empty)).toThrow(/no atoms/i);
+  });
+});

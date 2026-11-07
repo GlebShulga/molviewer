@@ -1,4 +1,5 @@
 import type { Atom, Bond, Molecule } from "../types";
+import { UnsupportedFormatError } from "./errors";
 
 export interface SDFParserOptions {
   parseProperties?: boolean;
@@ -52,11 +53,19 @@ export function parseSDF(
   const moleculeName = lines[0].trim() || "Molecule";
 
   const countsLine = lines[3];
+  // V3000 keeps its counts and atoms in "M  V30" lines; the V2000 counts
+  // fields read as 0 atoms, which used to load as an empty molecule
+  if (/V3000/i.test(countsLine)) {
+    throw new UnsupportedFormatError("V3000 molfiles are not supported yet; save as V2000");
+  }
   const atomCount = parseInt(countsLine.substring(0, 3).trim(), 10);
   const bondCount = parseInt(countsLine.substring(3, 6).trim(), 10);
 
   if (isNaN(atomCount) || isNaN(bondCount)) {
     throw new Error("Invalid SDF format: cannot parse atom/bond counts");
+  }
+  if (atomCount <= 0) {
+    throw new Error("Invalid SDF format: the molecule has no atoms");
   }
 
   const atoms: Atom[] = [];
