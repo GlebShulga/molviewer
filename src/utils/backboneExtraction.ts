@@ -1,5 +1,5 @@
 import type { Atom, Molecule, SecondaryStructure } from '../types';
-import { chainKey, compareResidueIds } from './residueAnalysis';
+import { atomResidueId, chainKey, compareResidueIds, isAminoAcid, residueLabel } from './residueAnalysis';
 
 export interface BackboneResidue {
   residueNumber: number;
@@ -27,6 +27,100 @@ const NUCLEIC_ACID_RESIDUES = new Set([
   'DA', 'DT', 'DC', 'DG', 'DU', // DNA
 ]);
 
+/** What an atom list's backbone answers are, each filled on first use. */
+interface BackboneFacts {
+  traceable?: ReadonlySet<string>;
+  hasBackbone?: boolean;
+  chainlessAmbiguous?: boolean;
+}
+
+/**
+ * Backbone facts per atom list. They read residue fields (chain, number,
+ * insertion code, residue name), atom names and elements, which never change
+ * after parsing; only secondaryStructure is written on atoms. Each walks
+ * every atom, and the color context, each atom-style component, Cartoon,
+ * the toolbar and the panels ask for them.
+ */
+const backboneCache = new WeakMap<Atom[], BackboneFacts>();
+
+function backboneFacts(atoms: Atom[]): BackboneFacts {
+  let facts = backboneCache.get(atoms);
+  if (!facts) {
+    facts = {};
+    backboneCache.set(atoms, facts);
+  }
+  return facts;
+}
+
+/**
+ * The residues Cartoon traces, as atomResidueId keys (chain, name, number
+ * and insertion code, so a ligand that shares a residue's number is a
+ * residue of its own): amino acids and nucleotides by name, and any other
+ * residue with atoms named N and C beside its CA, as modified amino acids
+ * (MSE) and simulation names (HIE, CYX) have.
+ * Not ligands, water or ions: their atoms can carry backbone names (a ligand
+ * carbon named CA) and, in MD and docking output, a residue's number.
+ *
+ * Walked once per atom list (backboneCache), so detectSecondaryStructure
+ * and extractBackbone on Cartoon's copy share one pass. The set is shared
+ * between callers: read-only.
+ */
+export function traceableResidues(molecule: Molecule): ReadonlySet<string> {
+  const facts = backboneFacts(molecule.atoms);
+  return (facts.traceable ??= findTraceableResidues(molecule.atoms));
+}
+
+function findTraceableResidues(atoms: Atom[]): Set<string> {
+  const result = new Set<string>();
+  // Per other residue: 1 when it has an N, 2 when it has a C
+  const named = new Map<string, number>();
+  // A residue's atoms are almost always consecutive: its key and name check once per residue
+  let previous: Atom | undefined;
+  let key = '';
+  let byName = false;
+  for (const atom of atoms) {
+    if (atom.residueNumber === undefined) continue;
+    if (
+      !previous || atom.residueNumber !== previous.residueNumber || atom.residueName !== previous.residueName ||
+      atom.chainId !== previous.chainId || atom.insertionCode !== previous.insertionCode
+    ) {
+      key = atomResidueId(atom);
+      const residueName = atom.residueName?.toUpperCase() ?? '';
+      byName = isAminoAcid(residueName) || NUCLEIC_ACID_RESIDUES.has(residueName);
+      if (byName) result.add(key);
+    }
+    previous = atom;
+    if (byName) continue;
+    const atomName = atom.name?.trim().toUpperCase();
+    const bit = atomName === 'N' ? 1 : atomName === 'C' ? 2 : 0;
+    if (!bit) continue;
+    const flags = (named.get(key) ?? 0) | bit;
+    named.set(key, flags);
+    if (flags === 3) result.add(key);
+  }
+  return result;
+}
+
+/**
+ * The filter both backbone passes (extractBackbone for Cartoon,
+ * detectSecondaryStructure's phi/psi) apply after their own atom-name check,
+ * which comes first because it is cheap and this one builds a residue key.
+ * An atom passes when it has a residue number (residue 0 included), isn't
+ * without a chain ID in a file whose chainless segments restart their
+ * numbering (chainlessTraceIsAmbiguous: they would merge into one zigzag),
+ * and belongs to a residue Cartoon traces (traceableResidues: a ligand's or
+ * water's N, CA, C or O with a residue's number must not replace that
+ * residue's atoms).
+ */
+export function tracedAtomFilter(molecule: Molecule): (atom: Atom) => atom is Atom & { residueNumber: number } {
+  const traceable = traceableResidues(molecule);
+  const skipChainless = chainlessTraceIsAmbiguous(molecule);
+  return (atom): atom is Atom & { residueNumber: number } =>
+    atom.residueNumber !== undefined && !(skipChainless && !atom.chainId) && traceable.has(atomResidueId(atom));
+}
+
+const BACKBONE_NAMES = new Set(['CA', 'C', 'N', 'O', 'P']);
+
 /**
  * Extract backbone residues from a molecule.
  * Groups atoms by chain and residue, extracts CA (alpha carbon) positions for proteins
@@ -36,26 +130,21 @@ const NUCLEIC_ACID_RESIDUES = new Set([
 export function extractBackbone(molecule: Molecule): BackboneChain[] {
   // Residues keyed by number and insertion code ("52", "52A")
   const chainMap = new Map<string, Map<string, BackboneResidue>>();
+  const traced = tracedAtomFilter(molecule);
 
   for (let atomIndex = 0; atomIndex < molecule.atoms.length; atomIndex++) {
     const atom = molecule.atoms[atomIndex];
-
-    // Skip atoms without residue info. Residue 0 is a real residue, and a
-    // blank chain is the chain 'Unknown' (chainKey).
-    if (atom.residueNumber === undefined || !atom.residueName || !atom.name) {
-      continue;
-    }
+    // Only backbone atoms (CA, C, N, O for proteins; P for nucleic acids), the
+    // cheap check first; then the residues Cartoon traces. A blank chain is
+    // the chain 'Unknown' (chainKey) unless it can't be traced.
+    const atomName = atom.name?.trim().toUpperCase();
+    if (!atomName || !BACKBONE_NAMES.has(atomName)) continue;
+    if (!traced(atom) || !atom.residueName) continue;
 
     const chainId = chainKey(atom);
     const resNum = atom.residueNumber;
-    const resKey = `${resNum}${atom.insertionCode ?? ''}`;
-    const atomName = atom.name.trim().toUpperCase();
+    const resKey = residueLabel(resNum, atom.insertionCode);
     const isNucleicAcid = NUCLEIC_ACID_RESIDUES.has(atom.residueName.toUpperCase());
-
-    // Only process backbone atoms (CA, C, N, O for proteins; P for nucleic acids)
-    if (!['CA', 'C', 'N', 'O', 'P'].includes(atomName)) {
-      continue;
-    }
 
     // A calcium ion is often named CA too (isBackboneAtom)
     if (atomName === 'CA' && atom.element?.toUpperCase() !== 'C') {
@@ -139,24 +228,74 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
 }
 
 /**
- * An atom Cartoon can trace: a protein's alpha carbon, or a nucleotide's
- * phosphorus (as extractBackbone takes P only in nucleic acids). Not a lipid's
- * P (POPC has one), and not a calcium ion, which PDB files also name CA; files
- * without an element column give a protein's CA the element C (the parsers
- * read it from the name).
+ * An atom Cartoon can trace: the alpha carbon of a residue it traces
+ * (traceableResidues), or a nucleotide's phosphorus (as extractBackbone
+ * takes P only in nucleic acids). Not a lipid's P (POPC has one), not a
+ * ligand carbon named CA, and not a calcium ion, which PDB files also name
+ * CA; files without an element column give a protein's CA the element C
+ * (the parsers read it from the name).
  */
-export function isBackboneAtom(atom: Atom): boolean {
+export function isBackboneAtom(atom: Atom, traceable: ReadonlySet<string>): boolean {
   if (atom.residueNumber === undefined) return false;
   const name = atom.name?.trim().toUpperCase();
-  if (name === 'CA') return atom.element?.toUpperCase() === 'C';
+  if (name === 'CA') return atom.element?.toUpperCase() === 'C' && traceable.has(atomResidueId(atom));
   if (name === 'P') return NUCLEIC_ACID_RESIDUES.has(atom.residueName?.toUpperCase() ?? '');
   return false;
 }
 
 /**
+ * Whether the atoms without a chain ID (chain 'Unknown') hold more than one
+ * chain: two backbone atoms (isBackboneAtom) with the same residue number
+ * and insertion code. Files from simulation packages write segments without
+ * chain IDs and restart the numbering in each; keyed by number, the
+ * segments would merge into one zigzag trace, so the chain isn't traced.
+ * Once per atom list (backboneCache).
+ */
+export function chainlessTraceIsAmbiguous(molecule: Molecule): boolean {
+  const facts = backboneFacts(molecule.atoms);
+  return (facts.chainlessAmbiguous ??= findChainlessAmbiguity(molecule));
+}
+
+function findChainlessAmbiguity(molecule: Molecule): boolean {
+  const traceable = traceableResidues(molecule);
+  const seen = new Set<string>();
+  for (const atom of molecule.atoms) {
+    if (atom.chainId || !isBackboneAtom(atom, traceable)) continue;
+    const key = residueLabel(atom.residueNumber, atom.insertionCode);
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
+/**
  * Check if a molecule has backbone data suitable for cartoon representation:
- * any atom Cartoon can trace (isBackboneAtom). Stops at the first one.
+ * any atom Cartoon can trace (isBackboneAtom), in a chain extractBackbone
+ * traces. Once per atom list (backboneCache), the fast path's answer
+ * included: on a chainless file that loop walks every atom and finds nothing.
  */
 export function hasBackboneData(molecule: Molecule): boolean {
-  return molecule.atoms.some(isBackboneAtom);
+  const facts = backboneFacts(molecule.atoms);
+  return (facts.hasBackbone ??= findBackbone(molecule));
+}
+
+function findBackbone(molecule: Molecule): boolean {
+  // The common case without building traceableResidues: a standard amino
+  // acid's alpha carbon in a chain with an ID
+  for (const atom of molecule.atoms) {
+    if (
+      atom.chainId && atom.residueNumber !== undefined && atom.name?.trim().toUpperCase() === 'CA' &&
+      atom.element?.toUpperCase() === 'C' && isAminoAcid(atom.residueName ?? '')
+    ) {
+      return true;
+    }
+  }
+  const traceable = traceableResidues(molecule);
+  let chainless = false;
+  for (const atom of molecule.atoms) {
+    if (!isBackboneAtom(atom, traceable)) continue;
+    if (atom.chainId) return true;
+    chainless = true;
+  }
+  return chainless && !chainlessTraceIsAmbiguous(molecule);
 }

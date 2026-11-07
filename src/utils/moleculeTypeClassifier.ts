@@ -1,6 +1,6 @@
 import type { Atom, Molecule } from '../types';
 import type { RepresentationType, ColorScheme } from '../store/moleculeStore';
-import { isAminoAcid, analyzeResidues, residueKey, type Residue } from './residueAnalysis';
+import { isAminoAcid, isWater, analyzeResidues, residueKey, type Residue } from './residueAnalysis';
 import { hasBackboneData } from './backboneExtraction';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 
@@ -33,9 +33,6 @@ const DNA_RESIDUES = new Set(['DA', 'DT', 'DC', 'DG', 'DU']);
 // RNA residue names (need additional validation)
 const RNA_RESIDUES = new Set(['A', 'U', 'C', 'G']);
 
-// Water residue names
-const WATER_RESIDUES = new Set(['HOH', 'WAT', 'H2O', 'SOL', 'TIP', 'TIP3', 'TIP4', 'SPC']);
-
 // Ion elements
 const ION_ELEMENTS = new Set([
   'Na', 'Cl', 'K', 'Ca', 'Mg', 'Zn', 'Fe', 'Mn', 'Cu', 'Co', 'Ni',
@@ -66,13 +63,6 @@ function isIon(residueAtoms: Atom[]): boolean {
   // XYZ files keep symbols as written ("ZN"); the set holds "Zn"
   const el = residueAtoms[0].element.trim();
   return ION_ELEMENTS.has(el.charAt(0).toUpperCase() + el.slice(1).toLowerCase());
-}
-
-/**
- * Check if a residue is water
- */
-function isWater(residueName: string): boolean {
-  return WATER_RESIDUES.has(residueName.toUpperCase());
 }
 
 /**

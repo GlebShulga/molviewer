@@ -1,7 +1,7 @@
 import type { Atom, Molecule } from '../types';
 import type { ColorScheme } from '../store/moleculeStore';
 import { UNIPROT_RE } from '../../site/identifiers';
-import { isBackboneAtom } from './backboneExtraction';
+import { hasBackboneData } from './backboneExtraction';
 import {
   getElementColor,
   getChainColor,
@@ -122,7 +122,6 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
   let hasBfactorData = false;
   let hasResidueNumbers = false;
   let hasSecondaryStructure = false;
-  let hasBackboneData = false;
 
   for (const atom of molecule.atoms) {
     if (atom.tempFactor !== undefined) {
@@ -149,10 +148,6 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
     if (atom.secondaryStructure !== undefined) {
       hasSecondaryStructure = true;
     }
-    // An atom Cartoon can trace, by the same rule as hasBackboneData
-    if (!hasBackboneData && isBackboneAtom(atom)) {
-      hasBackboneData = true;
-    }
   }
 
   // B-factor coloring only makes sense if there's actual variation in values
@@ -173,7 +168,8 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
     hasBfactorData: hasMeaningfulBfactorData,
     hasResidueNumbers,
     hasSecondaryStructure,
-    hasBackboneData,
+    // What Cartoon can trace: the same answer the toolbar and the classifier get
+    hasBackboneData: hasBackboneData(molecule),
     isPlddt: isAlphaFoldMolecule(molecule),
   };
 }

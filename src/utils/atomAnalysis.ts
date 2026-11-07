@@ -1,5 +1,6 @@
 import type { Atom, Bond } from '../types';
 import { getElement, type ElementData } from '../constants/elements';
+import { residueLabel } from './residueAnalysis';
 
 export interface AtomAnalysis {
   atom: Atom;
@@ -41,7 +42,7 @@ export function formatResidueInfo(atom: Atom): string | null {
   if (!atom.residueName) return null;
   let info = atom.residueName;
   if (atom.residueNumber !== undefined) {
-    info += ` ${atom.residueNumber}${atom.insertionCode ?? ''}`;
+    info += ` ${residueLabel(atom.residueNumber, atom.insertionCode)}`;
   }
   if (atom.chainId) {
     info += ` (Chain ${atom.chainId})`;

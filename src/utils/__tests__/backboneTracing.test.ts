@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractBackbone } from '../backboneExtraction';
+import { extractBackbone, hasBackboneData } from '../backboneExtraction';
+import { calculateColorSchemeContext } from '../atomColor';
 import { detectSecondaryStructure } from '../secondaryStructureDetection';
 import { classifyMolecule } from '../moleculeTypeClassifier';
 import { parsePDB } from '../../parsers/pdbParser';
@@ -47,6 +48,64 @@ describe('backbone tracing', () => {
     const m = chain([1, 2], 'A');
     m.atoms.push({ id: m.atoms.length, name: 'CA', element: 'Ca', residueName: 'CA', residueNumber: 3, chainId: 'A', x: 11.4, y: 0, z: 0 });
     expect(extractBackbone(m)[0].residues.map((r) => r.residueNumber)).toEqual([1, 2]);
+  });
+
+  it('does not trace segments without chain IDs whose numbering restarts', () => {
+    const first = chain([1, 2, 3]);
+    const second = chain([1, 2, 3]).atoms.map((a, i) => ({ ...a, id: first.atoms.length + i, y: 20 }));
+    const m: Molecule = { name: 'segments', atoms: [...first.atoms, ...second], bonds: [] };
+    expect(extractBackbone(m).find((c) => c.chainId === 'Unknown')).toBeUndefined();
+    // So Cartoon is not offered: it would draw nothing
+    expect(hasBackboneData(m)).toBe(false);
+    expect(calculateColorSchemeContext(m).hasBackboneData).toBe(false);
+    detectSecondaryStructure(m);
+    expect(m.atoms.every((a) => a.secondaryStructure === undefined)).toBe(true);
+  });
+
+  it('still traces the chains with IDs next to ambiguous chainless segments', () => {
+    const segments = [...chain([1, 2]).atoms, ...chain([1, 2]).atoms.map((a) => ({ ...a, y: 20 }))];
+    const m: Molecule = { name: 'mixed', atoms: [...chain([1, 2, 3], 'A').atoms, ...segments].map((a, id) => ({ ...a, id })), bonds: [] };
+    expect(extractBackbone(m).map((c) => c.chainId)).toEqual(['A']);
+    expect(hasBackboneData(m)).toBe(true);
+  });
+
+  it('keeps a residue\'s carbonyl O when a water has the same number', () => {
+    for (const chainId of ['A', undefined]) {
+      const m = chain([1, 2, 3], chainId);
+      m.atoms.push({ id: m.atoms.length, name: 'O', element: 'O', residueName: 'ALA', residueNumber: 2, chainId, x: 6.2, y: 1.2, z: 0 });
+      m.atoms.push({ id: m.atoms.length, name: 'O', element: 'O', residueName: 'HOH', residueNumber: 2, chainId, x: 40, y: 40, z: 40 });
+      const residue = extractBackbone(m)[0].residues.find((r) => r.residueNumber === 2)!;
+      expect(residue.o).toEqual({ x: 6.2, y: 1.2, z: 0 });
+    }
+  });
+
+  it('keeps tracing a chainless protein when a ligand has a residue\'s number and a carbon named CA', () => {
+    // MD and docking output: ligand LIG numbered 2, beside protein residue 2
+    const m = chain([1, 2, 3]);
+    const ligand = (name: string, element: string, x: number): Atom =>
+      ({ id: m.atoms.length, name, element, residueName: 'LIG', residueNumber: 2, x, y: 15, z: 0 });
+    m.atoms.push(ligand('CA', 'C', 40), ligand('C1', 'C', 41.5), ligand('O', 'O', 43));
+    expect(hasBackboneData(m)).toBe(true);
+    const [traced] = extractBackbone(m);
+    expect(traced.chainId).toBe('Unknown');
+    expect(traced.residues.map((r) => r.residueNumber)).toEqual([1, 2, 3]);
+    detectSecondaryStructure(m);
+    expect(m.atoms.filter((a) => a.residueName === 'ALA').every((a) => a.secondaryStructure !== undefined)).toBe(true);
+  });
+
+  it('keeps a residue\'s backbone atoms when a ligand with its number has atoms named CA, N, C or O', () => {
+    for (const chainId of ['A', undefined]) {
+      const m = chain([1, 2, 3], chainId);
+      const caIndex = m.atoms.findIndex((a) => a.residueNumber === 2 && a.name === 'CA');
+      for (const [name, element] of [['CA', 'C'], ['N', 'N'], ['O', 'O']] as const) {
+        m.atoms.push({ id: m.atoms.length, name, element, residueName: 'LIG', residueNumber: 2, chainId, x: 40, y: 40, z: 40 });
+      }
+      const residue = extractBackbone(m)[0].residues.find((r) => r.residueNumber === 2)!;
+      expect(residue.atomIndex).toBe(caIndex);
+      expect(residue.ca).toEqual({ x: m.atoms[caIndex].x, y: 0, z: 0 });
+      expect(residue.n).toEqual({ x: 3.8, y: 0, z: 0 });
+      expect(residue.o).toBeUndefined();
+    }
   });
 
   it('applies HELIX records of a file without chain IDs', () => {

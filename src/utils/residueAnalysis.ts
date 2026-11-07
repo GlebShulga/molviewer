@@ -164,3 +164,10 @@ export function getOneLetterCode(threeLetterCode: string): string {
 export function isAminoAcid(residueName: string): boolean {
   return residueName.toUpperCase() in AMINO_ACID_CODES;
 }
+
+/** Water residue names, in PDB files and from simulation packages. */
+const WATER_RESIDUES = new Set(['HOH', 'WAT', 'H2O', 'SOL', 'TIP', 'TIP3', 'TIP4', 'SPC']);
+
+export function isWater(residueName: string | undefined): boolean {
+  return !!residueName && WATER_RESIDUES.has(residueName.toUpperCase());
+}

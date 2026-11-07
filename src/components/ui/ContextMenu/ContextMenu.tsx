@@ -11,7 +11,7 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../../store/moleculeStore';
 import { selectTotalVisibleAtomCount } from '../../../store/selectors';
-import { atomResidueId, chainKey } from '../../../utils/residueAnalysis';
+import { atomResidueId, chainKey, residueLabel } from '../../../utils/residueAnalysis';
 import styles from './ContextMenu.module.css';
 
 /** Padding from viewport edge when adjusting menu position */
@@ -129,7 +129,7 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     // Build label text from atom info
     let labelText = atom.element;
     if (contextMenu.residueName && contextMenu.residueNumber !== undefined) {
-      labelText = `${contextMenu.residueName}${contextMenu.residueNumber}${atom.insertionCode ?? ''}`;
+      labelText = `${contextMenu.residueName}${residueLabel(contextMenu.residueNumber, atom.insertionCode)}`;
       if (atom.name) {
         labelText += ` ${atom.name}`;
       }
@@ -178,7 +178,7 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
   // Build title
   let title = atom.element;
   if (contextMenu.residueName && contextMenu.residueNumber !== undefined) {
-    title = `${contextMenu.residueName}${contextMenu.residueNumber}${atom.insertionCode ?? ''} ${atom.name || atom.element}`;
+    title = `${contextMenu.residueName}${residueLabel(contextMenu.residueNumber, atom.insertionCode)} ${atom.name || atom.element}`;
   }
   if (atom.chainId) {
     title += ` (Chain ${atom.chainId})`;

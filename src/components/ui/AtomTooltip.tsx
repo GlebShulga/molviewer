@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../store/moleculeStore';
 import { selectHoveredStructureMolecule } from '../../store/selectors';
 import { analyzeAtom } from '../../utils/atomAnalysis';
+import { residueLabel } from '../../utils/residueAnalysis';
 import { placeTooltip } from '../../utils/tooltipPlacement';
 import { prefersDockedCards } from '../../utils/touch';
 import styles from './AtomTooltip.module.css';
@@ -70,7 +71,7 @@ export function AtomTooltip({ docked = false, allowDocking = false }: AtomToolti
           </div>
           {hoveredAtom.residueName && (
             <div className={styles.dockedDetail}>
-              {hoveredAtom.residueName} {hoveredAtom.residueNumber}{hoveredAtom.insertionCode}
+              {hoveredAtom.residueName} {residueLabel(hoveredAtom.residueNumber, hoveredAtom.insertionCode)}
               {hoveredAtom.chainId && ` · chain ${hoveredAtom.chainId}`}
             </div>
           )}
@@ -121,7 +122,7 @@ export function AtomTooltip({ docked = false, allowDocking = false }: AtomToolti
         <div className={styles.tooltipRow}>
           <span className={styles.tooltipLabel}>Residue</span>
           <span className={clsx(styles.tooltipValue, styles.tooltipResidue)}>
-            {hoveredAtom.residueName} {hoveredAtom.residueNumber}{hoveredAtom.insertionCode}
+            {hoveredAtom.residueName} {residueLabel(hoveredAtom.residueNumber, hoveredAtom.insertionCode)}
             {hoveredAtom.chainId && ` (${hoveredAtom.chainId})`}
           </span>
         </div>

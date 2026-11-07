@@ -1,6 +1,6 @@
 import type { Molecule } from '../types';
 import { getElement, type ElementData } from '../constants/elements';
-import { chainKey } from './residueAnalysis';
+import { chainKey, residueLabel } from './residueAnalysis';
 
 export interface ElementCount {
   element: string;
@@ -122,7 +122,7 @@ function analyzeChains(molecule: Molecule): ChainSummary[] {
     const chain = chainMap.get(chainId)!;
     chain.atoms++;
     if (atom.residueName && atom.residueNumber !== undefined) {
-      chain.residues.add(`${atom.residueName}${atom.residueNumber}${atom.insertionCode ?? ''}`);
+      chain.residues.add(`${atom.residueName}${residueLabel(atom.residueNumber, atom.insertionCode)}`);
     }
   }
 

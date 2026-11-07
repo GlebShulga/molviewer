@@ -1,6 +1,7 @@
 import type { Molecule, SecondaryStructure } from '../types';
 import { dihedralAngle } from './measurements';
 import { chainKey, compareResidueIds, residueKey } from './residueAnalysis';
+import { tracedAtomFilter } from './backboneExtraction';
 
 interface BackboneAtoms {
   residueNumber: number;
@@ -49,13 +50,20 @@ function classifyFromAngles(phi: number, psi: number): SecondaryStructure {
 /**
  * Extract backbone atoms (N, CA, C) grouped by residue. Residue 0 counts, a
  * blank chain is chainKey's 'Unknown', and CA is an alpha carbon only when
- * its element is C (a calcium ion is often named CA too).
+ * its element is C (a calcium ion is often named CA too). A residue with
+ * none of the three gets no entry, as in extractBackbone.
  */
 function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
   const backboneMap = new Map<string, BackboneAtoms>();
+  // The filter extractBackbone applies too (tracedAtomFilter), after the
+  // cheap name check
+  const traced = tracedAtomFilter(molecule);
 
   for (const atom of molecule.atoms) {
-    if (atom.residueNumber === undefined || !atom.name) continue;
+    const atomName = atom.name?.trim().toUpperCase();
+    const isAlphaCarbon = atomName === 'CA' && atom.element?.toUpperCase() === 'C';
+    if (atomName !== 'N' && atomName !== 'C' && !isAlphaCarbon) continue;
+    if (!traced(atom)) continue;
 
     const chainId = chainKey(atom);
     const key = residueKey(chainId, atom.residueNumber, atom.insertionCode);
@@ -70,12 +78,11 @@ function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
       backboneMap.set(key, backbone);
     }
 
-    const atomName = atom.name.trim().toUpperCase();
     const pos = { x: atom.x, y: atom.y, z: atom.z };
 
     if (atomName === 'N') backbone.n = pos;
-    else if (atomName === 'CA' && atom.element?.toUpperCase() === 'C') backbone.ca = pos;
-    else if (atomName === 'C') backbone.c = pos;
+    else if (isAlphaCarbon) backbone.ca = pos;
+    else backbone.c = pos;
   }
 
   return backboneMap;
