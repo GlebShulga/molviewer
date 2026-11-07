@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { Atom, Molecule } from '../types';
 import type { ColorScheme } from '../store/moleculeStore';
 import type { ComponentSettings } from './moleculeTypeClassifier';
@@ -49,68 +50,16 @@ export function surfaceVertexColors(
   colorContext: ColorSchemeContext | undefined
 ): Float32Array {
   const colors = new Float32Array(nearestAtomIndices.length * 3);
+  // THREE.Color converts CSS colours (sRGB) to the linear values three.js
+  // expects in a colour attribute, like the materials of the other styles
+  const color = new THREE.Color();
   for (let i = 0; i < nearestAtomIndices.length; i++) {
     const nearest = nearestAtomIndices[i];
     const atom = molecule.atoms[subset.map ? subset.map[nearest] : nearest];
-    const [r, g, b] = parseColor(getAtomColor(atom, colorScheme, colorContext));
-    colors[i * 3] = r;
-    colors[i * 3 + 1] = g;
-    colors[i * 3 + 2] = b;
+    color.set(getAtomColor(atom, colorScheme, colorContext));
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
   }
   return colors;
-}
-
-/**
- * Parse a CSS color string to RGB values (0-1 range)
- */
-function parseColor(colorStr: string): [number, number, number] {
-  // Handle hex colors
-  if (colorStr.startsWith('#')) {
-    const hex = colorStr.slice(1);
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    return [r, g, b];
-  }
-
-  // Handle rgb() colors
-  if (colorStr.startsWith('rgb')) {
-    const match = colorStr.match(/\d+/g);
-    if (match && match.length >= 3) {
-      return [
-        parseInt(match[0]) / 255,
-        parseInt(match[1]) / 255,
-        parseInt(match[2]) / 255,
-      ];
-    }
-  }
-
-  // Handle hsl() colors
-  if (colorStr.startsWith('hsl')) {
-    const match = colorStr.match(/[\d.]+/g);
-    if (match && match.length >= 3) {
-      const h = parseFloat(match[0]) / 360;
-      const s = parseFloat(match[1]) / 100;
-      const l = parseFloat(match[2]) / 100;
-      // HSL to RGB conversion
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      return [
-        hue2rgb(p, q, h + 1/3),
-        hue2rgb(p, q, h),
-        hue2rgb(p, q, h - 1/3),
-      ];
-    }
-  }
-
-  // Default fallback
-  return [0.5, 0.5, 0.5];
 }

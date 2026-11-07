@@ -69,3 +69,16 @@ describe('surfaceVertexColors', () => {
     expect(rgb.indexOf(Math.max(...rgb))).toBe(exp.indexOf(Math.max(...exp)));
   });
 });
+
+describe('surfaceVertexColors colour space', () => {
+  it('stores linear values, as three.js reads vertex colours (same as THREE.Color for the atom)', async () => {
+    const THREE = await import('three');
+    const subset = surfaceAtoms(molecule, all());
+    const ctx = calculateColorSchemeContext(molecule);
+    const colors = surfaceVertexColors(Int32Array.from([0]), subset, molecule, 'chain', ctx);
+    const expected = new THREE.Color(getAtomColor(molecule.atoms[0], 'chain', ctx));
+    expect(colors[0]).toBeCloseTo(expected.r, 5);
+    expect(colors[1]).toBeCloseTo(expected.g, 5);
+    expect(colors[2]).toBeCloseTo(expected.b, 5);
+  });
+});
