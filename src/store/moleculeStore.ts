@@ -1264,6 +1264,8 @@ export const useMoleculeStore = create<MoleculeState>()(
       set({
         ...initialState,
         isLoading: sceneLoadsActive(),
+        // The viewer stays mounted: it sets this only once, on mount
+        controlsReady: get().controlsReady,
         structures,
         structureOrder: data.structureOrder,
         activeStructureId: data.activeStructureId,
@@ -1396,6 +1398,8 @@ export const useMoleculeStore = create<MoleculeState>()(
       set({
         ...initialState,
         isLoading: sceneLoadsActive(),
+        // The viewer stays mounted: it sets this only once, on mount
+        controlsReady: get().controlsReady,
         structures,
         structureOrder: newOrder,
         activeStructureId: newOrder[0] ?? null,
@@ -1512,6 +1516,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       ...initialState,
       // A load still in flight keeps its spinner (and finishes it later)
       isLoading: sceneLoadsActive(),
+      controlsReady: get().controlsReady,
       structures: new Map(),
     });
   },

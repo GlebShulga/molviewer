@@ -575,3 +575,40 @@ describe('residue numbers stored by older builds', () => {
     expect(deserializeSession(session).structures.get(id)!.molecule.atoms).toBe(molecule.atoms);
   });
 });
+
+describe('the mounted viewer stays ready across loads', () => {
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  it('keeps controlsReady through a session load, a share link and a reset', () => {
+    useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+    // The viewer sets this once, when it mounts
+    useMoleculeStore.setState({ controlsReady: true });
+    const s = useMoleculeStore.getState();
+    const session = serializeSession(
+      {
+        structures: s.structures, structureOrder: s.structureOrder, activeStructureId: s.activeStructureId, layoutMode: s.layoutMode,
+        measurements: s.measurements, labels: s.labels, surfaceSettings: s.surfaceSettings, autoRotate: s.autoRotate,
+      },
+      SAMPLE_CAMERA,
+      'ready'
+    );
+
+    useMoleculeStore.getState().loadSession(session);
+    expect(useMoleculeStore.getState().controlsReady).toBe(true);
+
+    const shared = { id: 'x', source: { type: 'rcsb' as const, id: '1ABC' }, name: 'S', representation: 'cartoon' as const, colorScheme: 'chain' as const, visible: true, componentSettings: [] };
+    useMoleculeStore.getState().applyShareableSession({
+      structures: [{ molecule: createMockMolecule('S'), source: shared.source, shareableStructure: shared }],
+      skipped: [], layoutMode: 'overlay', camera: SAMPLE_CAMERA, measurements: [], labels: [],
+      surfaceSettings: { type: 'vdw', opacity: 0.7, probeRadius: 1.4, wireframe: false, visible: false, color: '#ffffff' },
+      autoRotate: false, sourceStructures: [shared],
+    });
+    expect(useMoleculeStore.getState().controlsReady).toBe(true);
+
+    useMoleculeStore.getState().reset();
+    expect(useMoleculeStore.getState().controlsReady).toBe(true);
+  });
+});
