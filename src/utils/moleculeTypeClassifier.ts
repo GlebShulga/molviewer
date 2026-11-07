@@ -1,6 +1,8 @@
 import type { Atom, Molecule } from '../types';
 import type { RepresentationType, ColorScheme } from '../store/moleculeStore';
 import { isAminoAcid, analyzeResidues, type Residue } from './residueAnalysis';
+import { hasBackboneData } from './backboneExtraction';
+import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 
 export type MoleculeComponentType = 'protein' | 'dna' | 'rna' | 'ligand' | 'water' | 'ion';
 
@@ -183,4 +185,59 @@ export function getPrimaryComponent(classification: MoleculeClassification): Mol
     }
   }
   return classification.components[0] || null;
+}
+/**
+ * Component settings for a classification, with the smart defaults for each
+ * type (Cartoon falls back when the molecule has no backbone to trace).
+ */
+export function generateComponentSettings(
+  classification: MoleculeClassification,
+  molecule: Molecule
+): ComponentSettings[] {
+  const hasBB = hasBackboneData(molecule);
+  return classification.components.map((component) => {
+    const defaults = SMART_DEFAULTS[component.type];
+    const representation =
+      component.type === 'protein' && defaults.representation === 'cartoon' && !hasBB
+        ? CARTOON_FALLBACK_REPRESENTATION
+        : defaults.representation;
+    return {
+      type: component.type,
+      atomIndices: component.atomIndices,
+      residueFilter: component.residueFilter,
+      representation,
+      colorScheme: defaults.colorScheme,
+      visible: defaults.visible,
+    };
+  });
+}
+
+/** The parts of a component's settings a user chooses (and a session or share link keeps). */
+export type ComponentStyle = Pick<ComponentSettings, 'type' | 'representation' | 'colorScheme' | 'visible'>;
+
+/**
+ * Fresh settings (from classifying the molecule as loaded now) with the
+ * saved style of each type that still exists. Atom lists and the residue
+ * filter always come from the fresh classification; for a type saved twice
+ * the first entry wins; saved types the molecule no longer has are dropped.
+ */
+export function mergeComponentSettings(fresh: ComponentSettings[], saved: ComponentStyle[]): ComponentSettings[] {
+  return fresh.map((cs) => {
+    const style = saved.find((s) => s.type === cs.type);
+    return style
+      ? { ...cs, representation: style.representation, colorScheme: style.colorScheme, visible: style.visible }
+      : cs;
+  });
+}
+
+/** Classify a molecule and merge a saved style into the result. */
+export function restoreComponentSettings(
+  molecule: Molecule,
+  saved: ComponentStyle[]
+): { classification: MoleculeClassification; componentSettings: ComponentSettings[] } {
+  const classification = classifyMolecule(molecule);
+  return {
+    classification,
+    componentSettings: mergeComponentSettings(generateComponentSettings(classification, molecule), saved),
+  };
 }

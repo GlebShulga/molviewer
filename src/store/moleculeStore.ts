@@ -24,14 +24,13 @@ import {
   type MeasurementType,
 } from '../utils/measurements';
 import { detectAromaticRings } from '../utils/aromaticDetection';
-import { hasBackboneData } from '../utils/backboneExtraction';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { roundAtoms, track, type EventProps } from '../utils/track';
 import { showToast } from '../utils/toast';
 import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
 import { AROMATIC_DETECTION_THRESHOLD, GPU_PICKING_THRESHOLD } from '../config';
-import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
+import { SMART_DEFAULTS } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
 import {
   loadMoleculeAsync,
@@ -107,7 +106,8 @@ function serializeForComparison(state: TemporalState): string {
 
 import {
   classifyMolecule,
-  type MoleculeClassification,
+  generateComponentSettings,
+  mergeComponentSettings,
   type ComponentSettings,
   type MoleculeComponentType,
 } from '../utils/moleculeTypeClassifier';
@@ -520,38 +520,6 @@ function calculateStructureOffset(index: number, totalCount: number): [number, n
   const totalWidth = (totalCount - 1) * spacing;
   const x = index * spacing - totalWidth / 2;
   return [x, 0, 0];
-}
-
-/**
- * Generate component settings from classification using smart defaults
- */
-function generateComponentSettings(
-  classification: MoleculeClassification,
-  molecule: Molecule
-): ComponentSettings[] {
-  const settings: ComponentSettings[] = [];
-  const hasBB = hasBackboneData(molecule);
-
-  for (const component of classification.components) {
-    const defaults = SMART_DEFAULTS[component.type];
-
-    // For protein, check if Cartoon is available (needs backbone data)
-    let representation = defaults.representation;
-    if (component.type === 'protein' && representation === 'cartoon' && !hasBB) {
-      representation = CARTOON_FALLBACK_REPRESENTATION;
-    }
-
-    settings.push({
-      type: component.type,
-      atomIndices: component.atomIndices,
-      residueFilter: component.residueFilter,
-      representation,
-      colorScheme: defaults.colorScheme,
-      visible: defaults.visible,
-    });
-  }
-
-  return settings;
 }
 
 /**
@@ -1158,12 +1126,8 @@ export const useMoleculeStore = create<MoleculeState>()(
         structure.representation = shareable.representation;
         structure.colorScheme = shareable.colorScheme;
         structure.visible = shareable.visible;
-        if (shareable.componentSettings.length > 0) {
-          structure.componentSettings = shareable.componentSettings.map(cs => ({
-            ...cs,
-            residueFilter: cs.residueFilter ? new Set(cs.residueFilter) : undefined,
-          }));
-        }
+        // The shared style per component type, on atom lists from this load
+        structure.componentSettings = mergeComponentSettings(structure.componentSettings, shareable.componentSettings);
 
         idRemap.set(shareable.id, structure.id);
         newStructures.set(structure.id, structure);

@@ -1,6 +1,6 @@
 import type { Structure, Label3D, LayoutMode } from '../types';
 import type { Measurement } from './measurements';
-import type { ComponentSettings } from './moleculeTypeClassifier';
+import { restoreComponentSettings, type ComponentSettings } from './moleculeTypeClassifier';
 import {
   type MolViewerSession,
   type MolViewerSessionState,
@@ -31,13 +31,6 @@ function serializeComponentSettings(cs: ComponentSettings): SerializedComponentS
   };
 }
 
-function deserializeComponentSettings(cs: SerializedComponentSettings): ComponentSettings {
-  return {
-    ...cs,
-    residueFilter: cs.residueFilter ? new Set(cs.residueFilter) : undefined,
-  };
-}
-
 function serializeStructure(s: Structure): SerializedStructure {
   return {
     id: s.id,
@@ -57,18 +50,22 @@ function serializeStructure(s: Structure): SerializedStructure {
 }
 
 function deserializeStructure(s: SerializedStructure): Structure {
+  // Sessions saved by older versions stored rings from whatever detection
+  // that version ran (or none, if Ball & Stick and Stick were never shown),
+  // so they are dropped and detected again when a style that draws them is shown.
+  const molecule = { ...s.molecule, aromaticRings: undefined };
+  // The stored classification and atom lists may predate parser or
+  // classifier changes; classify again and keep only the saved styles.
+  const { classification, componentSettings } = restoreComponentSettings(molecule, s.componentSettings);
   return {
     id: s.id,
     name: s.name,
-    // Sessions saved by older versions stored rings from whatever detection
-    // that version ran (or none, if Ball & Stick and Stick were never shown),
-    // so they are dropped and detected again when a style that draws them is shown.
-    molecule: { ...s.molecule, aromaticRings: undefined },
+    molecule,
     visible: s.visible,
     representation: s.representation,
     colorScheme: s.colorScheme,
-    componentSettings: s.componentSettings.map(deserializeComponentSettings),
-    classification: s.classification,
+    componentSettings,
+    classification,
     aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
