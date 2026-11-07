@@ -12,12 +12,13 @@ import type {
   ColorScheme,
   LayoutMode,
   Label3D,
+  QualifiedAtomRef,
 } from '../types';
 import type { ComponentSettings } from './moleculeTypeClassifier';
 import type { CameraSnapshot, SerializedComponentSettings } from '../types/session';
 import type { Measurement } from './measurements';
 import { loadStructureFromSource } from './structureLoader';
-import type { Molecule } from '../types';
+import type { Atom, Molecule } from '../types';
 
 export const SHARE_SCHEMA_VERSION = 1;
 
@@ -44,13 +45,62 @@ export interface ShareableStructure {
   visible: boolean;
 }
 
+/**
+ * What a share stores about each atom a label or measurement points at,
+ * next to its index. A share re-reads its source on load, and a parser
+ * change (alternate locations, say) can shift atom indices; the identity
+ * finds the same atom again. Shares made before this have no identity and
+ * use the index alone.
+ */
+export interface SharedAtomIdentity {
+  chainId?: string;
+  residueNumber?: number;
+  residueName?: string;
+  name?: string;
+}
+
+export type SharedAtomRef = QualifiedAtomRef & { atom?: SharedAtomIdentity };
+export type SharedLabel = Label3D & { atom?: SharedAtomIdentity };
+export type SharedMeasurement = Omit<Measurement, 'atomRefs'> & { atomRefs: SharedAtomRef[] };
+
+export function atomIdentity(atom: Atom): SharedAtomIdentity {
+  return { chainId: atom.chainId, residueNumber: atom.residueNumber, residueName: atom.residueName, name: atom.name };
+}
+
+/** '' and a missing value are the same (JSON drops undefined fields). */
+const same = (a: unknown, b: unknown) => (a === '' ? undefined : a) === (b === '' ? undefined : b);
+
+function matchesIdentity(atom: Atom, id: SharedAtomIdentity): boolean {
+  return (
+    same(atom.chainId, id.chainId) &&
+    same(atom.residueNumber, id.residueNumber) &&
+    same(atom.residueName, id.residueName) &&
+    same(atom.name, id.name)
+  );
+}
+
+/**
+ * Index of the atom a shared reference means in `molecule`, or null. The
+ * atom at the stored index wins when it still matches (cheap, and right
+ * when two atoms share an identity); otherwise the first atom with that
+ * identity. Old references without an identity use the index if in range.
+ */
+export function resolveSharedAtom(molecule: Molecule, ref: { atomIndex: number; atom?: SharedAtomIdentity }): number | null {
+  const { atomIndex, atom: id } = ref;
+  const atIndex = Number.isInteger(atomIndex) && atomIndex >= 0 ? molecule.atoms[atomIndex] : undefined;
+  if (!id) return atIndex ? atomIndex : null;
+  if (atIndex && matchesIdentity(atIndex, id)) return atomIndex;
+  const found = molecule.atoms.findIndex((a) => matchesIdentity(a, id));
+  return found >= 0 ? found : null;
+}
+
 export interface ShareableSession {
   schemaVersion: typeof SHARE_SCHEMA_VERSION;
   structures: ShareableStructure[];
   layoutMode: LayoutMode;
   camera: CameraSnapshot | null;
-  measurements: Measurement[];
-  labels: Label3D[];
+  measurements: SharedMeasurement[];
+  labels: SharedLabel[];
   surfaceSettings: SerializedSurfaceSettings;
   autoRotate: boolean;
 }
@@ -120,13 +170,21 @@ export function serializeShareableSession(
     });
   }
 
+  const identityOf = (structureId: string, atomIndex: number): SharedAtomIdentity | undefined => {
+    const atom = state.structures.get(structureId)?.molecule.atoms[atomIndex];
+    return atom ? atomIdentity(atom) : undefined;
+  };
+
   return {
     schemaVersion: SHARE_SCHEMA_VERSION,
     structures,
     layoutMode: state.layoutMode,
     camera,
-    measurements: state.measurements.map(m => ({ ...m })),
-    labels: state.labels.map(l => ({ ...l })),
+    measurements: state.measurements.map(m => ({
+      ...m,
+      atomRefs: m.atomRefs.map(ref => ({ ...ref, atom: identityOf(ref.structureId, ref.atomIndex) })),
+    })),
+    labels: state.labels.map(l => ({ ...l, atom: identityOf(l.structureId, l.atomIndex) })),
     surfaceSettings: { ...state.surfaceSettings },
     autoRotate: state.autoRotate,
   };
@@ -142,8 +200,8 @@ export interface DeserializedShareableSession {
   structures: FetchedStructure[];
   layoutMode: LayoutMode;
   camera: CameraSnapshot | null;
-  measurements: Measurement[];
-  labels: Label3D[];
+  measurements: SharedMeasurement[];
+  labels: SharedLabel[];
   surfaceSettings: SerializedSurfaceSettings;
   autoRotate: boolean;
   /** Names of structures that couldn't be restored (e.g. source types this version no longer loads). */

@@ -24,6 +24,7 @@ import {
   type MeasurementType,
 } from '../utils/measurements';
 import { detectAromaticRings } from '../utils/aromaticDetection';
+import { resolveSharedAtom, type SharedAtomRef } from '../utils/shareSession';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { roundAtoms, track, type EventProps } from '../utils/track';
@@ -416,7 +417,7 @@ interface MoleculeState {
    */
   applyShareableSession: (payload: import('../utils/shareSession').DeserializedShareableSession & {
     sourceStructures: import('../utils/shareSession').ShareableStructure[];
-  }) => void;
+  }) => { droppedReferences: number };
 
   // Lazy aromatic ring detection (for active structure)
   detectAromaticRingsIfNeeded: (structureId?: string) => void;
@@ -1134,25 +1135,40 @@ export const useMoleculeStore = create<MoleculeState>()(
         newOrder.push(structure.id);
       });
 
-      // Measurements on a structure that couldn't be restored are dropped,
-      // like labels below, rather than left pointing at nothing.
-      const remappedMeasurements = payload.measurements
-        .filter(m => m.atomRefs.every(ref => idRemap.has(ref.structureId)))
-        .map(m => ({
-          ...m,
-          atomRefs: m.atomRefs.map(ref => ({
-            structureId: idRemap.get(ref.structureId)!,
-            atomIndex: ref.atomIndex,
-          })),
-        }));
+      // Each shared atom reference is looked up in the structure as loaded now
+      // (by the identity new shares store, else by index). Labels and
+      // measurements on a structure that couldn't be restored are dropped
+      // silently (the skipped structure is reported); ones whose atom can't
+      // be found any more are dropped and counted.
+      let droppedReferences = 0;
+      const resolveRef = (ref: SharedAtomRef): QualifiedAtomRef | null => {
+        const structureId = idRemap.get(ref.structureId)!;
+        const atomIndex = resolveSharedAtom(newStructures.get(structureId)!.molecule, ref);
+        return atomIndex === null ? null : { structureId, atomIndex };
+      };
 
-      const remappedLabels = payload.labels
-        .map(l => {
-          const newId = idRemap.get(l.structureId);
-          if (!newId) return null;
-          return { ...l, structureId: newId };
-        })
-        .filter((l): l is Label3D => l !== null);
+      const remappedMeasurements: Measurement[] = [];
+      for (const m of payload.measurements) {
+        if (!m.atomRefs.every(ref => idRemap.has(ref.structureId))) continue;
+        const atomRefs = m.atomRefs.map(resolveRef);
+        if (atomRefs.some(r => r === null)) {
+          droppedReferences++;
+          continue;
+        }
+        const refs = atomRefs as QualifiedAtomRef[];
+        remappedMeasurements.push({ ...m, atomRefs: refs, atomIndices: refs.map(r => r.atomIndex) });
+      }
+
+      const remappedLabels: Label3D[] = [];
+      for (const l of payload.labels) {
+        if (!idRemap.has(l.structureId)) continue;
+        const ref = resolveRef(l);
+        if (!ref) {
+          droppedReferences++;
+          continue;
+        }
+        remappedLabels.push({ id: l.id, text: l.text, ...ref });
+      }
 
       // After representation and componentSettings are restored above
       const structures = sessionStructures(newStructures);
@@ -1169,6 +1185,7 @@ export const useMoleculeStore = create<MoleculeState>()(
         savedMolecules: get().savedMolecules,
         pendingCameraSnapshot: payload.camera,
       });
+      return { droppedReferences };
     } finally {
       temporal.resume();
       temporal.clear();

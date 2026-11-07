@@ -487,7 +487,7 @@ describe('applyShareableSession measurement values', () => {
     temporalStore.getState().clear();
   });
 
-  it('recomputes dihedrals, keeps distances and keeps dihedrals whose atoms are missing', () => {
+  it('recomputes dihedrals, keeps distances and drops (and counts) measurements whose atoms are missing', () => {
     const shared = {
       id: 'orig-a',
       source: { type: 'rcsb' as const, id: '1CRN' },
@@ -505,7 +505,7 @@ describe('applyShareableSession measurement values', () => {
       value,
       unit: type === 'distance' ? 'Å' : '°',
     });
-    useMoleculeStore.getState().applyShareableSession({
+    const result = useMoleculeStore.getState().applyShareableSession({
       structures: [{ molecule: createDihedralMolecule(), source: shared.source, shareableStructure: shared }],
       skipped: [],
       layoutMode: 'overlay',
@@ -524,6 +524,56 @@ describe('applyShareableSession measurement values', () => {
     const values = Object.fromEntries(useMoleculeStore.getState().measurements.map((m) => [m.id, m.value]));
     expect(values.dih).toBeCloseTo(-90, 6);
     expect(values.dist).toBe(9.99);
-    expect(values.lost).toBe(12.5);
+    // An atom index past the end of the structure: dropped, and counted for the notice
+    expect(values.lost).toBeUndefined();
+    expect(result.droppedReferences).toBe(1);
+  });
+});
+
+describe('applyShareableSession atom references', () => {
+  const atom = (id: number, name: string) => ({ id, element: 'C', name, residueName: 'ALA', residueNumber: 1, chainId: 'A', x: id * 1.5, y: 0, z: 0 });
+  const shared = {
+    id: 'orig',
+    source: { type: 'rcsb' as const, id: '1ABC' },
+    name: '1ABC',
+    representation: 'cartoon' as const,
+    colorScheme: 'chain' as const,
+    componentSettings: [],
+    visible: true,
+  };
+  const apply = (atoms: ReturnType<typeof atom>[], labels: unknown[], measurements: unknown[] = []) =>
+    useMoleculeStore.getState().applyShareableSession({
+      structures: [{ molecule: { name: '1ABC', atoms, bonds: [] }, source: shared.source, shareableStructure: shared }],
+      skipped: [],
+      layoutMode: 'overlay',
+      camera: null,
+      measurements: measurements as never,
+      labels: labels as never,
+      surfaceSettings: { type: 'vdw', opacity: 0.7, probeRadius: 1.4, wireframe: false, visible: false, color: '#ffffff' },
+      autoRotate: false,
+      sourceStructures: [shared],
+    });
+  const ca = { chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' };
+
+  it('finds a labelled atom whose index shifted', () => {
+    const result = apply([atom(0, 'N'), atom(1, 'H'), atom(2, 'CA')], [{ id: 'l1', structureId: 'orig', atomIndex: 1, text: 'x', atom: ca }]);
+    expect(result.droppedReferences).toBe(0);
+    expect(useMoleculeStore.getState().labels.map((l) => l.atomIndex)).toEqual([2]);
+  });
+
+  it('drops and counts labels and measurements that no longer match', () => {
+    const result = apply(
+      [atom(0, 'N'), atom(1, 'C')],
+      [
+        { id: 'l1', structureId: 'orig', atomIndex: 1, text: 'gone', atom: ca },
+        { id: 'l2', structureId: 'orig', atomIndex: 9, text: 'old share, out of range' },
+        { id: 'l3', structureId: 'orig', atomIndex: 0, text: 'old share, fine' },
+      ],
+      [{ id: 'm1', type: 'distance', atomIndices: [0, 1], atomRefs: [{ structureId: 'orig', atomIndex: 0 }, { structureId: 'orig', atomIndex: 1, atom: ca }], value: 1.5, unit: 'Å' }]
+    );
+    expect(result.droppedReferences).toBe(3);
+    const s = useMoleculeStore.getState();
+    expect(s.labels.map((l) => l.id)).toEqual(['l3']);
+    expect(s.measurements).toEqual([]);
   });
 });

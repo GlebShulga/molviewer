@@ -49,3 +49,54 @@ describe('deserializeShareableSession', () => {
     );
   });
 });
+
+describe('share atom identity', () => {
+  const atom = (id: number, name: string, residueNumber: number, chainId = 'A') =>
+    ({ id, element: 'C', name, residueName: 'ALA', residueNumber, chainId, x: id, y: 0, z: 0 });
+  const molecule = (atoms: ReturnType<typeof atom>[]) => ({ name: 'm', atoms, bonds: [] });
+
+  it('stores each referenced atom\'s identity next to its index', async () => {
+    const { serializeShareableSession } = await import('../shareSession');
+    const mol = molecule([atom(0, 'N', 1), atom(1, 'CA', 1), atom(2, 'C', 1)]);
+    const structures = new Map([['s1', { id: 's1', name: 'm', molecule: mol, source: { type: 'rcsb', id: '1ABC' }, visible: true, representation: 'cartoon', colorScheme: 'chain', componentSettings: [] }]]);
+    const payload = serializeShareableSession(
+      {
+        structureOrder: ['s1'],
+        structures: structures as never,
+        layoutMode: 'overlay',
+        measurements: [{ id: 'm1', type: 'distance', atomIndices: [0, 2], atomRefs: [{ structureId: 's1', atomIndex: 0 }, { structureId: 's1', atomIndex: 2 }], value: 2, unit: 'Å' }],
+        labels: [{ id: 'l1', structureId: 's1', atomIndex: 1, text: 'CA' }],
+        surfaceSettings: { type: 'vdw', opacity: 0.7, probeRadius: 1.4, wireframe: false, visible: false, color: '#ffffff' },
+        autoRotate: false,
+      },
+      null
+    );
+    expect(payload.labels[0].atom).toEqual({ chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' });
+    expect(payload.measurements[0].atomRefs[1].atom).toMatchObject({ name: 'C', residueNumber: 1 });
+  });
+
+  it('resolves a reference by index when the atom there still matches, else by identity', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    const ca = { chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' };
+    // Same file: the index still points at CA
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: ca })).toBe(1);
+    // An atom was inserted before it: found by identity
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'H', 1), atom(2, 'CA', 1)]), { atomIndex: 1, atom: ca })).toBe(2);
+    // Gone
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1)]), { atomIndex: 1, atom: ca })).toBeNull();
+  });
+
+  it('uses the index alone for old shares, and drops it when out of range', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    const m = molecule([atom(0, 'N', 1), atom(1, 'CA', 1)]);
+    expect(resolveSharedAtom(m, { atomIndex: 1 })).toBe(1);
+    expect(resolveSharedAtom(m, { atomIndex: 5 })).toBeNull();
+    expect(resolveSharedAtom(m, { atomIndex: -1 })).toBeNull();
+  });
+
+  it('picks the atom at the stored index when two atoms share an identity', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    const twin = { chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' };
+    expect(resolveSharedAtom(molecule([atom(0, 'CA', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: twin })).toBe(1);
+  });
+});

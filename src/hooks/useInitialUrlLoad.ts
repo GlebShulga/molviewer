@@ -45,6 +45,20 @@ async function toSource(params: UrlMoleculeParams, signal: AbortSignal): Promise
   }
 }
 
+/**
+ * What a share link couldn't bring back: structures that failed to load,
+ * and labels or measurements whose atom isn't in the structure any more.
+ */
+export function shareRestoreNotice(skipped: string[], droppedReferences: number): string | null {
+  const parts: string[] = [];
+  if (skipped.length) parts.push(`Some structures in this share could not be restored: ${skipped.join(', ')}`);
+  if (droppedReferences === 1) parts.push('1 label or measurement no longer matches the structure and was left out.');
+  else if (droppedReferences > 1) {
+    parts.push(`${droppedReferences} labels or measurements no longer match the structure and were left out.`);
+  }
+  return parts.length ? parts.join('. ') : null;
+}
+
 function trackSource(source: StructureSource): string {
   return source.type === 'alphafold' ? 'af' : source.type === 'inline' ? 'file' : source.type;
 }
@@ -107,11 +121,10 @@ export function useInitialUrlLoad(): void {
           const session = await loadSharedSession(params.id!, signal);
           const deserialized = await deserializeShareableSession(session, signal);
           if (signal.aborted) return;
-          store().applyShareableSession({ ...deserialized, sourceStructures: session.structures });
+          const { droppedReferences } = store().applyShareableSession({ ...deserialized, sourceStructures: session.structures });
           document.title = 'Shared session - MolViewer';
-          if (deserialized.skipped.length) {
-            store().setError(`Some structures in this share could not be restored: ${deserialized.skipped.join(', ')}`);
-          }
+          const notice = shareRestoreNotice(deserialized.skipped, droppedReferences);
+          if (notice) store().setError(notice);
           // One event per share, sized by the structure now active, which
           // style switches made next are counted against
           const { structures, activeStructureId } = store();
