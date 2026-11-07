@@ -7,6 +7,8 @@
  *
  * Usage:
  *   pnpm exec tsx scripts/validate-ids.ts           fix mode: refresh and write the files
+ *     (an entry with an invalid id is kept as it was and listed as an error; a network
+ *     or server error aborts before anything is written)
  *   pnpm exec tsx scripts/validate-ids.ts --check   check mode: never writes, exits 1 on any problem
  *
  * What it does:
@@ -38,7 +40,7 @@ import { editDateProblem } from '../site/editDate';
 
 // ---------- types ----------
 
-interface PdbEntry {
+export interface PdbEntry {
   id: string;
   title: string;
   revised: string;
@@ -48,12 +50,12 @@ interface PdbEntry {
   resolution?: number;
 }
 
-interface PdbFile {
+export interface PdbFile {
   _comment?: string;
   pdbs: Array<PdbEntry | string>;
 }
 
-interface AfEntry {
+export interface AfEntry {
   id: string;
   name: string;
   gene?: string;
@@ -63,7 +65,7 @@ interface AfEntry {
   plddt?: { mean: number; veryHigh: number; confident: number; low: number; veryLow: number };
 }
 
-interface AfFile {
+export interface AfFile {
   _comment?: string;
   entries: Array<AfEntry | string>;
 }
@@ -96,7 +98,6 @@ const PDB_PATH = resolve(ROOT, 'data/popularPdbs.json');
 const AF_PATH = resolve(ROOT, 'data/alphafold.json');
 const COLLECTIONS_PATH = resolve(ROOT, 'data/collections.json');
 
-const CHECK = process.argv.includes('--check');
 const CONCURRENCY = 6;
 const EXPECTED_FEATURED = 8;
 
@@ -111,8 +112,13 @@ const UNIPROT_RE = /^([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const EM_DASH = String.fromCharCode(0x2014);
 
-const errors: string[] = [];
-const warnings: string[] = [];
+/** Problems found so far; exported for tests (resetReport clears them). */
+export const errors: string[] = [];
+export const warnings: string[] = [];
+export function resetReport(): void {
+  errors.length = 0;
+  warnings.length = 0;
+}
 const error = (msg: string) => errors.push(msg);
 const warn = (msg: string) => warnings.push(msg);
 
@@ -127,35 +133,39 @@ const day = (iso: string | undefined): string | undefined => iso?.slice(0, 10);
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /** Normalize a list that may contain bare id strings, report duplicates and bad ids. */
-function normalizeIds<T extends { id: string }>(
+export function normalizeIds<T extends { id: string }>(
   raw: Array<T | string>,
   label: string,
   format: RegExp,
-  upper: boolean
-): { ids: string[]; previous: Map<string, T> } {
+  upper: boolean,
+  check: boolean
+): { ids: string[]; previous: Map<string, T>; invalid: Array<T | string> } {
   const previous = new Map<string, T>();
   const ids: string[] = [];
   const seen = new Set<string>();
+  // Kept as they were in fix mode: an error is listed, never fixed by dropping data
+  const invalid: Array<T | string> = [];
   for (const item of raw) {
     const rawId = typeof item === 'string' ? item : item.id;
     const id = upper ? rawId.trim().toUpperCase() : rawId.trim();
     if (!format.test(id)) {
       error(`${label}: "${rawId}" is not a valid id`);
+      invalid.push(item);
       continue;
     }
     if (seen.has(id)) {
-      (CHECK ? error : warn)(`${label}: duplicate id ${id}${CHECK ? '' : ' (removed)'}`);
+      (check ? error : warn)(`${label}: duplicate id ${id}${check ? '' : ' (removed)'}`);
       continue;
     }
     seen.add(id);
     ids.push(id);
     if (typeof item !== 'string') previous.set(id, item);
   }
-  if (CHECK) {
+  if (check) {
     const sorted = [...ids].sort();
     if (ids.some((id, i) => id !== sorted[i])) error(`${label}: ids are not sorted`);
   }
-  return { ids, previous };
+  return { ids, previous, invalid };
 }
 
 // ---------- PDB ----------
@@ -167,7 +177,7 @@ interface RcsbEntry {
   rcsb_entry_info?: { resolution_combined?: number[] };
 }
 
-async function fetchPdb(id: string): Promise<PdbEntry | null> {
+export async function fetchPdb(id: string): Promise<PdbEntry | null> {
   try {
     const data = await fetchJson<RcsbEntry>(`https://data.rcsb.org/rest/v1/core/entry/${id}`);
     const info = data.rcsb_accession_info ?? {};
@@ -186,9 +196,11 @@ async function fetchPdb(id: string): Promise<PdbEntry | null> {
   }
 }
 
-async function validatePdbs(): Promise<{ file: PdbFile; entries: PdbEntry[] }> {
-  const file = await readJson<PdbFile>(PDB_PATH);
-  const { ids, previous } = normalizeIds<PdbEntry>(file.pdbs ?? [], 'popularPdbs', PDB_ID_RE, true);
+export async function validatePdbs(
+  file: PdbFile,
+  check: boolean
+): Promise<{ file: PdbFile; entries: PdbEntry[]; invalid: Array<PdbEntry | string> }> {
+  const { ids, previous, invalid } = normalizeIds<PdbEntry>(file.pdbs ?? [], 'popularPdbs', PDB_ID_RE, true, check);
   console.log(`PDB: checking ${ids.length} entries...`);
 
   const fetched = await mapLimit(ids, CONCURRENCY, fetchPdb);
@@ -197,8 +209,8 @@ async function validatePdbs(): Promise<{ file: PdbFile; entries: PdbEntry[] }> {
   fetched.forEach((entry, i) => {
     const id = ids[i];
     if (!entry) {
-      (CHECK ? error : warn)(
-        `popularPdbs: ${id} not found at RCSB (obsolete or unknown)${CHECK ? '' : ', dropped'}`
+      (check ? error : warn)(
+        `popularPdbs: ${id} not found at RCSB (obsolete or unknown)${check ? '' : ', dropped'}`
       );
       return;
     }
@@ -207,11 +219,11 @@ async function validatePdbs(): Promise<{ file: PdbFile; entries: PdbEntry[] }> {
     if (!old || old.title !== entry.title || old.revised !== entry.revised) drift++;
     entries.push(entry);
   });
-  if (CHECK && drift > 0) {
+  if (check && drift > 0) {
     warn(`popularPdbs: ${drift} entries have missing or outdated title/revised (run without --check)`);
   }
   entries.sort(byId);
-  return { file, entries };
+  return { file, entries, invalid };
 }
 
 // ---------- AlphaFold ----------
@@ -239,18 +251,19 @@ interface UniProtRecord {
   organism?: { scientificName?: string };
 }
 
-async function fetchUniProt(id: string): Promise<UniProtRecord | null> {
+export async function fetchUniProt(id: string): Promise<UniProtRecord | null> {
   try {
     return await fetchJson<UniProtRecord>(
       `https://rest.uniprot.org/uniprotkb/${id}.json?fields=protein_name,gene_names,organism_name`
     );
   } catch (err) {
-    if (err instanceof HttpError) return null;
+    // No record; anything else (5xx after retries) aborts the run before writing
+    if (err instanceof HttpError && err.status === 404) return null;
     throw err;
   }
 }
 
-async function fetchAf(id: string): Promise<AfEntry | null> {
+export async function fetchAf(id: string): Promise<AfEntry | null> {
   let predictions: AfPrediction[];
   try {
     predictions = await fetchJson<AfPrediction[]>(`https://alphafold.ebi.ac.uk/api/prediction/${id}`);
@@ -294,9 +307,11 @@ async function fetchAf(id: string): Promise<AfEntry | null> {
   };
 }
 
-async function validateAf(): Promise<{ file: AfFile; entries: AfEntry[] }> {
-  const file = await readJson<AfFile>(AF_PATH);
-  const { ids, previous } = normalizeIds<AfEntry>(file.entries ?? [], 'alphafold', UNIPROT_RE, true);
+export async function validateAf(
+  file: AfFile,
+  check: boolean
+): Promise<{ file: AfFile; entries: AfEntry[]; invalid: Array<AfEntry | string> }> {
+  const { ids, previous, invalid } = normalizeIds<AfEntry>(file.entries ?? [], 'alphafold', UNIPROT_RE, true, check);
   console.log(`AlphaFold: checking ${ids.length} entries...`);
 
   const fetched = await mapLimit(ids, CONCURRENCY, fetchAf);
@@ -305,8 +320,8 @@ async function validateAf(): Promise<{ file: AfFile; entries: AfEntry[] }> {
   fetched.forEach((entry, i) => {
     const id = ids[i];
     if (!entry) {
-      (CHECK ? error : warn)(
-        `alphafold: ${id} has no AlphaFold DB model${CHECK ? '' : ', dropped'}`
+      (check ? error : warn)(
+        `alphafold: ${id} has no AlphaFold DB model${check ? '' : ', dropped'}`
       );
       return;
     }
@@ -315,11 +330,11 @@ async function validateAf(): Promise<{ file: AfFile; entries: AfEntry[] }> {
     if (!old || JSON.stringify(old) !== JSON.stringify(entry)) drift++;
     entries.push(entry);
   });
-  if (CHECK && drift > 0) {
+  if (check && drift > 0) {
     warn(`alphafold: ${drift} entries have missing or outdated fields (run without --check)`);
   }
   entries.sort(byId);
-  return { file, entries };
+  return { file, entries, invalid };
 }
 
 // ---------- collections ----------
@@ -378,13 +393,15 @@ function validateCollections(
 // ---------- main ----------
 
 async function main() {
+  const CHECK = process.argv.includes('--check');
   console.log(CHECK ? 'Mode: --check (read only)' : 'Mode: fix (files will be rewritten)');
 
-  const [pdb, af, collections] = await Promise.all([
-    validatePdbs(),
-    validateAf(),
+  const [pdbFile, afFile, collections] = await Promise.all([
+    readJson<PdbFile>(PDB_PATH),
+    readJson<AfFile>(AF_PATH),
     readJson<CollectionsFile>(COLLECTIONS_PATH),
   ]);
+  const [pdb, af] = await Promise.all([validatePdbs(pdbFile, CHECK), validateAf(afFile, CHECK)]);
 
   for (const [path, text] of [
     [PDB_PATH, JSON.stringify(pdb.entries)],
@@ -409,8 +426,9 @@ async function main() {
   }
 
   if (!CHECK) {
-    await writeJson(PDB_PATH, { _comment: pdb.file._comment ?? PDB_COMMENT, pdbs: pdb.entries });
-    await writeJson(AF_PATH, { _comment: af.file._comment ?? AF_COMMENT, entries: af.entries });
+    // Entries with an invalid id stay as they were (listed as errors above)
+    await writeJson(PDB_PATH, { _comment: pdb.file._comment ?? PDB_COMMENT, pdbs: [...pdb.entries, ...pdb.invalid] });
+    await writeJson(AF_PATH, { _comment: af.file._comment ?? AF_COMMENT, entries: [...af.entries, ...af.invalid] });
     console.log(`Wrote ${pdb.entries.length} PDB entries and ${af.entries.length} AlphaFold entries.`);
   }
 
@@ -429,7 +447,11 @@ async function main() {
   console.log('OK');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Vitest sets VITEST: the tests import this file's functions without running
+// it. Anywhere else the script always runs (no path comparison to get wrong).
+if (!process.env.VITEST) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

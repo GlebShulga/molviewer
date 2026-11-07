@@ -18,6 +18,11 @@
  *   - the record is a single component (no "." in its SMILES, so no salts or mixtures);
  *   - a 3D conformer exists (GET/HEAD .../cid/{cid}/SDF?record_type=3d returns 200).
  * Entries that fail are dropped with a warning (or reported as problems with --check).
+ * Only PubChem's "not found" (404/400) counts as a failure of the entry: any other
+ * error (5xx after retries, a network failure) aborts the run before anything is
+ * written, so a PubChem outage can't empty the dataset. A failed batch is first
+ * retried CID by CID, so only a single-CID request that fails with something other
+ * than "not found" aborts.
  *
  * --check also reports entries whose stored PubChem-derived fields are missing
  * (a problem) or differ from what PubChem currently returns (a warning only,
@@ -127,7 +132,12 @@ const getJson = <T>(url: string) => throttled(() => fetchJson<T>(url));
 // PubChem lookups
 // ---------------------------------------------------------------------------
 
-async function fetchProperties(cids: number[]): Promise<Map<number, PubChemProperties>> {
+/** PubChem's answer for a CID it doesn't have (or a batch holding one). */
+function isNotFound(err: unknown): boolean {
+  return err instanceof HttpError && (err.status === 404 || err.status === 400);
+}
+
+export async function fetchProperties(cids: number[]): Promise<Map<number, PubChemProperties>> {
   const out = new Map<number, PubChemProperties>();
   const fetchBatch = async (batch: number[]) => {
     const url = `${PUG}/compound/cid/${batch.join(',')}/property/${PROPERTY_LIST}/JSON`;
@@ -139,13 +149,18 @@ async function fetchProperties(cids: number[]): Promise<Map<number, PubChemPrope
     try {
       await fetchBatch(batch);
     } catch (err) {
-      // One bad CID can fail the whole batch: retry one by one.
-      if (batch.length === 1) continue;
+      // A single CID: not found is reported later; any other error aborts the run (nothing is written)
+      if (batch.length === 1) {
+        if (!isNotFound(err)) throw err;
+        continue;
+      }
+      // One unknown CID, or the batch's size (a timeout), can fail the whole batch: retry one by one.
       console.warn(`  property batch failed (${describe(err)}), retrying individually`);
       for (const cid of batch) {
         try {
           await fetchBatch([cid]);
-        } catch {
+        } catch (e) {
+          if (!isNotFound(e)) throw e;
           /* reported later as "not found" */
         }
       }
@@ -154,7 +169,7 @@ async function fetchProperties(cids: number[]): Promise<Map<number, PubChemPrope
   return out;
 }
 
-async function fetchSynonyms(cids: number[]): Promise<Map<number, string[]>> {
+export async function fetchSynonyms(cids: number[]): Promise<Map<number, string[]>> {
   const out = new Map<number, string[]>();
   type SynResponse = { InformationList?: { Information?: { CID: number; Synonym?: string[] }[] } };
   const fetchBatch = async (batch: number[]) => {
@@ -166,12 +181,18 @@ async function fetchSynonyms(cids: number[]): Promise<Map<number, string[]>> {
     try {
       await fetchBatch(batch);
     } catch (err) {
-      if (batch.length === 1) continue;
+      // Same rule as the properties: a single CID aborts on anything but "not found"
+      if (batch.length === 1) {
+        if (!isNotFound(err)) throw err;
+        out.set(batch[0], []);
+        continue;
+      }
       console.warn(`  synonym batch failed (${describe(err)}), retrying individually`);
       for (const cid of batch) {
         try {
           await fetchBatch([cid]);
-        } catch {
+        } catch (e) {
+          if (!isNotFound(e)) throw e;
           out.set(cid, []);
         }
       }
@@ -182,8 +203,8 @@ async function fetchSynonyms(cids: number[]): Promise<Map<number, string[]>> {
 
 let headSupported = true;
 
-/** True if PubChem has a 3D conformer SDF for this CID, false on 404. Throws on other errors. */
-async function has3dConformer(cid: number): Promise<boolean> {
+/** True if PubChem has a 3D conformer SDF for this CID, false when PubChem says not found (404 or 400). Throws on other errors. */
+export async function has3dConformer(cid: number): Promise<boolean> {
   const url = `${PUG}/compound/cid/${cid}/SDF?record_type=3d`;
   try {
     if (headSupported) {
@@ -201,7 +222,7 @@ async function has3dConformer(cid: number): Promise<boolean> {
     await throttled(() => fetchText(url));
     return true;
   } catch (err) {
-    if (err instanceof HttpError && err.status === 404) return false;
+    if (isNotFound(err)) return false;
     throw err;
   }
 }
@@ -277,6 +298,19 @@ function inputProblems(e: InputEntry): string[] {
   return problems;
 }
 
+/**
+ * For each CID, whether PubChem has a 3D conformer, in input order. Errors
+ * other than "not found" reject (the run stops before writing).
+ */
+export async function conformerFlags(cids: number[]): Promise<boolean[]> {
+  let done = 0;
+  return mapLimit(cids, 5, async (cid) => {
+    const result = await has3dConformer(cid);
+    if (++done % 100 === 0) console.log(`  ${done}/${cids.length}`);
+    return result;
+  });
+}
+
 async function main() {
   const checkOnly = process.argv.includes('--check');
   const file = JSON.parse(readFileSync(DATA_PATH, 'utf8')) as { compounds?: InputEntry[] };
@@ -336,26 +370,12 @@ async function main() {
   });
 
   console.log(`Checking 3D conformers for ${singleComponent.length} CIDs...`);
-  let done = 0;
-  const conformer = await mapLimit(singleComponent, 5, async (e) => {
-    let result: boolean | Error;
-    try {
-      result = await has3dConformer(e.cid as number);
-    } catch (err) {
-      result = new Error(describe(err));
-    }
-    if (++done % 100 === 0) console.log(`  ${done}/${singleComponent.length}`);
-    return result;
-  });
+  const conformer = await conformerFlags(singleComponent.map((e) => e.cid as number));
 
   // 4. Build the output entries.
   const kept: Compound[] = [];
   singleComponent.forEach((e, i) => {
     const ok = conformer[i];
-    if (ok instanceof Error) {
-      drop(e, `3D check failed: ${ok.message}`);
-      return;
-    }
     if (!ok) {
       drop(e, 'no 3D conformer on PubChem');
       return;
@@ -431,7 +451,11 @@ async function main() {
   console.log(`Wrote ${SLUGS_PATH}`);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Vitest sets VITEST: the tests import this file's functions without running
+// it. Anywhere else the script always runs (no path comparison to get wrong).
+if (!process.env.VITEST) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
