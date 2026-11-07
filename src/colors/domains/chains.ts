@@ -16,11 +16,17 @@ export const CHAIN_COLORS: string[] = [
 ];
 
 /**
- * Get chain color by chain ID
- * Uses character code modulo to cycle through colors
+ * Get chain color by chain ID.
+ *
+ * A hash of every character (mmCIF chain ids like "AA", "AB" are common in
+ * large assemblies). A single character hashes to its own code, so chains
+ * A-Z keep the colours they always had; 37 is not 1 mod 10 (the palette
+ * size), so the order of characters matters ("AB" and "BA" differ), which a
+ * multiplier like 31 would not give.
  */
 export function getChainColor(chainId: string | undefined): string {
   if (!chainId) return CHAIN_COLORS[0];
-  const index = chainId.charCodeAt(0) % CHAIN_COLORS.length;
-  return CHAIN_COLORS[index];
+  let h = 0;
+  for (let i = 0; i < chainId.length; i++) h = (h * 37 + chainId.charCodeAt(i)) >>> 0;
+  return CHAIN_COLORS[h % CHAIN_COLORS.length];
 }

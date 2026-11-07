@@ -69,3 +69,14 @@ describe('Rainbow coloring', () => {
     expect(getAtomColor(protein[11], 'rainbow', ctx)).toBe('hsl(0, 100%, 50%)');
   });
 });
+
+describe('chain colours', () => {
+  it('keep single-letter chains on their old colours and tell longer ids apart', async () => {
+    const { getChainColor, CHAIN_COLORS } = await import('../../colors');
+    for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') {
+      expect(getChainColor(c), c).toBe(CHAIN_COLORS[c.charCodeAt(0) % CHAIN_COLORS.length]);
+    }
+    expect(getChainColor('AA')).not.toBe(getChainColor('AB'));
+    expect(getChainColor('AB')).not.toBe(getChainColor('BA'));
+  });
+});
