@@ -261,16 +261,6 @@ export async function switchActiveStructure(page: Page, name: string): Promise<v
 // ============================================
 
 /**
- * Click on a residue in the sequence viewer
- */
-export async function clickSequenceResidue(page: Page, chainId: string, resNumber: number): Promise<void> {
-  const residue = page.locator(
-    `[data-residue-key="${chainId}:${resNumber}"], [data-chain="${chainId}"][data-residue="${resNumber}"]`
-  );
-  await residue.click();
-}
-
-/**
  * Check if sequence viewer is visible
  */
 export async function isSequenceViewerVisible(page: Page): Promise<boolean> {

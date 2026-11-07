@@ -129,7 +129,7 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     // Build label text from atom info
     let labelText = atom.element;
     if (contextMenu.residueName && contextMenu.residueNumber !== undefined) {
-      labelText = `${contextMenu.residueName}${contextMenu.residueNumber}`;
+      labelText = `${contextMenu.residueName}${contextMenu.residueNumber}${atom.insertionCode ?? ''}`;
       if (atom.name) {
         labelText += ` ${atom.name}`;
       }
@@ -154,15 +154,19 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     const { residueNumber } = contextMenu;
     if (residueNumber === undefined) return;
 
-    // Select all atoms in the same residue (batched, single state update)
-    selectAtomsByFilter(structureId, (a) => chainKey(a) === chain && a.residueNumber === residueNumber);
+    // Select all atoms in the same residue (batched, single state update);
+    // 52 and 52A are different residues
+    selectAtomsByFilter(
+      structureId,
+      (a) => chainKey(a) === chain && a.residueNumber === residueNumber && a.insertionCode === atom.insertionCode
+    );
     hideContextMenu();
   };
 
   // Build title
   let title = atom.element;
   if (contextMenu.residueName && contextMenu.residueNumber !== undefined) {
-    title = `${contextMenu.residueName}${contextMenu.residueNumber} ${atom.name || atom.element}`;
+    title = `${contextMenu.residueName}${contextMenu.residueNumber}${atom.insertionCode ?? ''} ${atom.name || atom.element}`;
   }
   if (atom.chainId) {
     title += ` (Chain ${atom.chainId})`;

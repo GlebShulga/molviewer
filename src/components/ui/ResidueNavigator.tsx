@@ -7,6 +7,8 @@ import {
   analyzeResidues,
   getOneLetterCode,
   isAminoAcid,
+  residueId,
+  residueLabel,
   type Residue,
 } from '../../utils/residueAnalysis';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -54,7 +56,7 @@ export function ResidueNavigator({
   };
 
   const handleResidueHover = (residue: Residue | null) => {
-    setHoveredResidue(residue ? `${residue.chainId}-${residue.number}` : null);
+    setHoveredResidue(residue ? residueId(residue.chainId, residue.name, residue.number, residue.insertionCode) : null);
     onResidueHover?.(residue);
   };
 
@@ -64,7 +66,7 @@ export function ResidueNavigator({
     return residues.filter(
       (r) =>
         r.name.toLowerCase().includes(term) ||
-        r.number.toString().includes(term) ||
+        residueLabel(r.number, r.insertionCode).toLowerCase().includes(term) ||
         getOneLetterCode(r.name).toLowerCase() === term
     );
   };
@@ -119,13 +121,15 @@ export function ResidueNavigator({
                 {isExpanded && (
                   <div className={styles.residueList}>
                     {filteredResidues.map((residue) => {
-                      const residueKey = `${residue.chainId}-${residue.number}`;
-                      const isHovered = hoveredResidue === residueKey;
+                      // Different residues, different React keys: 52 and 52A, and
+                      // MET 1 and a ligand also numbered 1
+                      const key = residueId(residue.chainId, residue.name, residue.number, residue.insertionCode);
+                      const isHovered = hoveredResidue === key;
                       const isAmino = isAminoAcid(residue.name);
 
                       return (
                         <button
-                          key={residueKey}
+                          key={key}
                           className={clsx(styles.residueItem, isHovered && styles.hovered)}
                           onClick={() => onResidueSelect?.(residue)}
                           onMouseEnter={() => handleResidueHover(residue)}
@@ -134,7 +138,7 @@ export function ResidueNavigator({
                           <span className={styles.residueCode}>
                             {isAmino ? getOneLetterCode(residue.name) : residue.name}
                           </span>
-                          <span className={styles.residueNumber}>{residue.number}</span>
+                          <span className={styles.residueNumber}>{residueLabel(residue.number, residue.insertionCode)}</span>
                           <span className={styles.residueName}>{residue.name}</span>
                         </button>
                       );

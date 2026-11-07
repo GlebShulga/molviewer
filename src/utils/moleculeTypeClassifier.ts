@@ -1,6 +1,6 @@
 import type { Atom, Molecule } from '../types';
 import type { RepresentationType, ColorScheme } from '../store/moleculeStore';
-import { isAminoAcid, analyzeResidues, type Residue } from './residueAnalysis';
+import { isAminoAcid, analyzeResidues, residueKey, type Residue } from './residueAnalysis';
 import { hasBackboneData } from './backboneExtraction';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 
@@ -9,7 +9,7 @@ export type MoleculeComponentType = 'protein' | 'dna' | 'rna' | 'ligand' | 'wate
 export interface MoleculeComponent {
   type: MoleculeComponentType;
   atomIndices: number[];
-  residueFilter?: Set<string>; // For Cartoon filtering: "chainId:residueNumber"
+  residueFilter?: Set<string>; // For Cartoon filtering: residueKey(), e.g. "A:52A"
 }
 
 export interface MoleculeClassification {
@@ -130,7 +130,7 @@ export function classifyMolecule(molecule: Molecule): MoleculeClassification {
       }
 
       // Add residue key for Cartoon filtering
-      component.residueKeys.add(`${residue.chainId}:${residue.number}`);
+      component.residueKeys.add(residueKey(residue.chainId, residue.number, residue.insertionCode));
     }
   }
 

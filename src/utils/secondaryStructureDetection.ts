@@ -1,9 +1,10 @@
 import type { Molecule, SecondaryStructure } from '../types';
 import { dihedralAngle } from './measurements';
-import { chainKey } from './residueAnalysis';
+import { chainKey, compareResidueIds, residueKey } from './residueAnalysis';
 
 interface BackboneAtoms {
   residueNumber: number;
+  insertionCode?: string;
   chainId: string;
   n?: { x: number; y: number; z: number };
   ca?: { x: number; y: number; z: number };
@@ -46,14 +47,6 @@ function classifyFromAngles(phi: number, psi: number): SecondaryStructure {
 }
 
 /**
- * Key of a residue: chain and number, joined with '|' so a negative number
- * ("A|-3") can't be confused with the separator. Keys are never parsed back.
- */
-function residueKeyOf(chainId: string, residueNumber: number): string {
-  return `${chainId}|${residueNumber}`;
-}
-
-/**
  * Extract backbone atoms (N, CA, C) grouped by residue. Residue 0 counts, a
  * blank chain is chainKey's 'Unknown', and CA is an alpha carbon only when
  * its element is C (a calcium ion is often named CA too).
@@ -65,12 +58,13 @@ function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
     if (atom.residueNumber === undefined || !atom.name) continue;
 
     const chainId = chainKey(atom);
-    const key = residueKeyOf(chainId, atom.residueNumber);
+    const key = residueKey(chainId, atom.residueNumber, atom.insertionCode);
     let backbone = backboneMap.get(key);
 
     if (!backbone) {
       backbone = {
         residueNumber: atom.residueNumber,
+        insertionCode: atom.insertionCode,
         chainId,
       };
       backboneMap.set(key, backbone);
@@ -107,7 +101,7 @@ export function detectSecondaryStructure(molecule: Molecule): void {
     const ra = backboneMap.get(a)!;
     const rb = backboneMap.get(b)!;
     if (ra.chainId !== rb.chainId) return ra.chainId.localeCompare(rb.chainId);
-    return ra.residueNumber - rb.residueNumber;
+    return compareResidueIds(ra.residueNumber, ra.insertionCode, rb.residueNumber, rb.insertionCode);
   });
   const chainOf = (key: string | undefined) => (key === undefined ? undefined : backboneMap.get(key)?.chainId);
 
@@ -188,6 +182,6 @@ export function detectSecondaryStructure(molecule: Molecule): void {
   // Assign to atoms
   for (const atom of molecule.atoms) {
     if (atom.residueNumber === undefined) continue;
-    atom.secondaryStructure = smoothedSSMap.get(residueKeyOf(chainKey(atom), atom.residueNumber));
+    atom.secondaryStructure = smoothedSSMap.get(residueKey(chainKey(atom), atom.residueNumber, atom.insertionCode));
   }
 }

@@ -2,6 +2,7 @@ import type { Atom, Bond, Molecule, SecondaryStructure } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { createAltLocFilter } from "./altLoc";
+import { compareResidueIds } from "../utils/residueAnalysis";
 
 export interface MMCIFParserOptions {
   inferBonds?: boolean;
@@ -14,7 +15,9 @@ interface SecondaryStructureRange {
   type: SecondaryStructure;
   chainId: string;
   startResNum: number;
+  startInsertionCode?: string;
   endResNum: number;
+  endInsertionCode?: string;
 }
 
 const DEFAULT_OPTIONS: MMCIFParserOptions = {
@@ -122,6 +125,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
   const bFactorIdx = columnMap.get('_atom_site.B_iso_or_equiv');
   const modelNumIdx = columnMap.get('_atom_site.pdbx_PDB_model_num');
   const altIdIdx = columnMap.get('_atom_site.label_alt_id');
+  const insCodeIdx = columnMap.get('_atom_site.pdbx_PDB_ins_code');
 
   let atomIndex = 0;
   let firstModel: string | null = null;
@@ -185,11 +189,13 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
     const residueNumberStr = (authSeqIdIdx !== undefined ? parseValue(tokens[authSeqIdIdx]) : null)
                           || (labelSeqIdIdx !== undefined ? parseValue(tokens[labelSeqIdIdx]) : null);
     const residueNumber = residueNumberStr ? parseInt(residueNumberStr, 10) : undefined;
+    // '?' and '.' (parseValue's null) mean no insertion code
+    const insertionCode = (insCodeIdx !== undefined ? parseValue(tokens[insCodeIdx]) : null) || undefined;
 
     // One alternate location per residue (the first seen), so a residue
     // whose only conformer is B is kept
     const altLoc = (altIdIdx !== undefined ? parseValue(tokens[altIdIdx]) : null) || undefined;
-    if (!keepAltLoc({ altLoc, chainId, residueNumber })) {
+    if (!keepAltLoc({ altLoc, chainId, residueNumber, insertionCode })) {
       i++;
       continue;
     }
@@ -209,6 +215,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
       z,
       residueName,
       residueNumber: isNaN(residueNumber!) ? undefined : residueNumber,
+      ...(insertionCode ? { insertionCode } : {}),
       chainId,
       occupancy,
       ...(altLoc ? { altLoc } : {}),
@@ -244,6 +251,8 @@ function parseStructConf(lines: string[], startIndex: number): { ranges: Seconda
   const begLabelSeqIdx = columnMap.get('_struct_conf.beg_label_seq_id');
   const endAuthSeqIdx = columnMap.get('_struct_conf.end_auth_seq_id');
   const endLabelSeqIdx = columnMap.get('_struct_conf.end_label_seq_id');
+  const begInsIdx = columnMap.get('_struct_conf.pdbx_beg_PDB_ins_code');
+  const endInsIdx = columnMap.get('_struct_conf.pdbx_end_PDB_ins_code');
 
   // Parse data rows
   while (i < lines.length) {
@@ -286,7 +295,9 @@ function parseStructConf(lines: string[], startIndex: number): { ranges: Seconda
             type: 'helix',
             chainId,
             startResNum: startRes,
+            startInsertionCode: (begInsIdx !== undefined ? parseValue(tokens[begInsIdx]) : null) || undefined,
             endResNum: endRes,
+            endInsertionCode: (endInsIdx !== undefined ? parseValue(tokens[endInsIdx]) : null) || undefined,
           });
         }
       }
@@ -319,6 +330,8 @@ function parseStructSheetRange(lines: string[], startIndex: number): { ranges: S
   const begLabelSeqIdx = columnMap.get('_struct_sheet_range.beg_label_seq_id');
   const endAuthSeqIdx = columnMap.get('_struct_sheet_range.end_auth_seq_id');
   const endLabelSeqIdx = columnMap.get('_struct_sheet_range.end_label_seq_id');
+  const begInsIdx = columnMap.get('_struct_sheet_range.pdbx_beg_PDB_ins_code');
+  const endInsIdx = columnMap.get('_struct_sheet_range.pdbx_end_PDB_ins_code');
 
   // Parse data rows
   while (i < lines.length) {
@@ -357,7 +370,9 @@ function parseStructSheetRange(lines: string[], startIndex: number): { ranges: S
           type: 'sheet',
           chainId,
           startResNum: startRes,
+          startInsertionCode: (begInsIdx !== undefined ? parseValue(tokens[begInsIdx]) : null) || undefined,
           endResNum: endRes,
+          endInsertionCode: (endInsIdx !== undefined ? parseValue(tokens[endInsIdx]) : null) || undefined,
         });
       }
     }
@@ -381,8 +396,9 @@ function assignSecondaryStructure(atoms: Atom[], ranges: SecondaryStructureRange
       if (
         // A blank chain is '' or missing on either side
         (range.chainId || '') === (atom.chainId || '') &&
-        atom.residueNumber >= range.startResNum &&
-        atom.residueNumber <= range.endResNum
+        // Number, then insertion code: a range starting at 52A leaves 52 out
+        compareResidueIds(atom.residueNumber, atom.insertionCode, range.startResNum, range.startInsertionCode) >= 0 &&
+        compareResidueIds(atom.residueNumber, atom.insertionCode, range.endResNum, range.endInsertionCode) <= 0
       ) {
         atom.secondaryStructure = range.type;
         break;

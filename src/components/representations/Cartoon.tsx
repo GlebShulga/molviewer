@@ -16,12 +16,13 @@ import {
   type SplineSegment,
 } from '../../utils';
 import { SECONDARY_STRUCTURE_COLORS } from '../../colors';
+import { residueKey } from '../../utils/residueAnalysis';
 
 export interface CartoonProps {
   molecule: Molecule;
   colorScheme?: ColorScheme;
   subdivisions?: number;
-  residueFilter?: Set<string>; // Filter to render only these residues: "chainId:residueNumber"
+  residueFilter?: Set<string>; // Filter to render only these residues: residueKey(), e.g. "A:52A"
   /** Structure ID for multi-structure support (unused in Cartoon but kept for API consistency) */
   structureId?: string;
 }
@@ -65,7 +66,7 @@ export function Cartoon({
     for (const chain of chains) {
       // Filter residues
       const filtered = chain.residues.filter((r) =>
-        residueFilter.has(`${r.chainId}:${r.residueNumber}`)
+        residueFilter.has(residueKey(r.chainId, r.residueNumber, r.insertionCode))
       );
 
       if (filtered.length < 2) continue;

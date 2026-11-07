@@ -41,7 +41,7 @@ export function formatResidueInfo(atom: Atom): string | null {
   if (!atom.residueName) return null;
   let info = atom.residueName;
   if (atom.residueNumber !== undefined) {
-    info += ` ${atom.residueNumber}`;
+    info += ` ${atom.residueNumber}${atom.insertionCode ?? ''}`;
   }
   if (atom.chainId) {
     info += ` (Chain ${atom.chainId})`;

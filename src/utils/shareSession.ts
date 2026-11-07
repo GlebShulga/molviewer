@@ -55,6 +55,7 @@ export interface ShareableStructure {
 export interface SharedAtomIdentity {
   chainId?: string;
   residueNumber?: number;
+  insertionCode?: string;
   residueName?: string;
   name?: string;
   altLoc?: string;
@@ -68,6 +69,7 @@ export function atomIdentity(atom: Atom): SharedAtomIdentity {
   return {
     chainId: atom.chainId,
     residueNumber: atom.residueNumber,
+    insertionCode: atom.insertionCode,
     residueName: atom.residueName,
     name: atom.name,
     altLoc: atom.altLoc,
@@ -81,6 +83,7 @@ function matchesIdentity(atom: Atom, id: SharedAtomIdentity): boolean {
   return (
     same(atom.chainId, id.chainId) &&
     same(atom.residueNumber, id.residueNumber) &&
+    same(atom.insertionCode, id.insertionCode) &&
     same(atom.residueName, id.residueName) &&
     same(atom.name, id.name) &&
     same(atom.altLoc, id.altLoc)

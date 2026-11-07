@@ -3,6 +3,7 @@ import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { DEFAULT_ELEMENT, getElement } from "../constants";
 import { createAltLocFilter } from "./altLoc";
+import { compareResidueIds } from "../utils/residueAnalysis";
 
 export interface PDBParserOptions {
   inferBonds?: boolean;
@@ -15,7 +16,9 @@ interface SecondaryStructureRange {
   type: SecondaryStructure;
   chainId: string;
   startResNum: number;
+  startInsertionCode?: string;
   endResNum: number;
+  endInsertionCode?: string;
 }
 
 const DEFAULT_OPTIONS: PDBParserOptions = {
@@ -154,8 +157,10 @@ function parseHelixRecord(line: string): SecondaryStructureRange | null {
 
   const startChainId = line.substring(19, 20).trim();
   const startResNum = parseInt(line.substring(21, 25).trim(), 10);
+  const startInsertionCode = line.charAt(25).trim() || undefined;
   const endChainId = line.substring(31, 32).trim();
   const endResNum = parseInt(line.substring(33, 37).trim(), 10);
+  const endInsertionCode = line.charAt(37).trim() || undefined;
 
   if (isNaN(startResNum) || isNaN(endResNum)) return null;
 
@@ -166,7 +171,9 @@ function parseHelixRecord(line: string): SecondaryStructureRange | null {
     type: 'helix',
     chainId,
     startResNum,
+    startInsertionCode,
     endResNum,
+    endInsertionCode,
   };
 }
 
@@ -183,8 +190,10 @@ function parseSheetRecord(line: string): SecondaryStructureRange | null {
 
   const startChainId = line.substring(21, 22).trim();
   const startResNum = parseInt(line.substring(22, 26).trim(), 10);
+  const startInsertionCode = line.charAt(26).trim() || undefined;
   const endChainId = line.substring(32, 33).trim();
   const endResNum = parseInt(line.substring(33, 37).trim(), 10);
+  const endInsertionCode = line.charAt(37).trim() || undefined;
 
   if (isNaN(startResNum) || isNaN(endResNum)) return null;
 
@@ -195,7 +204,9 @@ function parseSheetRecord(line: string): SecondaryStructureRange | null {
     type: 'sheet',
     chainId,
     startResNum,
+    startInsertionCode,
     endResNum,
+    endInsertionCode,
   };
 }
 
@@ -205,6 +216,7 @@ function parseSheetRecord(line: string): SecondaryStructureRange | null {
 function getSecondaryStructure(
   chainId: string | undefined,
   residueNumber: number | undefined,
+  insertionCode: string | undefined,
   ranges: SecondaryStructureRange[]
 ): SecondaryStructure | undefined {
   if (residueNumber === undefined || ranges.length === 0) {
@@ -215,8 +227,9 @@ function getSecondaryStructure(
     if (
       // A blank chain ID is '' in HELIX/SHEET records and undefined on atoms
       (range.chainId || '') === (chainId || '') &&
-      residueNumber >= range.startResNum &&
-      residueNumber <= range.endResNum
+      // Number, then insertion code: a range ending at 52B covers 52A
+      compareResidueIds(residueNumber, insertionCode, range.startResNum, range.startInsertionCode) >= 0 &&
+      compareResidueIds(residueNumber, insertionCode, range.endResNum, range.endInsertionCode) <= 0
     ) {
       return range.type;
     }
@@ -291,6 +304,7 @@ function parseAtomLine(line: string, index: number): Atom | null {
   const chainId = line.substring(21, 22).trim();
   const resSeq = parseInt(line.substring(22, 26).trim(), 10);
   const residueNumber = Number.isNaN(resSeq) ? undefined : resSeq;
+  const insertionCode = line.charAt(26).trim();
   const x = parseFloat(line.substring(30, 38).trim());
   const y = parseFloat(line.substring(38, 46).trim());
   const z = parseFloat(line.substring(46, 54).trim());
@@ -316,6 +330,7 @@ function parseAtomLine(line: string, index: number): Atom | null {
     z,
     residueName,
     residueNumber,
+    ...(insertionCode ? { insertionCode } : {}),
     chainId: chainId || undefined,
     occupancy,
     ...(altLoc ? { altLoc } : {}),
@@ -414,6 +429,7 @@ export function parsePDB(
           atom.secondaryStructure = getSecondaryStructure(
             atom.chainId,
             atom.residueNumber,
+            atom.insertionCode,
             ssRanges
           );
         }

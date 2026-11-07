@@ -1,8 +1,10 @@
 import type { Atom, Molecule, SecondaryStructure } from '../types';
-import { chainKey } from './residueAnalysis';
+import { chainKey, compareResidueIds } from './residueAnalysis';
 
 export interface BackboneResidue {
   residueNumber: number;
+  /** Insertion code: 52A follows 52 */
+  insertionCode?: string;
   chainId: string;
   residueName: string;
   ca: { x: number; y: number; z: number };
@@ -32,7 +34,8 @@ const NUCLEIC_ACID_RESIDUES = new Set([
  * Optionally extracts C, N, O for orientation calculations in proteins.
  */
 export function extractBackbone(molecule: Molecule): BackboneChain[] {
-  const chainMap = new Map<string, Map<number, BackboneResidue>>();
+  // Residues keyed by number and insertion code ("52", "52A")
+  const chainMap = new Map<string, Map<string, BackboneResidue>>();
 
   for (let atomIndex = 0; atomIndex < molecule.atoms.length; atomIndex++) {
     const atom = molecule.atoms[atomIndex];
@@ -45,6 +48,7 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
 
     const chainId = chainKey(atom);
     const resNum = atom.residueNumber;
+    const resKey = `${resNum}${atom.insertionCode ?? ''}`;
     const atomName = atom.name.trim().toUpperCase();
     const isNucleicAcid = NUCLEIC_ACID_RESIDUES.has(atom.residueName.toUpperCase());
 
@@ -70,9 +74,10 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
     const residueMap = chainMap.get(chainId)!;
 
     // Get or create residue entry
-    if (!residueMap.has(resNum)) {
-      residueMap.set(resNum, {
+    if (!residueMap.has(resKey)) {
+      residueMap.set(resKey, {
         residueNumber: resNum,
+        ...(atom.insertionCode ? { insertionCode: atom.insertionCode } : {}),
         chainId,
         residueName: atom.residueName,
         ca: { x: 0, y: 0, z: 0 },
@@ -81,7 +86,7 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
       });
     }
 
-    const residue = residueMap.get(resNum)!;
+    const residue = residueMap.get(resKey)!;
     const pos = { x: atom.x, y: atom.y, z: atom.z };
 
     switch (atomName) {
@@ -119,8 +124,8 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
     const residues = Array.from(residueMap.values())
       // Filter out residues without backbone atom (CA for proteins, P for nucleic acids)
       .filter(r => r.atomIndex >= 0 || r.p !== undefined)
-      // Sort by residue number
-      .sort((a, b) => a.residueNumber - b.residueNumber);
+      // Sort by residue number, then insertion code
+      .sort((a, b) => compareResidueIds(a.residueNumber, a.insertionCode, b.residueNumber, b.insertionCode));
 
     if (residues.length > 0) {
       chains.push({ chainId, residues });

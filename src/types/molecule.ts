@@ -8,6 +8,8 @@ export interface Atom {
   z: number;
   residueName?: string;
   residueNumber?: number;
+  /** Insertion code (PDB column 27, mmCIF pdbx_PDB_ins_code): residue 52A follows 52. Absent when blank. */
+  insertionCode?: string;
   chainId?: string;
   serial?: number;
   name?: string;

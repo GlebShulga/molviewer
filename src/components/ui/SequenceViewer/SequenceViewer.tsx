@@ -6,8 +6,10 @@ import { useSelectedAtomsForStructure } from '../../../hooks';
 import { selectStructureById, selectStructureExists, selectStructureNamesInOrder } from '../../../store/selectors';
 import {
   analyzeResidues,
-  chainKey,
+  atomResidueId,
   getOneLetterCode,
+  residueId,
+  residueLabel,
   isAminoAcid,
   type Residue,
 } from '../../../utils/residueAnalysis';
@@ -119,41 +121,36 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
     }
   }, [selectedStructureId, proteinChains]);
 
-  // Find the residue key that contains the hovered/selected atom
-  const highlightedResidueKey = useMemo(() => {
+  // The residue (residueId) of the hovered or selected atom: by name too,
+  // so a ligand numbered like a residue doesn't highlight that residue
+  const highlightedResidueId = useMemo(() => {
     if (!molecule) return null;
 
     // Check hovered atom first - only if hovering on the selected structure
     if (hoveredAtomIndex !== null && hoveredStructureId === selectedStructureId) {
       const atom = molecule.atoms[hoveredAtomIndex];
-      // chainKey: residues of a file without chain IDs are in chain 'Unknown'
-      if (atom && atom.residueNumber !== undefined) {
-        return `${chainKey(atom)}-${atom.residueNumber}`;
-      }
+      if (atom && atom.residueNumber !== undefined) return atomResidueId(atom);
     }
 
     // Then check selected atoms for this structure
     if (selectedAtomIndices.length > 0) {
       const atom = molecule.atoms[selectedAtomIndices[selectedAtomIndices.length - 1]];
-      if (atom && atom.residueNumber !== undefined) {
-        return `${chainKey(atom)}-${atom.residueNumber}`;
-      }
+      if (atom && atom.residueNumber !== undefined) return atomResidueId(atom);
     }
 
     return null;
   }, [molecule, hoveredAtomIndex, hoveredStructureId, selectedStructureId, selectedAtomIndices]);
 
-  // Scroll to highlighted residue
+  // Scroll to the highlighted residue (found by its data-highlighted mark:
+  // an id can hold any character a selector would need escaped)
   useEffect(() => {
-    if (highlightedResidueKey && sequenceRef.current) {
-      const element = sequenceRef.current.querySelector(
-        `[data-residue-key="${highlightedResidueKey}"]`
-      );
+    if (highlightedResidueId && sequenceRef.current) {
+      const element = sequenceRef.current.querySelector('[data-highlighted]');
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     }
-  }, [highlightedResidueKey]);
+  }, [highlightedResidueId]);
 
   const activeChainData = proteinChains.find(c => c.id === activeChain);
   const activeChainResidues = useMemo(
@@ -174,7 +171,7 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
   };
 
   const handleResidueHover = (residue: Residue | null) => {
-    setHoveredResidue(residue ? `${residue.chainId}-${residue.number}` : null);
+    setHoveredResidue(residue ? residueId(residue.chainId, residue.name, residue.number, residue.insertionCode) : null);
     onResidueHover?.(residue);
   };
 
@@ -227,19 +224,24 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
           <div className={styles.sequenceContainer} ref={sequenceRef}>
             <div className={styles.sequence}>
               {activeChainResidues.map((residue, index) => {
-                const residueKey = `${residue.chainId}-${residue.number}`;
-                const isHighlighted = residueKey === highlightedResidueKey;
-                const isHovered = residueKey === hoveredResidue;
+                // Different residues, different React keys: 52 and 52A
+                const key = residueId(residue.chainId, residue.name, residue.number, residue.insertionCode);
+                const label = residueLabel(residue.number, residue.insertionCode);
+                const isHighlighted = key === highlightedResidueId;
+                const isHovered = key === hoveredResidue;
                 const ss = getResidueSecondaryStructure(residue);
 
                 return (
-                  <Fragment key={residueKey}>
+                  <Fragment key={key}>
                     {/* Group label before every 10-residue block */}
                     {index % 10 === 0 && (
-                      <span className={styles.groupLabel}>{residue.number}</span>
+                      <span className={styles.groupLabel}>{label}</span>
                     )}
                     <button
-                      data-residue-key={residueKey}
+                      data-residue-key={key}
+                      data-residue-chain={residue.chainId}
+                      data-residue={label}
+                      data-highlighted={isHighlighted || undefined}
                       className={clsx(
                         styles.residue,
                         isHighlighted && styles.highlighted,
@@ -251,7 +253,7 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
                       onClick={() => handleResidueClick(residue)}
                       onMouseEnter={() => handleResidueHover(residue)}
                       onMouseLeave={() => handleResidueHover(null)}
-                      title={`${residue.name} ${residue.number} (${ss})`}
+                      title={`${residue.name} ${label} (${ss})`}
                     >
                       <span className={styles.residueCode}>
                         {getOneLetterCode(residue.name)}

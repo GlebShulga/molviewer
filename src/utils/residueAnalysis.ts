@@ -2,7 +2,10 @@ import type { Atom } from '../types';
 
 export interface Residue {
   name: string;
-  number: number;
+  /** Missing when the file gives none (a ligand without a residue number): never 0, which is a real residue. */
+  number: number | undefined;
+  /** Insertion code: residue 52A follows 52 (antibody Kabat numbering). */
+  insertionCode?: string;
   chainId: string;
   atoms: Atom[];
   startIndex: number;
@@ -24,37 +27,92 @@ export function chainKey(atom: Pick<Atom, 'chainId'>): string {
   return atom.chainId || 'Unknown';
 }
 
+/**
+ * Key of a residue position: chain, number and insertion code ("A:52",
+ * "A:52A", "A:-3"). Used for the Cartoon residue filter and
+ * secondary-structure lookups. A ligand numbered like a residue (MD and
+ * docking output) shares its key: for one residue, use residueId. Built,
+ * never parsed back.
+ */
+export function residueKey(chain: string, number: number | undefined, insertionCode?: string): string {
+  return `${chain}:${number ?? 'none'}${insertionCode ?? ''}`;
+}
+
+/**
+ * Id of one residue: chain, name, number and insertion code ("A:MET:1",
+ * "A:LIG:1", "A:SER:52A"), 'UNK' for a missing name and 'none' for a
+ * missing number, as analyzeResidues groups atoms. Pass the chain as
+ * chainKey gives it. For UI keys, hover and highlight. Built, never parsed back.
+ */
+export function residueId(
+  chain: string,
+  name: string | undefined,
+  number: number | undefined,
+  insertionCode?: string
+): string {
+  return `${chain}:${name || 'UNK'}:${number ?? 'none'}${insertionCode ?? ''}`;
+}
+
+/** residueId of the residue an atom belongs to. */
+export function atomResidueId(atom: Pick<Atom, 'chainId' | 'residueName' | 'residueNumber' | 'insertionCode'>): string {
+  return residueId(chainKey(atom), atom.residueName, atom.residueNumber, atom.insertionCode);
+}
+
+/** A residue number as shown to people: "52", "52A". */
+export function residueLabel(number: number | undefined, insertionCode?: string): string {
+  return `${number ?? ''}${insertionCode ?? ''}`;
+}
+
+/**
+ * Order of residues in a chain: by number, then insertion code (52 < 52A <
+ * 52B < 53). Residues without a number come last.
+ */
+export function compareResidueIds(
+  aNumber: number | undefined,
+  aCode: string | undefined,
+  bNumber: number | undefined,
+  bCode: string | undefined
+): number {
+  if (aNumber !== bNumber) {
+    if (aNumber === undefined) return 1;
+    if (bNumber === undefined) return -1;
+    return aNumber - bNumber;
+  }
+  return (aCode ?? '').localeCompare(bCode ?? '');
+}
+
 export function analyzeResidues(atoms: Atom[]): Chain[] {
   const chainMap = new Map<string, Map<string, Residue>>();
 
   atoms.forEach((atom, index) => {
     const chainId = chainKey(atom);
     // Atoms without a residue number get their own residue, not residue 0's
-    const residueKey = `${atom.residueName || 'UNK'}_${atom.residueNumber ?? 'none'}`;
+    const key = atomResidueId(atom);
 
     if (!chainMap.has(chainId)) {
       chainMap.set(chainId, new Map());
     }
 
     const residueMap = chainMap.get(chainId)!;
-    if (!residueMap.has(residueKey)) {
-      residueMap.set(residueKey, {
+    if (!residueMap.has(key)) {
+      residueMap.set(key, {
         name: atom.residueName || 'UNK',
-        number: atom.residueNumber ?? 0,
+        number: atom.residueNumber,
+        ...(atom.insertionCode ? { insertionCode: atom.insertionCode } : {}),
         chainId,
         atoms: [],
         startIndex: index,
       });
     }
 
-    residueMap.get(residueKey)!.atoms.push(atom);
+    residueMap.get(key)!.atoms.push(atom);
   });
 
   const chains: Chain[] = [];
 
   chainMap.forEach((residueMap, chainId) => {
-    const residues = Array.from(residueMap.values()).sort(
-      (a, b) => a.number - b.number
+    const residues = Array.from(residueMap.values()).sort((a, b) =>
+      compareResidueIds(a.number, a.insertionCode, b.number, b.insertionCode)
     );
 
     chains.push({

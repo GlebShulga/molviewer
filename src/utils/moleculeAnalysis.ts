@@ -122,7 +122,7 @@ function analyzeChains(molecule: Molecule): ChainSummary[] {
     const chain = chainMap.get(chainId)!;
     chain.atoms++;
     if (atom.residueName && atom.residueNumber !== undefined) {
-      chain.residues.add(`${atom.residueName}${atom.residueNumber}`);
+      chain.residues.add(`${atom.residueName}${atom.residueNumber}${atom.insertionCode ?? ''}`);
     }
   }
 

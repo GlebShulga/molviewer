@@ -30,8 +30,8 @@ export class SequenceViewerPage {
     // Structure selector for multi-structure support - use specific select element to avoid matching wrapper div
     this.structureSelector = this.container.locator('select[class*="structureSelect"]');
 
-    // Chain tabs
-    this.chainTabs = this.container.locator('[class*="chainTab"], button[data-chain]');
+    // Chain tabs: the buttons, not their wrapper (class chainTabs)
+    this.chainTabs = this.container.locator('button[class*="chainTab"]');
 
     // Residue elements - buttons with data-residue-key attribute
     this.residues = this.container.locator('[data-residue-key]');
@@ -108,33 +108,32 @@ export class SequenceViewerPage {
   }
 
   /**
-   * Click a residue by chain ID and residue number
+   * A residue button by chain ID and residue number as shown ("52", "52A")
    */
-  async clickResidue(chainId: string, resNumber: number): Promise<void> {
-    const residue = this.container.locator(
-      `[data-residue-key="${chainId}-${resNumber}"], [data-chain="${chainId}"][data-residue="${resNumber}"]`
-    );
-    await residue.click();
+  residue(chainId: string, resNumber: number | string): Locator {
+    return this.container.locator(`[data-residue-chain="${chainId}"][data-residue="${resNumber}"]`);
+  }
+
+  /**
+   * Click a residue by chain ID and residue number. force: the buttons sit
+   * beside the WebGL canvas, whose repaints can hang the stability check.
+   */
+  async clickResidue(chainId: string, resNumber: number | string): Promise<void> {
+    await this.residue(chainId, resNumber).click({ force: true });
   }
 
   /**
    * Hover over a residue by chain ID and residue number
    */
-  async hoverResidue(chainId: string, resNumber: number): Promise<void> {
-    const residue = this.container.locator(
-      `[data-residue-key="${chainId}-${resNumber}"], [data-chain="${chainId}"][data-residue="${resNumber}"]`
-    );
-    await residue.hover();
+  async hoverResidue(chainId: string, resNumber: number | string): Promise<void> {
+    await this.residue(chainId, resNumber).hover({ force: true });
   }
 
   /**
    * Check if a residue is highlighted/selected
    */
-  async isResidueHighlighted(chainId: string, resNumber: number): Promise<boolean> {
-    const residue = this.container.locator(
-      `[data-residue-key="${chainId}-${resNumber}"], [data-chain="${chainId}"][data-residue="${resNumber}"]`
-    );
-    const classes = await residue.getAttribute('class');
+  async isResidueHighlighted(chainId: string, resNumber: number | string): Promise<boolean> {
+    const classes = await this.residue(chainId, resNumber).getAttribute('class');
     return classes?.includes('highlight') || classes?.includes('selected') || classes?.includes('active') || false;
   }
 
