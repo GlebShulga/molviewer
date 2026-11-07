@@ -2,6 +2,11 @@ name: Update E2E Snapshots
 
 on:
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to take the snapshots from (a branch preview for PRs that change rendering)'
+        default: 'https://molviewer.bio/'
+        type: string
 
 permissions:
   contents: write
@@ -26,7 +31,7 @@ jobs:
       - name: Generate Linux snapshots
         run: pnpm test:e2e --project=chromium-visual --project=webkit --update-snapshots
         env:
-          BASE_URL: https://molviewer.bio/
+          BASE_URL: ${{ inputs.base_url || 'https://molviewer.bio/' }}
           CI: true
 
       - name: Create PR with updated snapshots
@@ -34,6 +39,6 @@ jobs:
         with:
           commit-message: 'chore: update Linux e2e snapshots'
           title: 'chore: update Linux e2e snapshots'
-          body: Auto-generated Linux baselines from `Update E2E Snapshots` workflow.
+          body: Auto-generated Linux baselines from `Update E2E Snapshots` workflow, taken from ${{ inputs.base_url || 'https://molviewer.bio/' }} on `${{ github.ref_name }}`.
           branch: update-e2e-snapshots
           add-paths: e2e-snapshots/
