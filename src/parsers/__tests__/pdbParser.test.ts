@@ -170,6 +170,14 @@ describe('parsePDB element symbols', () => {
     expect(elementOf('HG  ', ' HG')).toBe('Hg');
   });
 
+  it("keeps a nucleotide's beta phosphorus PB as P, and reads a lead ion", () => {
+    // Left-justified, as tool output without an element column writes it
+    expect(elementOf('PB  ', 'ADP')).toBe('P');
+    expect(elementOf('PB  ', 'ATP')).toBe('P');
+    expect(elementOf('PB  ', ' PB')).toBe('Pb');
+    expect(elementOf('GA  ', ' GA')).toBe('Ga');
+  });
+
   it('reads hydrogens', () => {
     expect(elementOf('HG21', 'THR')).toBe('H');
     expect(elementOf('HE21', 'GLN')).toBe('H');

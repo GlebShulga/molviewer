@@ -14,8 +14,8 @@ export interface ElementData {
  * low-spin values for Fe, Co, Mn). Van der Waals radii: Bondi 1964 and
  * Mantina 2009 for the main-group elements and alkali/alkaline-earth metals
  * (as in PubChem's periodic table). The entries added on 2026-11-07 (Cr, Mn,
- * As, Se, Mo, Ag, Cd, Sn, Cs, Gd, W, Pt, Au, Hg) take their vdW radius from
- * PubChem's periodic table; the older Fe, Co, Ni, Cu, Zn values have no
+ * As, Se, Mo, Ag, Cd, Sn, Cs, Gd, W, Pt, Au, Hg) and 2026-11-08 (Ga, In, Tl,
+ * Pb, Bi) take their vdW radius from PubChem's periodic table; the older Fe, Co, Ni, Cu, Zn values have no
  * recorded source and differ from it.
  */
 export const ELEMENTS: Record<string, ElementData> = {
@@ -263,6 +263,15 @@ export const ELEMENTS: Record<string, ElementData> = {
     vdwRadius: 2.01,
     covalentRadius: 1.22,
   },
+  Ga: {
+    symbol: "Ga",
+    name: "Gallium",
+    atomicNumber: 31,
+    atomicMass: 69.723,
+    color: "#C28F8F",
+    vdwRadius: 1.87,
+    covalentRadius: 1.22,
+  },
   As: {
     symbol: "As",
     name: "Arsenic",
@@ -316,6 +325,15 @@ export const ELEMENTS: Record<string, ElementData> = {
     color: "#FFD98F",
     vdwRadius: 1.58,
     covalentRadius: 1.44,
+  },
+  In: {
+    symbol: "In",
+    name: "Indium",
+    atomicNumber: 49,
+    atomicMass: 114.818,
+    color: "#A67573",
+    vdwRadius: 1.93,
+    covalentRadius: 1.42,
   },
   Sn: {
     symbol: "Sn",
@@ -388,6 +406,33 @@ export const ELEMENTS: Record<string, ElementData> = {
     color: "#B8B8D0",
     vdwRadius: 2.09,
     covalentRadius: 1.32,
+  },
+  Tl: {
+    symbol: "Tl",
+    name: "Thallium",
+    atomicNumber: 81,
+    atomicMass: 204.383,
+    color: "#A6544D",
+    vdwRadius: 1.96,
+    covalentRadius: 1.45,
+  },
+  Pb: {
+    symbol: "Pb",
+    name: "Lead",
+    atomicNumber: 82,
+    atomicMass: 207.2,
+    color: "#575961",
+    vdwRadius: 2.02,
+    covalentRadius: 1.46,
+  },
+  Bi: {
+    symbol: "Bi",
+    name: "Bismuth",
+    atomicNumber: 83,
+    atomicMass: 208.98,
+    color: "#9E4FB5",
+    vdwRadius: 2.07,
+    covalentRadius: 1.48,
   },
 };
 

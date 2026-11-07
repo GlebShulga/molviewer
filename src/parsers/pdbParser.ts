@@ -248,10 +248,11 @@ const STANDARD_RESIDUES = new Set([
 
 /**
  * Two-letter symbols that are also common atom names (alpha carbon, delta
- * carbon, epsilon nitrogen, ...). Read as the element only in a residue
- * named after it: "CA" in residue CA is calcium.
+ * carbon, epsilon nitrogen, a nucleotide's beta phosphorus PB, ...). Read as
+ * the element only in a residue named after it: "CA" in residue CA is
+ * calcium, "PB" in residue PB is lead.
  */
-const AMBIGUOUS_TWO_LETTER = new Set(['CA', 'CD', 'NE', 'HE', 'NA', 'HG']);
+const AMBIGUOUS_TWO_LETTER = new Set(['CA', 'CD', 'NE', 'HE', 'NA', 'HG', 'PB']);
 
 /**
  * Element from columns 77-78, or from the atom name (columns 13-16) when

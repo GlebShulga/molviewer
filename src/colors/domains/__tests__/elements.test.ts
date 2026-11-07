@@ -11,7 +11,7 @@ describe('element table', () => {
   });
 
   it('knows the metals found in PDB entries and metal complexes', () => {
-    for (const symbol of ['Mn', 'Hg', 'Cd', 'Pt', 'Cr', 'Mo', 'W', 'Au', 'Ag', 'As', 'Sn', 'Gd', 'Cs']) {
+    for (const symbol of ['Mn', 'Hg', 'Cd', 'Pt', 'Cr', 'Mo', 'W', 'Au', 'Ag', 'As', 'Sn', 'Gd', 'Cs', 'Ga', 'In', 'Tl', 'Pb', 'Bi']) {
       const el = getElement(symbol);
       expect(el.symbol, symbol).toBe(symbol);
       expect(el.covalentRadius, symbol).toBeGreaterThan(1);

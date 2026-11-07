@@ -22,8 +22,8 @@ const METALS = new Set([
   'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
   'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
   'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
-  // post-transition and lanthanides seen in structures
-  'Sn', 'Gd',
+  // post-transition (Al: an AlF4- sits about 3 Å from its Mg2+) and lanthanides seen in structures
+  'Al', 'Ga', 'In', 'Sn', 'Tl', 'Pb', 'Bi', 'Gd',
 ]);
 
 function isMetal(element: string): boolean {
@@ -72,29 +72,54 @@ function bondBetween(atoms: Atom[], radii: number[], metal: boolean[], tolerance
 }
 
 /**
- * O(n) bond inference using spatial hash grid. The cell size and search
- * radius are the longest bond this molecule's elements allow (2 × the
- * largest covalent radius present + tolerance), so no possible bond is
- * missed: about 2.5 Å for a protein, more with metals.
+ * O(n) bond inference using spatial hash grid. getNeighbors looks at the 27
+ * cells around an atom, so a cell must hold the longest bond it searches
+ * for. Sized by the largest metal ion, one K+ or Cs+ would make every
+ * protein atom search a much larger volume. So the grid is sized by the
+ * largest non-metal radius (about 2.5 Å cells for a protein), and the
+ * metals larger than that ("big", a few ions at most) search further on
+ * their own. Two big atoms are both metals, which never bond.
  */
 function inferBondsWithSpatialIndex(atoms: Atom[], radii: number[], metal: boolean[], tolerance: number): Bond[] {
-  // A loop, not Math.max(...radii): spreading 200,000+ atoms overflows the call stack
-  let maxRadius = 0;
-  for (const r of radii) if (r > maxRadius) maxRadius = r;
-  const maxBondLength = 2 * maxRadius + tolerance;
-  const grid = new SpatialHashGrid(maxBondLength);
+  let rNormal = 0;
+  for (let i = 0; i < atoms.length; i++) if (!metal[i] && radii[i] > rNormal) rNormal = radii[i];
+  const big = radii.map((r, i) => metal[i] && r > rNormal);
+  // Only metals: nothing to bond (and rNormal 0 would shrink the cells to the tolerance)
+  if (big.every(Boolean)) return [];
+
+  const grid = new SpatialHashGrid(2 * rNormal + tolerance);
   grid.build(atoms);
 
   const bonds: Bond[] = [];
+  // Pass 1: pairs of non-big atoms, each found once (i < j), within the 27
+  // cells. getNeighbors returns cell order, so each atom's few bonds are
+  // sorted by partner: pass 1 alone is then in the O(n²) path's order.
+  const atomBonds: Bond[] = [];
   for (let i = 0; i < atoms.length; i++) {
-    for (const j of grid.getNeighbors(i, maxBondLength)) {
-      // Only process each pair once (i < j)
-      if (j <= i) continue;
+    if (big[i]) continue;
+    atomBonds.length = 0;
+    for (const j of grid.getNeighbors(i, radii[i] + rNormal + tolerance)) {
+      if (j <= i || big[j]) continue;
       const bond = bondBetween(atoms, radii, metal, tolerance, i, j);
+      if (bond) atomBonds.push(bond);
+    }
+    if (atomBonds.length > 1) atomBonds.sort((a, b) => a.atom2Index - b.atom2Index);
+    for (const bond of atomBonds) bonds.push(bond);
+  }
+  const pass1Count = bonds.length;
+  // Pass 2: each big atom with its non-big neighbours, over as many cells as its reach needs
+  for (let b = 0; b < atoms.length; b++) {
+    if (!big[b]) continue;
+    const { x, y, z } = atoms[b];
+    // Returns b itself too: big, so skipped
+    for (const k of grid.getNeighborsAt(x, y, z, radii[b] + rNormal + tolerance)) {
+      if (big[k]) continue;
+      const bond = b < k ? bondBetween(atoms, radii, metal, tolerance, b, k) : bondBetween(atoms, radii, metal, tolerance, k, b);
       if (bond) bonds.push(bond);
     }
   }
-  // Same order as the O(n²) path
+  // Same order as the O(n²) path: pass 2's bonds go in among pass 1's
+  if (bonds.length === pass1Count) return bonds;
   return bonds.sort((a, b) => a.atom1Index - b.atom1Index || a.atom2Index - b.atom2Index);
 }
 
