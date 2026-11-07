@@ -407,3 +407,82 @@ ${rows.join('\n')}
     expect(m.atoms.map((a) => `${a.residueName}${a.residueNumber}:${a.name}${a.altLoc ?? ''}`)).toEqual(['SER1:CA', 'SER1:CBA', 'GLY2:CAB']);
   });
 });
+
+describe('parseMMCIF single-row categories (no loop_)', () => {
+  const atomLoop = (n: number) => `loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+${Array.from({ length: n }, (_, i) => `ATOM ${i + 1} C CA ALA A ${i + 1} A ${i + 1} ${(i * 3.8).toFixed(1)} 0.0 0.0`).join('\n')}
+#
+`;
+
+  it('reads a single helix written as key-value pairs, values on the same line', () => {
+    const cif = `data_ONE
+_struct_conf.conf_type_id HELX_P
+_struct_conf.id HELX_P1
+_struct_conf.beg_auth_asym_id A
+_struct_conf.beg_auth_seq_id 2
+_struct_conf.end_auth_seq_id 4
+_struct_conf.details 'a short helix'
+#
+${atomLoop(5)}`;
+    expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['coil', 'helix', 'helix', 'helix', 'coil']);
+  });
+
+  it('reads values on the next line and ; text fields', () => {
+    const cif = `data_TWO
+_struct_conf.conf_type_id
+HELX_P
+_struct_conf.details
+;a helix
+described over two lines
+;
+_struct_conf.beg_auth_asym_id A
+_struct_conf.beg_auth_seq_id 1
+_struct_conf.end_auth_seq_id "3"
+#
+${atomLoop(4)}`;
+    expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['helix', 'helix', 'helix', 'coil']);
+  });
+
+  it('reads a single sheet strand', () => {
+    const cif = `data_SHEET
+_struct_sheet_range.sheet_id A
+_struct_sheet_range.id 1
+_struct_sheet_range.beg_auth_asym_id A
+_struct_sheet_range.beg_auth_seq_id 1
+_struct_sheet_range.end_auth_seq_id 2
+#
+${atomLoop(3)}`;
+    expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['sheet', 'sheet', 'coil']);
+  });
+
+  it('reads a file with a single atom written as key-value pairs', () => {
+    const cif = `data_ATOM1
+_atom_site.group_PDB HETATM
+_atom_site.id 1
+_atom_site.type_symbol ZN
+_atom_site.label_atom_id ZN
+_atom_site.label_comp_id ZN
+_atom_site.label_asym_id B
+_atom_site.label_seq_id .
+_atom_site.Cartn_x 1.5
+_atom_site.Cartn_y -2.0
+_atom_site.Cartn_z 3.25
+#
+`;
+    const m = parseMMCIF(cif);
+    expect(m.atoms).toHaveLength(1);
+    expect(m.atoms[0]).toMatchObject({ element: 'Zn', residueName: 'ZN', chainId: 'B', x: 1.5, y: -2, z: 3.25 });
+  });
+});

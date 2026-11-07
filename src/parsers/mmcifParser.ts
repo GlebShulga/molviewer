@@ -397,6 +397,49 @@ function assignSecondaryStructure(atoms: Atom[], ranges: SecondaryStructureRange
 }
 
 /**
+ * Read a category written as key-value pairs (no loop_): one row, used by
+ * files with a single helix, sheet strand or atom. A value is on the key's
+ * line, on the next line, or in a ';' text field. Returns the keys and the
+ * row as a header plus one data line, so the loop parsers above can read
+ * it, and the index after the block.
+ */
+function readKeyValueBlock(lines: string[], startIndex: number, prefix: string): { loopLines: string[]; endIndex: number } {
+  const keys: string[] = [];
+  const values: string[] = [];
+  let i = startIndex;
+  while (i < lines.length && lines[i].trim().startsWith(prefix)) {
+    const line = lines[i].trim();
+    const key = line.split(/\s+/, 1)[0];
+    const rest = line.slice(key.length).trim();
+    i++;
+    let value: string;
+    if (rest) {
+      value = tokenizeLine(rest)[0];
+    } else if (i < lines.length && lines[i].startsWith(';')) {
+      // Text field: from ';' to a line holding only ';'
+      const text = [lines[i].slice(1)];
+      i++;
+      while (i < lines.length && !lines[i].startsWith(';')) text.push(lines[i++]);
+      i++; // the closing ';'
+      value = text.join(' ').trim();
+    } else {
+      value = tokenizeLine(lines[i]?.trim() ?? '')[0] ?? '?';
+      i++;
+    }
+    keys.push(key);
+    values.push(value);
+  }
+  return { loopLines: [...keys, values.map(quoteValue).join(' ')], endIndex: i };
+}
+
+/** A value as one token of a data line: quoted when it holds spaces and isn't quoted already. */
+function quoteValue(value: string): string {
+  if (value === '') return '?';
+  if (/^['"]/.test(value) || !/\s/.test(value)) return value;
+  return value.includes("' ") ? `"${value}"` : `'${value}'`;
+}
+
+/**
  * Parse mmCIF/PDBx format file content
  */
 export function parseMMCIF(
@@ -442,6 +485,24 @@ export function parseMMCIF(
           i = result.endIndex - 1;
         }
       }
+    }
+
+    // The same categories written as key-value pairs (a single row, no loop_)
+    if (line.startsWith('_atom_site.')) {
+      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_atom_site.');
+      atoms = parseAtomSiteLoop(loopLines, 0).atoms;
+      i = endIndex - 1;
+      continue;
+    } else if (line.startsWith('_struct_conf.')) {
+      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_struct_conf.');
+      ssRanges.push(...parseStructConf(loopLines, 0).ranges);
+      i = endIndex - 1;
+      continue;
+    } else if (line.startsWith('_struct_sheet_range.')) {
+      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_struct_sheet_range.');
+      ssRanges.push(...parseStructSheetRange(loopLines, 0).ranges);
+      i = endIndex - 1;
+      continue;
     }
 
     // Also check for _entry.id for molecule name
