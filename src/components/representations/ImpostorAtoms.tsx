@@ -175,13 +175,14 @@ export function ImpostorAtoms({
 
   const { gl, camera, invalidate } = useThree();
 
-  const { setHoveredAtom, selectAtom, showContextMenu, measurementMode, hoveredAtomIndex, activeStructureId } =
+  const { setHoveredAtom, selectAtom, showContextMenu, measurementMode, hoveredAtomIndex, hoveredStructureId, activeStructureId } =
     useMoleculeStore(useShallow(state => ({
       setHoveredAtom: state.setHoveredAtom,
       selectAtom: state.selectAtom,
       showContextMenu: state.showContextMenu,
       measurementMode: state.measurementMode,
       hoveredAtomIndex: state.hoveredAtomIndex,
+      hoveredStructureId: state.hoveredStructureId,
       activeStructureId: state.activeStructureId,
     })));
 
@@ -323,12 +324,14 @@ export function ImpostorAtoms({
       // Selection state
       selectedArray[i] = selectedSet.has(data.index) ? 1.0 : 0.0;
 
-      // Hover state
-      hoveredArray[i] = data.index === hoveredAtomIndex ? 1.0 : 0.0;
 
       // Instance index for GPU picking
       indexArray[i] = i;
     });
+
+    // Hover state: only this structure's hovered atom (another structure may
+    // have an atom with the same index)
+    hoveredArray.set(hoverFlags(atomsData.map((d) => d.index), hoveredAtomIndex, hoveredStructureId, effectiveStructureId));
 
     mesh.instanceMatrix.needsUpdate = true;
 
@@ -357,6 +360,8 @@ export function ImpostorAtoms({
     atomsData,
     selectedIndices,
     hoveredAtomIndex,
+    hoveredStructureId,
+    effectiveStructureId,
     colorArray,
     radiusArray,
     selectedArray,
@@ -588,3 +593,20 @@ export function ImpostorAtoms({
  * Above this, impostors are critical for performance.
  */
 export const IMPOSTOR_THRESHOLD = 2000;
+
+/**
+ * Per-instance hover flags: 1 for the hovered atom when it belongs to this
+ * structure, else 0. Comparing indices alone lit the same index in every
+ * structure drawn with impostors.
+ */
+export function hoverFlags(
+  atomIndices: ArrayLike<number>,
+  hoveredAtomIndex: number | null,
+  hoveredStructureId: string | null,
+  structureId: string
+): Float32Array {
+  const flags = new Float32Array(atomIndices.length);
+  if (hoveredAtomIndex === null || hoveredStructureId !== structureId) return flags;
+  for (let i = 0; i < atomIndices.length; i++) flags[i] = atomIndices[i] === hoveredAtomIndex ? 1 : 0;
+  return flags;
+}
