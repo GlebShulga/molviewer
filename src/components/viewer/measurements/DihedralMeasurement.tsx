@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { Line, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -38,82 +38,8 @@ export function DihedralMeasurement({
     [atom1, atom2, atom3, atom4]
   );
 
-  // Calculate sector geometry (Mol*-style filled wedge)
-  const { sectorGeometry, arcPoints, sectorCenter, armStart, armEnd } = useMemo(() => {
-    const pos1 = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
-    const pos2 = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
-    const pos3 = new THREE.Vector3(atom3.x, atom3.y, atom3.z);
-    const pos4 = new THREE.Vector3(atom4.x, atom4.y, atom4.z);
-
-    // Central axis (bond 2-3)
-    const axis = pos3.clone().sub(pos2).normalize();
-    const center = pos2.clone().add(pos3).multiplyScalar(0.5);
-
-    // Project atom1 and atom4 directions onto the perpendicular plane
-    const v1 = pos1.clone().sub(center);
-    const v4 = pos4.clone().sub(center);
-
-    // Remove component along axis to get perpendicular projection
-    const proj1 = v1.clone().sub(axis.clone().multiplyScalar(v1.dot(axis))).normalize();
-    const proj4 = v4.clone().sub(axis.clone().multiplyScalar(v4.dot(axis))).normalize();
-
-    // Sector radius
-    const radius = 1.2;
-    const segments = 24;
-
-    // Calculate angle between projections
-    let angle = Math.acos(Math.max(-1, Math.min(1, proj1.dot(proj4))));
-
-    // Determine sign of angle using cross product
-    const cross = new THREE.Vector3().crossVectors(proj1, proj4);
-    if (cross.dot(axis) < 0) {
-      angle = -angle;
-    }
-
-    // Generate sector triangles (fan from center)
-    const vertices: number[] = [];
-    const arcPts: THREE.Vector3[] = [];
-
-    for (let i = 0; i <= segments; i++) {
-      const t = i / segments;
-      const currentAngle = t * angle;
-
-      // Rotate proj1 around axis by currentAngle
-      const q = new THREE.Quaternion().setFromAxisAngle(axis, currentAngle);
-      const dir = proj1.clone().applyQuaternion(q);
-      const point = center.clone().add(dir.multiplyScalar(radius));
-      arcPts.push(point);
-
-      // Add triangle vertices (center, current point, next point)
-      if (i < segments) {
-        const nextAngle = ((i + 1) / segments) * angle;
-        const qNext = new THREE.Quaternion().setFromAxisAngle(axis, nextAngle);
-        const dirNext = proj1.clone().applyQuaternion(qNext);
-        const nextPoint = center.clone().add(dirNext.multiplyScalar(radius));
-
-        // Triangle: center -> current -> next
-        vertices.push(center.x, center.y, center.z);
-        vertices.push(point.x, point.y, point.z);
-        vertices.push(nextPoint.x, nextPoint.y, nextPoint.z);
-      }
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-    geometry.computeVertexNormals();
-
-    // Arm endpoints (from center to arc start/end)
-    const armStartPt = center.clone().add(proj1.clone().multiplyScalar(radius));
-    const armEndPt = center.clone().add(proj4.clone().multiplyScalar(radius));
-
-    return {
-      sectorGeometry: geometry,
-      arcPoints: arcPts,
-      sectorCenter: center,
-      armStart: armStartPt,
-      armEnd: armEndPt,
-    };
-  }, [atom1, atom2, atom3, atom4]);
+  // Sector geometry (Mol*-style filled wedge), rebuilt only when coordinates change
+  const { sectorGeometry, arcPoints, sectorCenter, armStart, armEnd } = useSectorGeometry(atom1, atom2, atom3, atom4);
 
   // Update label position every frame based on camera. Priority -1 runs this
   // before drei's Html projects the label, so it never lags a frame behind.
@@ -178,4 +104,100 @@ export function DihedralMeasurement({
       </group>
     </group>
   );
+}
+
+/** The filled wedge, arc and arms of a dihedral, from its four atoms. */
+export function buildDihedralSector(atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom) {
+  const pos1 = new THREE.Vector3(atom1.x, atom1.y, atom1.z);
+  const pos2 = new THREE.Vector3(atom2.x, atom2.y, atom2.z);
+  const pos3 = new THREE.Vector3(atom3.x, atom3.y, atom3.z);
+  const pos4 = new THREE.Vector3(atom4.x, atom4.y, atom4.z);
+
+  // Central axis (bond 2-3)
+  const axis = pos3.clone().sub(pos2).normalize();
+  const center = pos2.clone().add(pos3).multiplyScalar(0.5);
+
+  // Project atom1 and atom4 directions onto the perpendicular plane
+  const v1 = pos1.clone().sub(center);
+  const v4 = pos4.clone().sub(center);
+
+  // Remove component along axis to get perpendicular projection
+  const proj1 = v1.clone().sub(axis.clone().multiplyScalar(v1.dot(axis))).normalize();
+  const proj4 = v4.clone().sub(axis.clone().multiplyScalar(v4.dot(axis))).normalize();
+
+  // Sector radius
+  const radius = 1.2;
+  const segments = 24;
+
+  // Calculate angle between projections
+  let angle = Math.acos(Math.max(-1, Math.min(1, proj1.dot(proj4))));
+
+  // Determine sign of angle using cross product
+  const cross = new THREE.Vector3().crossVectors(proj1, proj4);
+  if (cross.dot(axis) < 0) {
+    angle = -angle;
+  }
+
+  // Generate sector triangles (fan from center)
+  const vertices: number[] = [];
+  const arcPts: THREE.Vector3[] = [];
+
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const currentAngle = t * angle;
+
+    // Rotate proj1 around axis by currentAngle
+    const q = new THREE.Quaternion().setFromAxisAngle(axis, currentAngle);
+    const dir = proj1.clone().applyQuaternion(q);
+    const point = center.clone().add(dir.multiplyScalar(radius));
+    arcPts.push(point);
+
+    // Add triangle vertices (center, current point, next point)
+    if (i < segments) {
+      const nextAngle = ((i + 1) / segments) * angle;
+      const qNext = new THREE.Quaternion().setFromAxisAngle(axis, nextAngle);
+      const dirNext = proj1.clone().applyQuaternion(qNext);
+      const nextPoint = center.clone().add(dirNext.multiplyScalar(radius));
+
+      // Triangle: center -> current -> next
+      vertices.push(center.x, center.y, center.z);
+      vertices.push(point.x, point.y, point.z);
+      vertices.push(nextPoint.x, nextPoint.y, nextPoint.z);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+
+  // Arm endpoints (from center to arc start/end)
+  const armStartPt = center.clone().add(proj1.clone().multiplyScalar(radius));
+  const armEndPt = center.clone().add(proj4.clone().multiplyScalar(radius));
+
+  return {
+    sectorGeometry: geometry,
+    arcPoints: arcPts,
+    sectorCenter: center,
+    armStart: armStartPt,
+    armEnd: armEndPt,
+  };
+}
+
+/**
+ * Sector geometry for a dihedral. The atoms arrive as new objects on every
+ * render (positions are resolved with the structure offset), so the
+ * geometry is keyed on their coordinates, and the one it replaces (and the
+ * last one, on unmount) is disposed instead of leaking GPU buffers.
+ */
+export function useSectorGeometry(atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom) {
+  const key = [atom1, atom2, atom3, atom4].map((a) => `${a.x},${a.y},${a.z}`).join(';');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sector = useMemo(() => buildDihedralSector(atom1, atom2, atom3, atom4), [key]);
+  const shown = useRef<THREE.BufferGeometry | null>(null);
+  useEffect(() => {
+    if (shown.current && shown.current !== sector.sectorGeometry) shown.current.dispose();
+    shown.current = sector.sectorGeometry;
+  }, [sector.sectorGeometry]);
+  useEffect(() => () => shown.current?.dispose(), []);
+  return sector;
 }
