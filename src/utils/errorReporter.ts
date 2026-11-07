@@ -9,6 +9,10 @@ const LOG_API_URL = 'https://log-api.eu.newrelic.com/log/v1';
 const LICENSE_KEY = import.meta.env.VITE_NEW_RELIC_LICENSE_KEY ?? '';
 const FLUSH_INTERVAL_MS = 5000;
 const MAX_BUFFER_SIZE = 10;
+/** The same error (message and stack) is sent at most once per window... */
+const REPEAT_WINDOW_MS = 60_000;
+/** ...and a session sends at most this many errors, so a loop can't flood the log. */
+const MAX_ERRORS_PER_SESSION = 50;
 
 interface LogEntry {
   message: string;
@@ -19,6 +23,9 @@ interface LogEntry {
 
 let buffer: LogEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+/** Per error: when it was last sent, and how often it occurred since without being sent. */
+const recent = new Map<string, { sentAt: number; repeats: number }>();
+let errorsSent = 0;
 
 function isEnabled(): boolean {
   return LICENSE_KEY.length > 0;
@@ -90,18 +97,42 @@ export function logError(
   error: Error | string,
   customAttributes?: Record<string, string | number | boolean>
 ): void {
+  if (!isEnabled()) return;
   const err = typeof error === 'string' ? new Error(error) : error;
+  const now = Date.now();
+
+  const signature = `${err.message}\n${err.stack ?? ''}`;
+  const seen = recent.get(signature);
+  if (seen && now - seen.sentAt < REPEAT_WINDOW_MS) {
+    seen.repeats++;
+    return;
+  }
+
+  if (errorsSent >= MAX_ERRORS_PER_SESSION) return;
+  errorsSent++;
+  recent.set(signature, { sentAt: now, repeats: 0 });
 
   enqueue({
     message: err.message,
     level: 'ERROR',
-    timestamp: Date.now(),
+    timestamp: now,
     attributes: {
       'error.name': err.name,
       'error.stack': err.stack ?? 'no stack',
+      // Occurrences since this error was last sent
+      ...(seen?.repeats ? { 'error.repeats': seen.repeats } : {}),
       ...customAttributes,
     },
   });
+
+  if (errorsSent === MAX_ERRORS_PER_SESSION) {
+    enqueue({
+      message: `Error report cap reached (${MAX_ERRORS_PER_SESSION}); further errors in this session are not sent`,
+      level: 'WARN',
+      timestamp: now,
+      attributes: {},
+    });
+  }
 }
 
 /**
