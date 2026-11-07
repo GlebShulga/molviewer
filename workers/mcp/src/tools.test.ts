@@ -162,6 +162,12 @@ describe('find_structures', () => {
     const r = await findStructures({ query: 'caffeine in VR', kind: 'compound' }, upstream());
     expect(r.status).not.toBe('denied');
   });
+
+  it('asks for the name alone when nothing is found', async () => {
+    const r = await findStructures({ query: 'caffeine in water', kind: 'compound' }, upstream());
+    expect(r.status).toBe('not_found');
+    expect(r.text).toContain('search again with the name alone');
+  });
 });
 
 describe('queryShape', () => {

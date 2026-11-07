@@ -221,7 +221,13 @@ export async function findStructures(args: FindArgs, upstream: UpstreamOptions):
   if (!results.length) {
     const text = deniedQuery
       ? REFUSAL_MESSAGE
-      : [`No structures found for "${args.query}". Try another name, a 4-character PDB ID or a UniProt accession.`, ...info].join(' ');
+      : [
+          `No structures found for "${args.query}".`,
+          // Names must match as a whole, so extra words ("caffeine in water") find nothing; the model retries with this.
+          'If the query has words besides the name, search again with the name alone (for example "caffeine", not "caffeine in water").',
+          'Otherwise try another name, a 4-character PDB ID or a UniProt accession.',
+          ...info,
+        ].join(' ');
     return {
       text: degraded.length ? `${text} (${degraded.join('; ')}.)` : text,
       structuredContent: { query: args.query, results: [] },
