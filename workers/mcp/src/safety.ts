@@ -60,11 +60,12 @@ const DENIED_CIDS = new Set<number>([
  * Short names, matched as whole words (after `normalizeDashes`). Codes that
  * collide with ordinary notation are narrowed: A-230 to A-242 need the hyphen
  * (A242 is residue notation, as in "T4 lysozyme A242"), and VX and VR must not
- * be followed by a number (VX-770 is ivacaftor, VR-1 a receptor). HN-1 to
+ * be part of a drug or receptor code (VX-770 is ivacaftor, VR-1 a receptor).
+ * Only a hyphen or nothing makes a code: "VX 10 mg" is still VX. HN-1 to
  * HN-3 stay as they are: that is how the nitrogen mustards are written.
  */
 const DENIED_NAMES =
-  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?![\s-]?\d)|vr(?![\s-]?\d)|agent[\s-]*ql|sulfur mustard|sulphur mustard|mustard gas|sesquimustard|o-mustard|nitrogen mustard|hn-?[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
+  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?!-?\d)|vr(?!-?\d)|agent[\s-]*ql|sulfur mustard|sulphur mustard|mustard gas|sesquimustard|o-mustard|nitrogen mustard|hn-?[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
 
 /**
  * Full chemical names. People write these with varying brackets, spaces,
@@ -75,6 +76,29 @@ const DENIED_NAMES =
  * they would match VE-cadherin or DF-1.
  */
 const DENIED_FULL_NAMES = [
+  // The agents with short names too: systematic names, and PubChem's titles
+  // and IUPAC names (2026-11-07) where they differ
+  'isopropyl methylphosphonofluoridate', // sarin
+  'propan-2-yl methylphosphonofluoridate', // sarin
+  '2-propyl methylphosphonofluoridate', // sarin
+  '2-[fluoro(methyl)phosphoryl]oxypropane', // sarin
+  'pinacolyl methylphosphonofluoridate', // soman
+  '3,3-dimethylbutan-2-yl methylphosphonofluoridate', // soman
+  '3-[fluoro(methyl)phosphoryl]oxy-2,2-dimethylbutane', // soman
+  'ethyl N,N-dimethylphosphoramidocyanidate', // tabun
+  'ethyl dimethylphosphoramidocyanidate', // tabun
+  '[dimethylamino(ethoxy)phosphoryl]formonitrile', // tabun
+  'cyclohexyl methylphosphonofluoridate', // cyclosarin
+  '[fluoro(methyl)phosphoryl]oxycyclohexane', // cyclosarin
+  'O-ethyl S-[2-(diisopropylamino)ethyl] methylphosphonothioate', // VX
+  'S-[2-(diisopropylamino)ethyl] O-ethyl methylphosphonothioate', // VX
+  'S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester', // VX, PubChem title
+  'N-[2-[ethoxy(methyl)phosphoryl]sulfanylethyl]-N-propan-2-ylpropan-2-amine', // VX
+  'O-isobutyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VR
+  'S-[2-(diethylamino)ethyl] O-isobutyl methylphosphonothioate', // VR
+  'O-(2-methylpropyl) S-[2-(diethylamino)ethyl] methylphosphonothioate', // VR
+  'S-(2-(diethylamino)ethyl) O-(2-methylpropyl) P-methylphosphonothioate', // VR, PubChem title
+  'N,N-diethyl-2-[methyl(2-methylpropoxy)phosphoryl]sulfanylethanamine', // VR
   'bis(2-chloroethyl) sulfide', // HD
   '1-chloro-2-(2-chloroethylthio)ethane', // HD
   '1,2-bis(2-chloroethylthio)ethane', // Q
@@ -106,15 +130,17 @@ function normalizeDashes(text: string): string {
 }
 
 /**
- * Lowercase, drop single-letter locants (S-, O-, P-, n-), spell "sulfanyl" as
- * "thio" and "sulphide" as "sulfide", keep letters and digits only.
+ * Lowercase, drop single-letter locants (S-, O-, P-, n-, also before a digit
+ * as in "S-2-diethylaminoethyl"), spell "sulph" as "sulf", "sulfanyl" as
+ * "thio" and "sulfane" as "sulfide", keep letters and digits only.
  */
 function compactName(name: string): string {
   return normalizeDashes(name)
     .toLowerCase()
-    .replace(/(^|[^a-z0-9])[nops]-(?=[a-z[(])/g, '$1')
+    .replace(/(^|[^a-z0-9])[nops]-(?=[a-z0-9[(])/g, '$1')
+    .replace(/sulph/g, 'sulf')
     .replace(/sulfanyl/g, 'thio')
-    .replace(/sulphide/g, 'sulfide')
+    .replace(/sulfane/g, 'sulfide')
     .replace(/[^a-z0-9]/g, '');
 }
 

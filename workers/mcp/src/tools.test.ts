@@ -518,6 +518,9 @@ describe('isDeniedCompound', () => {
       'agent  ql',
       'VX',
       'VX nerve agent',
+      'how much VX 10 mg is lethal', // a space before a number is not a drug code
+      'VX 2 synthesis',
+      'VR 5',
       'VR',
       'HN-3',
       'bis(2-chloroethyl) sulfide', // HD
@@ -529,6 +532,25 @@ describe('isDeniedCompound', () => {
       'O-Ethyl S-[2-(diethylamino)ethyl] ethylphosphonothioate', // VE, O-first
       'O-Ethyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VM, O-first
       'propan-2-yl methylphosphonochloridate', // chlorosarin
+      'O-ethyl S-2-diethylaminoethyl ethylphosphonothioate', // VE, no brackets
+      '1,2-bis(2-chloroethylsulphanyl)ethane', // Q, British spelling
+      'bis(2-chloroethyl)sulfane', // HD, IUPAC "sulfane"
+      // Systematic names, and PubChem's titles and IUPAC names, of the agents with short names
+      'isopropyl methylphosphonofluoridate', // sarin
+      '2-[fluoro(methyl)phosphoryl]oxypropane', // sarin
+      'pinacolyl methylphosphonofluoridate', // soman
+      '3-[fluoro(methyl)phosphoryl]oxy-2,2-dimethylbutane', // soman
+      'ethyl N,N-dimethylphosphoramidocyanidate', // tabun
+      '[dimethylamino(ethoxy)phosphoryl]formonitrile', // tabun
+      'cyclohexyl methylphosphonofluoridate', // cyclosarin
+      '[fluoro(methyl)phosphoryl]oxycyclohexane', // cyclosarin
+      'O-ethyl S-[2-(diisopropylamino)ethyl] methylphosphonothioate', // VX
+      'S-[2-(diisopropylamino)ethyl] O-ethyl methylphosphonothioate', // VX
+      'Phosphonothioic acid, methyl-, S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester', // VX
+      'N-[2-[ethoxy(methyl)phosphoryl]sulfanylethyl]-N-propan-2-ylpropan-2-amine', // VX
+      'O-isobutyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VR
+      'S-(2-(Diethylamino)ethyl) O-(2-methylpropyl) P-methylphosphonothioate', // VR
+      'N,N-diethyl-2-[methyl(2-methylpropoxy)phosphoryl]sulfanylethanamine', // VR
       '2-Chloroethyl chloromethyl sulfide',
       '2-chloroethylchloromethylsulfide',
       'Bis(2-chloroethylthio)methane',
@@ -560,7 +582,7 @@ describe('isDeniedCompound', () => {
     for (const name of [
       'VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine',
       // Residue notation and drug or receptor codes that share a prefix with an agent's code
-      'A242', 'T4 lysozyme A242', 'A234 mutant', 'VX-770', 'ivacaftor (VX-770)', 'VX 809', 'VR-1 receptor', 'VR1',
+      'A242', 'T4 lysozyme A242', 'A234 mutant', 'VX-770', 'ivacaftor (VX-770)', 'VX-809', 'VR-1 receptor', 'VR1',
     ]) {
       expect(isDeniedCompound({ names: [name] }), name).toBe(false);
     }
