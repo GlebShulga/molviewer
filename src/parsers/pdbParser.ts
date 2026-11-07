@@ -385,10 +385,19 @@ export function parsePDB(
     throw new Error('No valid atoms found in PDB file. The file may be malformed or empty.');
   }
 
-  let bonds: Bond[] = [];
+  // Distance inference first, then CONECT on top: files often list CONECT
+  // only for disulfides and ligands (1CRN has its 3 disulfides and nothing
+  // else), and a CONECT bond can be longer than the inference cutoff.
+  const bonds: Bond[] = opts.inferBonds ? inferBondsFromDistance(atoms, opts.bondTolerance!) : [];
 
   if (connectRecords.length > 0) {
-    const bondSet = new Set<string>();
+    // Built only here: files without CONECT records (simulation and tool
+    // output) skip it. wwPDB files list CONECT for hetero groups and
+    // disulfides, so they build it. A pair's key is a number, exact below
+    // 2^53 for any atom count this app loads.
+    const n = atoms.length;
+    const pairKey = (a: number, b: number) => Math.min(a, b) * n + Math.max(a, b);
+    const bondSet = new Set<number>(bonds.map((b) => pairKey(b.atom1Index, b.atom2Index)));
     for (const serials of connectRecords) {
       const primaryIndex = serialToIndex.get(serials[0]);
       if (primaryIndex === undefined) continue;
@@ -397,7 +406,7 @@ export function parsePDB(
         const bondedIndex = serialToIndex.get(serials[i]);
         if (bondedIndex === undefined) continue;
 
-        const key = `${Math.min(primaryIndex, bondedIndex)}-${Math.max(primaryIndex, bondedIndex)}`;
+        const key = pairKey(primaryIndex, bondedIndex);
         if (!bondSet.has(key)) {
           bondSet.add(key);
           bonds.push({
@@ -408,10 +417,6 @@ export function parsePDB(
         }
       }
     }
-  }
-
-  if (bonds.length === 0 && opts.inferBonds) {
-    bonds = inferBondsFromDistance(atoms, opts.bondTolerance!);
   }
 
   // Parse biological assembly information

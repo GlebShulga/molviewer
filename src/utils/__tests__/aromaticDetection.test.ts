@@ -317,7 +317,7 @@ describe('detectAromaticRings', () => {
   it('finds nothing in a protein whose bonds are all single (Crambin)', () => {
     // Also the early exit: no double or flagged bond means no ring search
     const crambin = parsePDB(readFileSync(resolve(samples, '1crn.pdb'), 'utf8'));
-    expect(crambin.bonds.length).toBeGreaterThan(0);
+    expect(crambin.bonds.length).toBeGreaterThan(300);
     expect(crambin.bonds.every((b) => b.order === 1 && !b.isAromatic)).toBe(true);
     expect(detectAromaticRings(crambin)).toEqual([]);
   });

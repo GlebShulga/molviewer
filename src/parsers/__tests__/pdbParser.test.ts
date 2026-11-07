@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parsePDB } from '../pdbParser';
+
+const samples = resolve(__dirname, '../../../public/sample-molecules');
 
 describe('parsePDB', () => {
   it('parses a simple PDB with HETATM records', () => {
@@ -62,6 +66,38 @@ END`;
 
     expect(molecule.atoms).toHaveLength(3);
     expect(molecule.bonds.length).toBeGreaterThan(0);
+  });
+
+  it('infers bonds and adds CONECT records on top (1CRN lists only its disulfides)', () => {
+    const crambin = parsePDB(readFileSync(resolve(samples, '1crn.pdb'), 'utf8'));
+    expect(crambin.bonds.length).toBeGreaterThan(300);
+    const serialIndex = new Map(crambin.atoms.map((a, i) => [a.serial, i]));
+    const has = (s1: number, s2: number) => {
+      const [a, b] = [serialIndex.get(s1)!, serialIndex.get(s2)!];
+      return crambin.bonds.some((bd) => (bd.atom1Index === a && bd.atom2Index === b) || (bd.atom1Index === b && bd.atom2Index === a));
+    };
+    expect(has(20, 282) && has(26, 229) && has(116, 188)).toBe(true);
+  });
+
+  it('keeps a CONECT bond longer than the distance cutoff', () => {
+    const pdb = `HETATM    1  C1  LIG A   1       0.000   0.000   0.000  1.00  0.00           C
+HETATM    2  C2  LIG A   1       1.500   0.000   0.000  1.00  0.00           C
+HETATM    3  C3  LIG A   1       7.500   0.000   0.000  1.00  0.00           C
+CONECT    1    2
+CONECT    1    3
+END`;
+    const molecule = parsePDB(pdb);
+    const pairs = molecule.bonds.map((b) => [b.atom1Index, b.atom2Index].sort().join('-')).sort();
+    expect(pairs).toEqual(['0-1', '0-2']);
+  });
+
+  it('adds inferred bonds to partial CONECT records', () => {
+    const pdb = `HETATM    1  C1  LIG A   1       0.000   0.000   0.000  1.00  0.00           C
+HETATM    2  C2  LIG A   1       1.500   0.000   0.000  1.00  0.00           C
+HETATM    3  C3  LIG A   1       3.000   0.000   0.000  1.00  0.00           C
+CONECT    1    2
+END`;
+    expect(parsePDB(pdb).bonds).toHaveLength(2);
   });
 
   it('throws on empty input', () => {
