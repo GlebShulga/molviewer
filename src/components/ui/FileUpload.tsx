@@ -1,7 +1,15 @@
 import { useCallback, useState } from 'react';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
-import { useMoleculeStore, MAX_STRUCTURES } from '../../store/moleculeStore';
+import {
+  useMoleculeStore,
+  MAX_STRUCTURES,
+  beginSceneLoad,
+  finishSceneLoad,
+  isCurrentSceneLoad,
+  applySceneLoad,
+  type SceneLoadMode,
+} from '../../store/moleculeStore';
 import { parseByFilename } from '../../parsers';
 import { SAMPLE_MOLECULES, type SampleMolecule } from '../../config';
 import { validateFile } from '../../utils/fileValidation';
@@ -57,14 +65,12 @@ export function FileUpload() {
     setMolecule,
     addStructure,
     structureOrder,
-    setLoading,
     setError,
     isLoading,
   } = useMoleculeStore(useShallow(state => ({
     setMolecule: state.setMolecule,
     addStructure: state.addStructure,
     structureOrder: state.structureOrder,
-    setLoading: state.setLoading,
     setError: state.setError,
     isLoading: state.isLoading,
   })));
@@ -77,6 +83,9 @@ export function FileUpload() {
   // Check if we have existing structures
   const hasStructures = structureOrder.length > 0;
   const canAddMore = structureOrder.length < MAX_STRUCTURES;
+  // Decided when a load starts: Add-mode loads coexist, a Replace load that
+  // applies wins over the loads started before it (beginSceneLoad)
+  const loadMode: SceneLoadMode = hasStructures && addMode ? 'add' : 'replace';
 
   const parseFile = useCallback((content: string, filename: string) => {
     return parseByFilename(content, filename);
@@ -104,7 +113,7 @@ export function FileUpload() {
 
   const handleFile = useCallback(async (file: File) => {
     if (refuseAtLimit()) return;
-    setLoading(true);
+    const token = beginSceneLoad(loadMode);
     setError(null);
 
     try {
@@ -125,15 +134,16 @@ export function FileUpload() {
       const inlineFormat = detectInlineFormat(file.name);
       const inlineSource: StructureSource | undefined =
         inlineFormat ? { type: 'inline', format: inlineFormat, data: content } : undefined;
-      if (!loadMolecule(molecule, name, inlineSource)) return;
+      if (!applySceneLoad(token, () => loadMolecule(molecule, name, inlineSource))) return;
       track('structure_loaded', { source: 'file', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       setError(getErrorMessage(err, 'Failed to parse file'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.handleFile' });
     } finally {
-      setLoading(false);
+      finishSceneLoad(token);
     }
-  }, [parseFile, loadMolecule, refuseAtLimit, setLoading, setError]);
+  }, [parseFile, loadMolecule, refuseAtLimit, loadMode, setError]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -171,7 +181,7 @@ export function FileUpload() {
       return;
     }
 
-    setLoading(true);
+    const token = beginSceneLoad(loadMode);
     setError(null);
 
     const isRcsb = sample.file.startsWith('rcsb:');
@@ -184,7 +194,7 @@ export function FileUpload() {
       if (isRcsb) {
         const pdbId = sample.file.slice(5); // strip 'rcsb:'
         ({ molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal));
-        if (!loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId })) return;
+        if (!applySceneLoad(token, () => loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId }))) return;
       } else {
         const response = await fetch(sample.file, { signal: controller.signal });
         if (!response.ok) {
@@ -198,17 +208,18 @@ export function FileUpload() {
           : inlineFormat
             ? { type: 'inline', format: inlineFormat, data: content }
             : undefined;
-        if (!loadMolecule(molecule, sample.name, sampleSource)) return;
+        if (!applySceneLoad(token, () => loadMolecule(molecule, sample.name, sampleSource))) return;
       }
       track('structure_loaded', { source: 'sample', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       setError(getErrorMessage(err, 'Failed to load sample', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.loadSample' });
     } finally {
       clearTimeout(timeout);
-      setLoading(false);
+      finishSceneLoad(token);
     }
-  }, [parseFile, loadMolecule, refuseAtLimit, setLoading, setError]);
+  }, [parseFile, loadMolecule, refuseAtLimit, loadMode, setError]);
 
   const fetchPDB = useCallback(async (id: string) => {
     const trimmedId = id.trim().toUpperCase();
@@ -229,7 +240,7 @@ export function FileUpload() {
       return;
     }
 
-    setLoading(true);
+    const token = beginSceneLoad(loadMode);
     setError(null);
 
     const controller = new AbortController();
@@ -238,10 +249,11 @@ export function FileUpload() {
     try {
       const source = { type: 'rcsb', id: trimmedId } as const;
       const { molecule } = await loadStructureFromSource(source, controller.signal);
-      if (!loadMolecule(molecule, trimmedId, source)) return;
+      if (!applySceneLoad(token, () => loadMolecule(molecule, trimmedId, source))) return;
       track('structure_loaded', { source: 'rcsb', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setPdbId(''); // Clear input on success
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       setError(getErrorMessage(
         err,
         'Failed to fetch PDB',
@@ -250,9 +262,9 @@ export function FileUpload() {
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchPDB' });
     } finally {
       clearTimeout(timeout);
-      setLoading(false);
+      finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
 
   const handlePdbSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -277,7 +289,7 @@ export function FileUpload() {
       return;
     }
 
-    setLoading(true);
+    const token = beginSceneLoad(loadMode);
     setError(null);
 
     const controller = new AbortController();
@@ -286,10 +298,11 @@ export function FileUpload() {
     try {
       const source = { type: 'alphafold', id: trimmedId } as const;
       const { molecule, name } = await loadStructureFromSource(source, controller.signal);
-      if (!loadMolecule(molecule, name, source)) return;
+      if (!applySceneLoad(token, () => loadMolecule(molecule, name, source))) return;
       track('structure_loaded', { source: 'af', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setUniprotId(''); // Clear input on success
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       setError(getErrorMessage(
         err,
         'Failed to fetch AlphaFold structure',
@@ -298,9 +311,9 @@ export function FileUpload() {
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchAlphaFold' });
     } finally {
       clearTimeout(timeout);
-      setLoading(false);
+      finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
 
   const handleAlphaFoldSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -320,7 +333,7 @@ export function FileUpload() {
       return;
     }
 
-    setLoading(true);
+    const token = beginSceneLoad(loadMode);
     setError(null);
 
     const controller = new AbortController();
@@ -331,19 +344,20 @@ export function FileUpload() {
       // Curated compounds keep their canonical address (/compound/caffeine).
       const source = { type: 'pubchem', cid, slug: slugForCid(cid) } as const;
       const { molecule, name, warning } = await loadStructureFromSource(source, controller.signal);
-      if (!loadMolecule(molecule, name, source)) return;
+      if (!applySceneLoad(token, () => loadMolecule(molecule, name, source))) return;
       track('structure_loaded', { source: 'pubchem', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setCompoundQuery('');
       // Loading clears errors; show the 2D notice after the structure is in.
       if (warning) setError(warning);
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       setError(getErrorMessage(err, 'Failed to fetch compound from PubChem', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchPubchem' });
     } finally {
       clearTimeout(timeout);
-      setLoading(false);
+      finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
 
   const handlePubchemSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();

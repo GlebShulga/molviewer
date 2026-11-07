@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useMoleculeStore, type MeasurementMode } from './store/moleculeStore';
+import { beginSceneLoad, finishSceneLoad, isCurrentSceneLoad, useMoleculeStore, type MeasurementMode } from './store/moleculeStore';
 import { selectActiveStructure, selectSelectedAtomIndices, selectTotalVisibleAtomCount, selectVisibleStructuresBoundingBox } from './store/selectors';
 // Type only: the viewer (and three.js) loads lazily through ViewerStage.
 import type { MoleculeViewerHandle } from './components/viewer/MoleculeViewer';
@@ -112,15 +112,18 @@ export function EmptyOrWelcome({ onOpenSidebar }: { onOpenSidebar: () => void })
     const params = parsePathnameParams(path);
     if (!params) return;
     const store = useMoleculeStore.getState();
-    store.setLoading(true);
+    const token = beginSceneLoad('add');
     try {
-      const { warning } = await loadStructureFromParams(params, new AbortController().signal, via);
+      const { warning } = await loadStructureFromParams(params, new AbortController().signal, via, token);
+      // Overtaken by a later load: no warning, and onboarding goes on
+      if (!isCurrentSceneLoad(token)) return;
       if (warning) store.setError(warning);
       if (completeOnboarding) completeWithExample();
     } catch (err) {
+      if (!isCurrentSceneLoad(token)) return;
       store.setError(err instanceof Error ? err.message : 'Failed to load molecule');
     } finally {
-      store.setLoading(false);
+      finishSceneLoad(token);
     }
   }, [completeWithExample]);
   const loadWelcomeExample = useCallback(

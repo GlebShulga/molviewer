@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StrictMode, type ReactNode } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
+import { useMoleculeStore, temporalStore, beginSceneLoad, finishSceneLoad, applySceneLoad } from '../../store/moleculeStore';
 import { useUrlSyncStore, initialUrlSyncState } from '../../store/urlSyncStore';
 import { useUrlSync, computeUrlTarget, computeTitle, DEFAULT_TITLE } from '../useUrlSync';
 import { useInitialUrlLoad, UNSUPPORTED_URL_PARAM } from '../useInitialUrlLoad';
@@ -268,12 +268,41 @@ describe('useUrlSync + useInitialUrlLoad', () => {
     expect(useUrlSyncStore.getState().initialLoadSettled).toBe(false);
     expect(useMoleculeStore.getState().structureOrder).toHaveLength(0);
     expect(history).toEqual([]);
+    // The aborted load still ended: no spinner left on (it would stop the sync for good)
+    expect(useMoleculeStore.getState().isLoading).toBe(false);
 
     mountApp();
     await resolveAll();
     await waitFor(() => expect(useUrlSyncStore.getState().initialLoadSettled).toBe(true));
     expect(currentUrl()).toBe('/pdb/1CRN');
     expect(history).not.toContain('/');
+  });
+
+  it('a startup load overtaken by an applied Replace load adds nothing, shows no error, and still settles', async () => {
+    openAt('/pdb/1CRN');
+    mountApp();
+    await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+    act(() => {
+      const replace = beginSceneLoad('replace');
+      applySceneLoad(replace, () => {});
+      finishSceneLoad(replace);
+    });
+    await resolveAll();
+    await waitFor(() => expect(useUrlSyncStore.getState().initialLoadSettled).toBe(true));
+    expect(useMoleculeStore.getState().structureOrder).toHaveLength(0);
+    expect(useMoleculeStore.getState().error).toBeNull();
+    expect(useMoleculeStore.getState().isLoading).toBe(false);
+  });
+
+  it('a startup load still lands when a Replace load started meanwhile applied nothing', async () => {
+    openAt('/pdb/1CRN');
+    mountApp();
+    await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+    act(() => finishSceneLoad(beginSceneLoad('replace')));
+    await resolveAll();
+    await waitFor(() => expect(useUrlSyncStore.getState().initialLoadSettled).toBe(true));
+    expect(useMoleculeStore.getState().structureOrder).toHaveLength(1);
+    expect(currentUrl()).toBe('/pdb/1CRN');
   });
 
   it('failed load keeps the original address', async () => {

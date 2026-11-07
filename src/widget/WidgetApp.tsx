@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import * as THREE from 'three';
 import { useShallow } from 'zustand/react/shallow';
 import { ExternalLink, Maximize2, Minimize2, RotateCw, Scan } from 'lucide-react';
-import { useMoleculeStore } from '../store/moleculeStore';
+import { applySceneLoad, beginSceneLoad, finishSceneLoad, useMoleculeStore } from '../store/moleculeStore';
 import { selectActiveStructure, selectTotalVisibleAtomCount, selectVisibleStructuresBoundingBox } from '../store/selectors';
 import { MoleculeViewer, type MoleculeViewerHandle } from '../components/viewer';
 import { MoleculeScene } from '../components/MoleculeScene';
@@ -105,12 +105,14 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
     store().reset();
     setLoadError(null);
     setView(initial);
-    store().setLoading(true);
+    const token = beginSceneLoad('replace');
     (async () => {
       try {
         const { molecule, name, warning } = await loadStructureFromSource(toSource(payload.load), controller.signal);
         if (controller.signal.aborted) return;
-        const id = store().addStructure(molecule, name, toSource(payload.load));
+        // '' when the store refused it, which marks nothing
+        let id = '';
+        applySceneLoad(token, () => (id = store().addStructure(molecule, name, toSource(payload.load))) !== '');
         if (id) {
           // As in the app (styleToShow): Cartoon without a backbone shows Ball &
           // Stick, and Ball & Stick and Stick stop at 1,000 atoms on touch screens
@@ -129,7 +131,8 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
         if (controller.signal.aborted) return;
         setLoadError(err instanceof Error ? err.message : 'Could not load the structure');
       } finally {
-        if (!controller.signal.aborted) store().setLoading(false);
+        // Always, also when aborted: an open load would keep the spinner on
+        finishSceneLoad(token);
       }
     })();
     return () => controller.abort();

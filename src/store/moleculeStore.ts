@@ -326,32 +326,111 @@ export function styleSafeStructure(
 }
 
 /**
- * Loads from the Saved panel (sessions and saved molecules) read their entry
- * asynchronously, so a slow read could finish after the user asked for
- * something else. Each such load takes a number; when its read finishes it is
- * applied only if nothing has superseded it since: a later saved load, any
- * other scene load (file, sample, fetch, share link, URL), deleting the entry
- * being loaded, or clearing all entries.
+ * Scene loads (a file, sample, fetch, share link, startup URL, example, the
+ * tour, the widget, a Saved-panel entry) read or fetch asynchronously, so
+ * several can be in flight. Each takes a token when it starts: `replace`
+ * (Replace mode, share links, Saved loads, the widget) or `add` (Add mode,
+ * startup URL, examples, the tour). Loads apply in the order they finish, and
+ * only a replace load that applied drops the loads started before it, of
+ * either kind. So adds coexist, an add never drops a replace (a slow fetch in
+ * Replace mode still replaces the scene after a file added meanwhile), a load
+ * that fails or is cancelled drops nothing, and an older replace load that
+ * finishes first shows until the newer one replaces it. A Saved load whose
+ * entry is deleted (or Clear All) is never current. A load applies its
+ * result through applySceneLoad (the only way a load counts as applied), and
+ * calls finishSceneLoad in `finally` whatever happened. Open counted loads
+ * are what `isLoading` shows.
+ * The count lives here, not in store state, because loadSession,
+ * applyShareableSession and reset() spread initialState.
  */
-let latestSavedLoad = 0;
-let pendingSavedLoadId: string | null = null;
+export type SceneLoadMode = 'replace' | 'add';
 
-function startSavedLoad(id: string): number {
-  pendingSavedLoadId = id;
-  return ++latestSavedLoad;
+export interface SceneLoadToken {
+  readonly seq: number;
+  readonly mode: SceneLoadMode;
+  /** Whether this load shows the spinner (isLoading). */
+  readonly counted: boolean;
 }
 
-/** Whether a saved load is still the one to apply; if so it is no longer pending. */
-function isCurrentSavedLoad(load: number): boolean {
-  if (load !== latestSavedLoad) return false;
-  pendingSavedLoadId = null;
+let sceneLoadSeq = 0;
+/** The newest replace load that has applied its result: older loads are dropped. */
+let latestAppliedReplaceSeq = 0;
+const openSceneLoads = new Set<SceneLoadToken>();
+let countedOpenLoads = 0;
+/**
+ * The Saved-panel loads in flight, by token seq (several can be: an older one
+ * stays current until a replace load applies). Deleting an entry cancels every load
+ * of it, Clear All cancels them all.
+ */
+const pendingSavedLoads = new Map<number, { entryId: string; cancelled: boolean }>();
+
+const sceneLoadsActive = () => countedOpenLoads > 0;
+
+function syncIsLoading(): void {
+  useMoleculeStore.setState({ isLoading: sceneLoadsActive() });
+}
+
+export function beginSceneLoad(mode: SceneLoadMode, { countsAsLoading = true }: { countsAsLoading?: boolean } = {}): SceneLoadToken {
+  const token: SceneLoadToken = { seq: ++sceneLoadSeq, mode, counted: countsAsLoading };
+  openSceneLoads.add(token);
+  if (token.counted) {
+    countedOpenLoads++;
+    syncIsLoading();
+  }
+  return token;
+}
+
+/** Whether a load may still apply its result. */
+export function isCurrentSceneLoad(token: SceneLoadToken): boolean {
+  if (pendingSavedLoads.get(token.seq)?.cancelled) return false;
+  return latestAppliedReplaceSeq < token.seq;
+}
+
+/**
+ * Applies a load's result: calls `apply` only while the load is open and
+ * current, then records it as applied, which (for a replace load) drops the
+ * loads started before it. `apply` returns false when the store refused the
+ * result (the structure limit): nothing is recorded. If it throws, nothing is
+ * recorded and the error goes to the caller. Returns whether it applied.
+ */
+export function applySceneLoad(token: SceneLoadToken, apply: () => unknown): boolean {
+  if (!openSceneLoads.has(token) || !isCurrentSceneLoad(token)) return false;
+  if (apply() === false) return false;
+  if (token.mode === 'replace') latestAppliedReplaceSeq = Math.max(latestAppliedReplaceSeq, token.seq);
   return true;
 }
 
-function cancelPendingSavedLoad(): void {
-  if (pendingSavedLoadId === null) return;
-  latestSavedLoad++;
-  pendingSavedLoadId = null;
+/** Ends a load; always call it (in `finally`). A second call for the same token does nothing. */
+export function finishSceneLoad(token: SceneLoadToken): void {
+  if (!openSceneLoads.delete(token)) return;
+  pendingSavedLoads.delete(token.seq);
+  if (token.counted) {
+    countedOpenLoads--;
+    syncIsLoading();
+  }
+}
+
+/** Test-only: forget every load in flight. */
+export function resetSceneLoadsForTests(): void {
+  openSceneLoads.clear();
+  countedOpenLoads = 0;
+  pendingSavedLoads.clear();
+  latestAppliedReplaceSeq = sceneLoadSeq;
+  useMoleculeStore.setState({ isLoading: false });
+}
+
+/** A Saved-panel load: replace mode without the spinner, as before, cancelled by deleting its entry. */
+function beginSavedLoad(entryId: string): SceneLoadToken {
+  const token = beginSceneLoad('replace', { countsAsLoading: false });
+  pendingSavedLoads.set(token.seq, { entryId, cancelled: false });
+  return token;
+}
+
+/** Cancels every pending Saved load (of `entryId` when given), never other loads. */
+function cancelPendingSavedLoad(entryId?: string): void {
+  for (const load of pendingSavedLoads.values()) {
+    if (entryId === undefined || load.entryId === entryId) load.cancelled = true;
+  }
 }
 
 /**
@@ -482,7 +561,6 @@ interface MoleculeState {
     structureId: string | null,
     position: { x: number; y: number } | null
   ) => void;
-  setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 
   // Selection actions
@@ -717,8 +795,6 @@ export const useMoleculeStore = create<MoleculeState>()(
       set({ error: `Maximum of ${MAX_STRUCTURES} structures allowed` });
       return '';
     }
-    // The user asked for this structure after any pending saved load
-    cancelPendingSavedLoad();
 
     // Generate name from molecule if not provided
     const structureName = name || molecule.name || `Structure ${structures.size + 1}`;
@@ -885,7 +961,6 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   // ===== Legacy actions (backward compatibility) =====
   setMolecule: (molecule, source) => {
-    cancelPendingSavedLoad();
     if (!molecule) {
       set({
         structures: new Map(),
@@ -944,8 +1019,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     set({ hoveredAtom, hoveredAtomIndex, hoveredStructureId, hoverPosition });
   },
 
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error, isLoading: false }),
+  // isLoading follows the loads in flight (finishSceneLoad), not errors
+  setError: (error) => set({ error }),
 
   // Selection actions
   selectAtom: (structureId, atomIndex) => {
@@ -1060,46 +1135,55 @@ export const useMoleculeStore = create<MoleculeState>()(
 
   loadSavedMolecule: async (id) => {
     // Async: entries of 50,000+ atoms live in IndexedDB
-    const load = startSavedLoad(id);
-    const data = await loadMoleculeAsync(id);
-    // Something the user did since (see latestSavedLoad) wins over this load
-    if (!isCurrentSavedLoad(load)) return;
-    // null: the data is missing, or the read failed (the loader logged that)
-    if (!data) throw new SavedEntryReadError('This saved molecule could not be read.');
-
-    // Use setMolecule to clear and load single structure. Stored rings are
-    // dropped so they are detected again, as for a session. Every saved
-    // molecule predates the parsers that write a missing residue number as
-    // undefined: NaN or null ones are made undefined.
-    get().setMolecule(withFiniteResidueNumbers({ ...data.molecule, aromaticRings: undefined }));
-    // Then restore measurements. A saved molecule is one structure with a new
-    // ID, so every ref points at it. Old saves carry only atomIndices; a
-    // measurement that spanned several structures lost the others and is dropped.
-    // Older saves also kept measurements taken on other structures: those
-    // would land on unrelated atoms, so a measurement is kept only if its
-    // stored value matches these atoms.
-    // loadedMoleculeId stays null (setMolecule cleared it): it only drives the
-    // Update button, which these entries never get.
-    const { activeStructureId, structures } = get();
-    if (activeStructureId && data.measurements.length > 0) {
-      const migratedMeasurements = data.measurements
-        .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
-        .map(m => ({
-          ...m,
-          atomRefs: (m.atomRefs?.map(ref => ref.atomIndex) ?? m.atomIndices).map(idx => ({
-            structureId: activeStructureId,
-            atomIndex: idx,
-          })),
-        }))
-        .filter(m => matchesStoredValue(m, structures));
-      set({ measurements: refreshDihedrals(migratedMeasurements, structures) });
+    const token = beginSavedLoad(id);
+    try {
+      const read = await loadMoleculeAsync(id);
+      // Applied only while current: a later Replace load that applied since (or
+      // deleting this entry) wins over this one, and then a failed read isn't
+      // reported either. Use setMolecule to clear and load single structure.
+      // Stored rings are dropped so they are detected again, as for a session.
+      // Every saved molecule predates the parsers that write a missing residue
+      // number as undefined: NaN or null ones are made undefined.
+      const applied = applySceneLoad(token, () => {
+        // null: the data is missing, or the read failed (the loader logged that)
+        if (!read) throw new SavedEntryReadError('This saved molecule could not be read.');
+        get().setMolecule(withFiniteResidueNumbers({ ...read.molecule, aromaticRings: undefined }));
+      });
+      // Recorded before the measurement restore: the scene is replaced even if
+      // that throws. (`read` is set whenever it applied.)
+      if (!applied || !read) return;
+      const data = read;
+      // Then restore measurements. A saved molecule is one structure with a new
+      // ID, so every ref points at it. Old saves carry only atomIndices; a
+      // measurement that spanned several structures lost the others and is dropped.
+      // Older saves also kept measurements taken on other structures: those
+      // would land on unrelated atoms, so a measurement is kept only if its
+      // stored value matches these atoms.
+      // loadedMoleculeId stays null (setMolecule cleared it): it only drives the
+      // Update button, which these entries never get.
+      const { activeStructureId, structures } = get();
+      if (activeStructureId && data.measurements.length > 0) {
+        const migratedMeasurements = data.measurements
+          .filter(m => new Set(m.atomRefs?.map(ref => ref.structureId)).size <= 1)
+          .map(m => ({
+            ...m,
+            atomRefs: (m.atomRefs?.map(ref => ref.atomIndex) ?? m.atomIndices).map(idx => ({
+              structureId: activeStructureId,
+              atomIndex: idx,
+            })),
+          }))
+          .filter(m => matchesStoredValue(m, structures));
+        set({ measurements: refreshDihedrals(migratedMeasurements, structures) });
+      }
+    } finally {
+      finishSceneLoad(token);
     }
   },
 
   deleteSavedMolecule: (id) => {
     const { loadedMoleculeId } = get();
     // A load of this entry still reading would find it gone; drop it quietly
-    if (pendingSavedLoadId === id) cancelPendingSavedLoad();
+    cancelPendingSavedLoad(id);
     deleteMolecule(id);
     set({
       savedMolecules: get().savedMolecules.filter((e) => e.id !== id),
@@ -1168,7 +1252,6 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSession: (session) => {
-    cancelPendingSavedLoad();
     const data = deserializeSession(session);
 
     // Pause undo/redo tracking during the swap so the load is not undoable
@@ -1180,6 +1263,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       const structures = sessionStructures(data.structures);
       set({
         ...initialState,
+        isLoading: sceneLoadsActive(),
         structures,
         structureOrder: data.structureOrder,
         activeStructureId: data.activeStructureId,
@@ -1204,19 +1288,27 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedSession: async (id) => {
-    const load = startSavedLoad(id);
-    const session = await loadSessionAsync(id);
-    // Something the user did since (see latestSavedLoad) wins over this load
-    if (!isCurrentSavedLoad(load)) return null;
-    // null: the data is missing, or the read failed (the loader logged that)
-    if (!session) throw new SavedEntryReadError('This saved session could not be read.');
-    const camera = get().loadSession(session);
-    set({ loadedMoleculeId: id });
-    return camera;
+    const token = beginSavedLoad(id);
+    try {
+      const session = await loadSessionAsync(id);
+      // Applied only while current: a later Replace load that applied since (or
+      // deleting this entry) wins over this one, and then a failed read isn't
+      // reported either.
+      let camera: CameraSnapshot | null = null;
+      const applied = applySceneLoad(token, () => {
+        // null: the data is missing, or the read failed (the loader logged that)
+        if (!session) throw new SavedEntryReadError('This saved session could not be read.');
+        camera = get().loadSession(session);
+      });
+      if (!applied) return null;
+      set({ loadedMoleculeId: id });
+      return camera;
+    } finally {
+      finishSceneLoad(token);
+    }
   },
 
   applyShareableSession: (payload) => {
-    cancelPendingSavedLoad();
     const temporal = useMoleculeStore.temporal.getState();
     temporal.pause();
     try {
@@ -1303,6 +1395,7 @@ export const useMoleculeStore = create<MoleculeState>()(
       const structures = sessionStructures(newStructures);
       set({
         ...initialState,
+        isLoading: sceneLoadsActive(),
         structures,
         structureOrder: newOrder,
         activeStructureId: newOrder[0] ?? null,
@@ -1417,6 +1510,8 @@ export const useMoleculeStore = create<MoleculeState>()(
     clearSelectorCaches();
     set({
       ...initialState,
+      // A load still in flight keeps its spinner (and finishes it later)
+      isLoading: sceneLoadsActive(),
       structures: new Map(),
     });
   },

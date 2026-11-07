@@ -52,3 +52,48 @@ describe('empty state', () => {
     expect(track).not.toHaveBeenCalledWith('onboarding_completed', expect.anything());
   });
 });
+
+describe('an example load and a Replace load started meanwhile', () => {
+  /** Clicks the Caffeine example from the welcome screen; its load finishes when told to, with a warning. */
+  async function startExample() {
+    localStorage.removeItem('mol3d-onboarding-completed');
+    let finish!: () => void;
+    loadStructureFromParams.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = () => resolve({ structId: null, source: null, warning: 'A notice' } as never)))
+    );
+    render(
+      <OnboardingProvider>
+        <EmptyOrWelcome onOpenSidebar={vi.fn()} />
+      </OnboardingProvider>
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Caffeine' }));
+    await waitFor(() => expect(loadStructureFromParams).toHaveBeenCalledTimes(1));
+    return () => finish();
+  }
+
+  it('overtaken by an applied Replace load, shows no warning and leaves onboarding as it was', async () => {
+    const { beginSceneLoad, finishSceneLoad, applySceneLoad, useMoleculeStore } = await import('../store/moleculeStore');
+    useMoleculeStore.getState().reset();
+    const finish = await startExample();
+
+    const replace = beginSceneLoad('replace');
+    applySceneLoad(replace, () => {});
+    finishSceneLoad(replace);
+    finish();
+    await waitFor(() => expect(useMoleculeStore.getState().isLoading).toBe(false));
+
+    expect(useMoleculeStore.getState().error).toBeNull();
+    expect(track).not.toHaveBeenCalledWith('onboarding_completed', expect.anything());
+    expect(localStorage.getItem('mol3d-onboarding-completed')).toBeNull();
+  });
+
+  it('with a Replace load that applied nothing, still shows its warning', async () => {
+    const { beginSceneLoad, finishSceneLoad, useMoleculeStore } = await import('../store/moleculeStore');
+    useMoleculeStore.getState().reset();
+    const finish = await startExample();
+
+    finishSceneLoad(beginSceneLoad('replace'));
+    finish();
+    await waitFor(() => expect(useMoleculeStore.getState().error).toBe('A notice'));
+  });
+});
