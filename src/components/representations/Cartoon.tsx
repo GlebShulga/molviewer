@@ -110,7 +110,8 @@ export function Cartoon({
   const segmentMeshes = useMemo<SegmentMesh[]>(() => {
     const meshes: SegmentMesh[] = [];
 
-    for (const { chain, segments } of chainSegments) {
+    // A chain broken in pieces appears once per piece, so keys include the piece
+    for (const [piece, { chain, segments }] of chainSegments.entries()) {
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
         if (segment.points.length < 2) continue;
@@ -179,7 +180,7 @@ export function Cartoon({
         meshes.push({
           geometry,
           color,
-          key: `${chain.chainId}-${i}-${segment.type}-${colorScheme}`,
+          key: `${chain.chainId}-${piece}-${i}-${segment.type}-${colorScheme}`,
           useVertexColors: needsVertexColors && !!splineColors,
         });
       }
