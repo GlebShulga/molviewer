@@ -157,6 +157,17 @@ describe('find_structures', () => {
     const results = (any.structuredContent?.results ?? []) as { kind: string }[];
     expect(results.every((x) => x.kind !== 'compound')).toBe(true);
   });
+
+  it('does not refuse a query that only mentions VR', async () => {
+    const r = await findStructures({ query: 'caffeine in VR', kind: 'compound' }, upstream());
+    expect(r.status).not.toBe('denied');
+  });
+
+  it('asks for the name alone when nothing is found', async () => {
+    const r = await findStructures({ query: 'caffeine in water', kind: 'compound' }, upstream());
+    expect(r.status).toBe('not_found');
+    expect(r.text).toContain('search again with the name alone');
+  });
 });
 
 describe('queryShape', () => {
@@ -520,9 +531,19 @@ describe('isDeniedCompound', () => {
       'VX nerve agent',
       'how much VX 10 mg is lethal', // a space before a number is not a drug code
       'VX 2 synthesis',
-      'VR 5',
-      'VR',
+      'agent VR',
+      'VR nerve agent',
+      'VR agent',
       'HN-3',
+      'HN3',
+      'HN 3',
+      ' HN 3 ',
+      'HN 2 agent',
+      'mustard HN 1',
+      'sulfur-mustard',
+      'sulphur-mustard',
+      'mustard-gas',
+      'nitrogen  mustard',
       'bis(2-chloroethyl) sulfide', // HD
       '1-chloro-2-(2-chloroethylsulfanyl)ethane', // HD, PubChem's IUPAC name
       '1,2-bis(2-chloroethylthio)ethane', // Q
@@ -565,6 +586,13 @@ describe('isDeniedCompound', () => {
       'O-ethyl O-2-diisopropylaminoethyl methylphosphonite',
       'O-isopropyl methylphosphonochloridate',
       'pinacolyl methylphosphonochloridate',
+      // "thiolate" for "thioate", another order, no locant
+      'O-ethyl S-[2-(diisopropylamino)ethyl] methylphosphonothiolate', // VX
+      'O-isobutyl S-[2-(diethylamino)ethyl] methylphosphonothiolate', // VR
+      'S-[2-(diethylamino)ethyl] O-ethyl ethylphosphonothiolate', // VE
+      'S-[2-(diethylamino)ethyl] O-ethyl methylphosphonothiolate', // VM
+      'chloromethyl 2-chloroethyl sulfide',
+      'bis(2-chloroethylthio)ethane', // Q
     ];
     for (const name of names) expect(isDeniedCompound({ names: [name] }), name).toBe(true);
   });
@@ -578,11 +606,23 @@ describe('isDeniedCompound', () => {
     }
   });
 
+  it('matches names hidden by zero-width or fullwidth characters', () => {
+    for (const name of ['V\u200BX', '\uFF36\uFF38', 'sa\u200Brin']) {
+      expect(isDeniedCompound({ names: [name] }), name).toBe(true);
+    }
+  });
+
   it('leaves unrelated names alone', () => {
     for (const name of [
       'VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine',
       // Residue notation and drug or receptor codes that share a prefix with an agent's code
       'A242', 'T4 lysozyme A242', 'A234 mutant', 'VX-770', 'ivacaftor (VX-770)', 'VX-809', 'VR-1 receptor', 'VR1',
+      // VR without "agent" next to it is virtual reality
+      'caffeine in VR', 'VR', 'VR 5', 'VR headset',
+      // An HN code with a space counts only on its own or next to "mustard" or "agent"
+      'HN 1 cell line',
+      // A thioester that shares the end of VX's PubChem title
+      'Carbonothioic acid, S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester',
     ]) {
       expect(isDeniedCompound({ names: [name] }), name).toBe(false);
     }
