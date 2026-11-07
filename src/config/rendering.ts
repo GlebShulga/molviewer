@@ -3,20 +3,6 @@
  * Centralizes all magic numbers for Three.js rendering.
  */
 
-export const GEOMETRY = {
-  /** Sphere geometry parameters for atoms */
-  sphere: {
-    radius: 1,
-    widthSegments: 32,
-    heightSegments: 16,
-  },
-  /** Cylinder geometry parameters for bonds */
-  cylinder: {
-    radialSegments: 8,
-    heightSegments: 1,
-  },
-} as const;
-
 export const CAMERA = {
   position: [0, 0, 50] as const,
   fov: 50,

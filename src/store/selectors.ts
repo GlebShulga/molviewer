@@ -40,17 +40,6 @@ interface MoleculeStateShape {
 export const selectActiveStructureId = (state: MoleculeStateShape): string | null =>
   state.activeStructureId;
 
-// Extended state shape for selectors that need hover atom index
-interface MoleculeStateShapeWithHoverIndex extends MoleculeStateShape {
-  hoveredAtomIndex: number | null;
-}
-
-/**
- * Select the hovered atom index (primitive value, stable reference)
- */
-export const selectHoveredAtomIndex = (state: MoleculeStateShapeWithHoverIndex): number | null =>
-  state.hoveredAtomIndex;
-
 /**
  * Select the currently active structure (or null if none)
  */

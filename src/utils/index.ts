@@ -18,17 +18,6 @@ export {
 } from './moleculeStorage';
 export { GPUPickingManager } from './gpuPicking';
 export {
-  detectSymmetryFromAssembly,
-  shouldUseInstancing,
-  getAsymmetricUnitAtoms,
-  assemblyTransformToMatrix4,
-  transformPosition,
-  estimateTotalAtomCount,
-  getSymmetryDescription,
-  type SymmetryType,
-  type DetectedSymmetry,
-} from './symmetryDetection';
-export {
   classifyMolecule,
   type MoleculeComponentType,
   type MoleculeComponent,
