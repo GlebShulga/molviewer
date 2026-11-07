@@ -94,20 +94,27 @@ test.describe('Context Menu', () => {
   });
 
   test.describe('Focus Action', () => {
-    test('[CM-09] should focus on clicked atom', async () => {
-      await moleculeViewer.openContextMenu();
+    test('[CM-09] should focus on clicked atom', async ({ page }) => {
+      expect(await moleculeViewer.openContextMenu()).toBe(true);
 
-      const focusAction = moleculeViewer.contextMenu.getByRole('button', { name: /focus/i });
-      if (await focusAction.isVisible()) {
-        await focusAction.click();
+      const cameraPosition = () =>
+        page.evaluate(() => {
+          const camera = (window as unknown as { __mol3d_camera?: { position: { x: number; y: number; z: number } } })
+            .__mol3d_camera;
+          return camera ? [camera.position.x, camera.position.y, camera.position.z] : null;
+        });
+      const before = await cameraPosition();
+      expect(before).not.toBeNull();
 
-        // Context menu should close
-        const isMenuVisible = await moleculeViewer.isContextMenuVisible();
-        expect(isMenuVisible).toBe(false);
+      await moleculeViewer.contextMenu.getByRole('button', { name: /focus/i }).click({ force: true });
+      await page.waitForTimeout(300);
 
-        // Camera should have moved (hard to verify without visual)
-        await moleculeViewer.canvas.expectMoleculeRendered();
-      }
+      expect(await moleculeViewer.isContextMenuVisible()).toBe(false);
+      // The view moves to centre the atom
+      const after = await cameraPosition();
+      const moved = Math.hypot(...after!.map((v, i) => v - before![i]));
+      expect(moved).toBeGreaterThan(0.1);
+      await moleculeViewer.canvas.expectMoleculeRendered();
     });
   });
 

@@ -18,7 +18,7 @@ import styles from './ContextMenu.module.css';
 const MENU_VIEWPORT_PADDING = 10;
 
 interface ContextMenuProps {
-  onFocusAtom?: (atomIndex: number) => void;
+  onFocusAtom?: (structureId: string, atomIndex: number) => void;
   onAddLabel?: (atomIndex: number) => void;
 }
 
@@ -118,7 +118,7 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
 
   const handleFocus = () => {
     if (onFocusAtom && contextMenu.atomIndex !== null) {
-      onFocusAtom(contextMenu.atomIndex);
+      onFocusAtom(structureId, contextMenu.atomIndex);
     }
     hideContextMenu();
   };

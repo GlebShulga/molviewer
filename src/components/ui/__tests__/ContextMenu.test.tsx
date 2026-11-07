@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useMoleculeStore, temporalStore } from '../../../store/moleculeStore';
 import { ContextMenu } from '../ContextMenu';
@@ -122,5 +122,23 @@ describe('ContextMenu with insertion codes', () => {
     expect(screen.getByText(/SER52A CA/)).toBeTruthy();
     fireEvent.click(screen.getByText('Select residue'));
     expect(useMoleculeStore.getState().selectedAtoms.map((r) => r.atomIndex).sort()).toEqual([2, 3]);
+  });
+});
+
+describe('ContextMenu Focus', () => {
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  it('passes the structure and atom to onFocusAtom and closes', () => {
+    useMoleculeStore.getState().addStructure(chainless(), 'first');
+    const id = useMoleculeStore.getState().addStructure(chainless(), 'second');
+    useMoleculeStore.getState().showContextMenu({ x: 10, y: 10, atomIndex: 2, structureId: id });
+    const onFocusAtom = vi.fn();
+    render(<ContextMenu onFocusAtom={onFocusAtom} />);
+    fireEvent.click(screen.getByText('Focus'));
+    expect(onFocusAtom).toHaveBeenCalledWith(id, 2);
+    expect(useMoleculeStore.getState().contextMenu.visible).toBe(false);
   });
 });

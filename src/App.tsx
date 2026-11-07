@@ -6,6 +6,7 @@ import { selectActiveStructure, selectSelectedAtomIndices, selectTotalVisibleAto
 import type { MoleculeViewerHandle } from './components/viewer/MoleculeViewer';
 import { loadViewerStage, viewerLoadFailed } from './components/viewer/loadViewerStage';
 import { viewerHandle } from './utils/viewerHandle';
+import { focusCameraOnAtom } from './utils/cameraFocus';
 import {
   FileUpload,
   ControlPanel,
@@ -663,7 +664,7 @@ function AppContent() {
 
       {/* On phones and touch screens the docked card in the toolbar-side stack shows instead */}
       <AtomTooltip allowDocking />
-      <ContextMenu />
+      <ContextMenu onFocusAtom={focusCameraOnAtom} />
       <ShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <OnboardingSpotlight setSidebarOpen={setSidebarOpen} />
     </div>
