@@ -436,33 +436,54 @@ function summarizeSession(session: MolViewerSession) {
   return { totalAtoms, totalBonds, totalAromaticRings };
 }
 
+const STORAGE_FULL = 'Storage is full. Please delete some saved sessions.';
+
+/** A quota error becomes "Storage is full"; anything else stays as it is. */
+function asStorageError(e: unknown): unknown {
+  return e instanceof DOMException && e.name === 'QuotaExceededError' ? new Error(STORAGE_FULL) : e;
+}
+
 /**
- * Save a full viewer session. Awaits the IDB write before committing the index
- * so a failed write never leaves a dangling index entry pointing at nothing.
+ * Where a session's payload goes, and its JSON when that is localStorage.
+ * A session of 50,000+ atoms goes to IndexedDB without being stringified
+ * (tens of MB); smaller ones are stringified once to check their size.
+ */
+function sessionPayload(session: MolViewerSession, totalAtoms: number): { useIndexedDB: boolean; serialized?: string } {
+  const idb = isIndexedDBAvailable();
+  if (idb && totalAtoms >= LARGE_MOLECULE_THRESHOLD) return { useIndexedDB: true };
+  const serialized = JSON.stringify(session);
+  if (idb && serialized.length * 2 > LARGE_SESSION_BYTES) return { useIndexedDB: true };
+  return { useIndexedDB: false, serialized };
+}
+
+async function writeSessionPayload(id: string, session: MolViewerSession, payload: { useIndexedDB: boolean; serialized?: string }): Promise<void> {
+  if (payload.useIndexedDB) {
+    await saveSessionToIndexedDB(id, session);
+    return;
+  }
+  try {
+    localStorage.setItem(`${SESSION_PREFIX}${id}`, payload.serialized!);
+  } catch (e) {
+    throw asStorageError(e);
+  }
+}
+
+async function removeSessionPayload(id: string, useIndexedDB: boolean): Promise<void> {
+  if (useIndexedDB) await deleteSessionFromIndexedDB(id);
+  else localStorage.removeItem(`${SESSION_PREFIX}${id}`);
+}
+
+/**
+ * Save a full viewer session. The payload is written first and the index
+ * entry only after it, so a failed write never leaves an entry pointing at
+ * nothing; if the index write fails, the payload just written is removed.
  */
 export async function saveSession(session: MolViewerSession): Promise<SavedMoleculeEntry> {
   const id = generateId();
   const { totalAtoms, totalBonds, totalAromaticRings } = summarizeSession(session);
+  const payload = sessionPayload(session, totalAtoms);
 
-  const serialized = JSON.stringify(session);
-  const useIndexedDB =
-    isIndexedDBAvailable() &&
-    (serialized.length * 2 > LARGE_SESSION_BYTES ||
-      totalAtoms >= LARGE_MOLECULE_THRESHOLD);
-
-  // Write payload first; only commit the index entry if the write succeeds.
-  if (useIndexedDB) {
-    await saveSessionToIndexedDB(id, session);
-  } else {
-    try {
-      localStorage.setItem(`${SESSION_PREFIX}${id}`, serialized);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        throw new Error('Storage is full. Please delete some saved sessions.');
-      }
-      throw e;
-    }
-  }
+  await writeSessionPayload(id, session, payload);
 
   const entry: SavedMoleculeEntry = {
     id,
@@ -472,57 +493,51 @@ export async function saveSession(session: MolViewerSession): Promise<SavedMolec
     bondCount: totalBonds,
     aromaticRingCount: totalAromaticRings,
     measurementCount: session.state.measurements.length,
-    storage: useIndexedDB ? 'indexedDB' : 'localStorage',
+    storage: payload.useIndexedDB ? 'indexedDB' : 'localStorage',
     kind: 'session',
     structureCount: session.state.structures.length,
   };
 
-  const index = getIndex();
-  index.entries.unshift(entry);
-  saveIndex(index);
+  try {
+    const index = getIndex();
+    index.entries.unshift(entry);
+    saveIndex(index);
+  } catch (e) {
+    await removeSessionPayload(id, payload.useIndexedDB);
+    throw asStorageError(e);
+  }
   return entry;
 }
 
 /**
- * Update an existing session entry in place. Awaits the write before committing
- * the index update so a failed write doesn't leave the index inconsistent.
+ * Update an existing session entry in place (Update in the Saved panel).
+ *
+ * The payload is written under the entry's own key, so a failure never
+ * deletes it. The index is read again after the write, because the user
+ * may have deleted or renamed the entry meanwhile: a deleted entry stays
+ * deleted (the payload just written is removed), a rename is kept. When the
+ * session moves between localStorage and IndexedDB, the old copy is removed
+ * only after the index points at the new one.
  */
 export async function updateSession(
   id: string,
   session: MolViewerSession
 ): Promise<SavedMoleculeEntry | null> {
-  const index = getIndex();
-  const entry = index.entries.find((e) => e.id === id);
-  if (!entry || entry.kind !== 'session') return null;
+  const before = getIndex().entries.find((e) => e.id === id);
+  if (!before || before.kind !== 'session') return null;
+  const previousStorage = before.storage;
 
   const { totalAtoms, totalBonds, totalAromaticRings } = summarizeSession(session);
+  const payload = sessionPayload(session, totalAtoms);
+  const storage = payload.useIndexedDB ? 'indexedDB' : 'localStorage';
 
-  const serialized = JSON.stringify(session);
-  const useIndexedDB =
-    isIndexedDBAvailable() &&
-    (serialized.length * 2 > LARGE_SESSION_BYTES ||
-      totalAtoms >= LARGE_MOLECULE_THRESHOLD);
-  const previousStorage = entry.storage;
+  await writeSessionPayload(id, session, payload);
 
-  // Write the new payload first.
-  if (useIndexedDB) {
-    await saveSessionToIndexedDB(id, session);
-  } else {
-    try {
-      localStorage.setItem(`${SESSION_PREFIX}${id}`, serialized);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
-        throw new Error('Storage is full. Please delete some saved sessions.');
-      }
-      throw e;
-    }
-  }
-
-  // After the new write succeeds, clean up the previous backend if it changed.
-  if (previousStorage === 'localStorage' && useIndexedDB) {
-    localStorage.removeItem(`${SESSION_PREFIX}${id}`);
-  } else if (previousStorage === 'indexedDB' && !useIndexedDB) {
-    await deleteSessionFromIndexedDB(id);
+  const index = getIndex();
+  const entry = index.entries.find((e) => e.id === id);
+  if (!entry || entry.kind !== 'session') {
+    await removeSessionPayload(id, payload.useIndexedDB);
+    return null;
   }
 
   entry.savedAt = Date.now();
@@ -530,11 +545,19 @@ export async function updateSession(
   entry.bondCount = totalBonds;
   entry.aromaticRingCount = totalAromaticRings;
   entry.measurementCount = session.state.measurements.length;
-  entry.storage = useIndexedDB ? 'indexedDB' : 'localStorage';
+  entry.storage = storage;
   entry.structureCount = session.state.structures.length;
-  entry.name = session.name;
+  // entry.name stays: it may have been renamed while the payload was written
 
-  saveIndex(index);
+  try {
+    saveIndex(index);
+  } catch (e) {
+    // The index still points at the old copy: drop the new one if it is elsewhere
+    if (previousStorage !== storage) await removeSessionPayload(id, payload.useIndexedDB);
+    throw asStorageError(e);
+  }
+
+  if (previousStorage !== storage) await removeSessionPayload(id, previousStorage === 'indexedDB');
   return entry;
 }
 

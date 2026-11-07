@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getSavedMolecules, saveSession } from '../moleculeStorage';
+import 'fake-indexeddb/auto';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { deleteMolecule, getSavedMolecules, loadSessionAsync, renameMolecule, saveSession, updateSession } from '../moleculeStorage';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { AROMATIC_DETECTION_THRESHOLD } from '../../config/rendering';
 import type { Molecule } from '../../types';
 
-// jsdom has no indexedDB, so every save here goes through localStorage.
+// IndexedDB is fake-indexeddb. Sessions below 50,000 atoms (and 1 MB) go to
+// localStorage, larger ones to IndexedDB, as in the app.
 
 /** Six carbons on a hexagon, ring bonds with the given orders (benzene: 2,1,2,1,2,1). */
 function hexagonMolecule(name: string, orders: (1 | 2)[]): Molecule {
@@ -63,5 +65,73 @@ describe('saved ring count', () => {
     useMoleculeStore.getState().addStructure(big, 'big');
     const entry = await saveSession(useMoleculeStore.getState().buildSession('big', null));
     expect(entry.aromaticRingCount).toBe(0);
+  });
+});
+
+describe('session writes that fail or race', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  /** A session as the Saved panel builds it; `atoms` of 50,000+ go to IndexedDB. */
+  function buildSession(name: string, atoms: number) {
+    const store = useMoleculeStore.getState();
+    store.reset();
+    const molecule: Molecule = {
+      name,
+      atoms: Array.from({ length: atoms }, (_, i) => ({ id: i, element: 'C', x: (i % 100) * 4, y: Math.floor(i / 100) * 4, z: 0 })),
+      bonds: [],
+    };
+    store.addStructure(molecule, name);
+    const session = store.buildSession(name, null);
+    store.reset();
+    return session;
+  }
+  const LARGE = 50_000;
+
+  /** localStorage.setItem fails for the Saved index only. */
+  function failIndexWrites() {
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === 'mol3d_index') throw new DOMException('full', 'QuotaExceededError');
+      return original.call(this, key, value);
+    });
+  }
+
+  it('an entry deleted while its update is writing stays deleted', async () => {
+    const entry = await saveSession(buildSession('Big', LARGE));
+    const update = updateSession(entry.id, buildSession('Big', LARGE));
+    deleteMolecule(entry.id);
+    await expect(update).resolves.toBeNull();
+    expect(getSavedMolecules().map((e) => e.id)).not.toContain(entry.id);
+    expect(await loadSessionAsync(entry.id)).toBeNull();
+  });
+
+  it('a rename made while an update is writing is kept', async () => {
+    const entry = await saveSession(buildSession('Old name', LARGE));
+    const update = updateSession(entry.id, buildSession('Old name', LARGE));
+    renameMolecule(entry.id, 'New name');
+    await update;
+    expect(getSavedMolecules().find((e) => e.id === entry.id)?.name).toBe('New name');
+  });
+
+  it('a failed index write on save leaves no orphaned payload, and says storage is full', async () => {
+    const session = buildSession('Small', 10);
+    failIndexWrites();
+    await expect(saveSession(session)).rejects.toThrow('Storage is full');
+    expect(Object.keys(localStorage).filter((k) => k.startsWith('mol3d_session_'))).toEqual([]);
+  });
+
+  it('a failed index write on an update that moves storage keeps the saved session loadable', async () => {
+    const entry = await saveSession(buildSession('Grows', 10));
+    failIndexWrites();
+    await expect(updateSession(entry.id, buildSession('Grows', LARGE))).rejects.toThrow();
+    vi.restoreAllMocks();
+    // The index still points at localStorage, so that copy must still be there
+    const loaded = await loadSessionAsync(entry.id);
+    expect(loaded?.state.structures[0].molecule.atoms).toHaveLength(10);
   });
 });

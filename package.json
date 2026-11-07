@@ -81,6 +81,7 @@
     "@vitest/ui": "^2.1.0",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
+    "fake-indexeddb": "^6.2.7",
     "gifenc": "^1.0.3",
     "globals": "^15.14.0",
     "jsdom": "^24.0.0",
