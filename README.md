@@ -140,8 +140,7 @@ src/
 ├── components/
 │   ├── ui/              # FileUpload, ControlPanel, Toolbar, SequenceViewer, ContextMenu, etc.
 │   ├── viewer/          # MoleculeViewer, MeasurementOverlay, Labels3D
-│   ├── representations/ # BallAndStick, Stick, Spacefill, Cartoon, Surface, AromaticRings
-│   └── layout/          # Header, Sidebar, ViewerContainer
+│   └── representations/ # BallAndStick, Stick, Spacefill, Cartoon, Surface, AromaticRings
 ├── colors/              # Color scheme definitions
 ├── parsers/             # PDB, mmCIF, SDF, XYZ file parsers
 ├── constants/           # Element data (colors, radii for 30+ elements)
@@ -151,7 +150,6 @@ src/
 ├── utils/               # Bond inference, surface generation, measurements, export
 ├── store/               # Zustand state management with undo/redo
 ├── types/               # TypeScript interfaces
-├── workers/             # Web workers for background tasks
 └── styles/              # Global CSS
 ```
 

@@ -3,7 +3,7 @@
  * (hover), which a finger can't do: around a tap the browser fires
  * pointermove/pointerout, and pointerout cleared the tooltip at once. So:
  *
- * - atom renderers (ImpostorAtoms, LODAtoms, SelectableAtom) ignore touch
+ * - atom renderers (ImpostorAtoms, SelectableAtom) ignore touch
  *   pointerover/pointermove/pointerout (isTouchPointer);
  * - a tap on an atom shows its tooltip (lastPointerWasTouch, in onClick);
  * - any new touch on the canvas hides it (this hook), so dragging to rotate or

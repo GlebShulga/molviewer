@@ -106,8 +106,8 @@ export const SCALES = {
 } as const;
 
 /**
- * Sphere impostors (ImpostorAtoms, its GPU picking shader, LODAtoms,
- * InstancedAssembly) draw each atom on a 1x1 plane. The vertex shader scales
+ * Sphere impostors (ImpostorAtoms and its GPU picking shader) draw each atom
+ * on a 1x1 plane. The vertex shader scales
  * the plane by this times the radius, and the fragment shader scales the UV
  * offset by the same, so `coord` is the offset in radii and the disc it keeps
  * (|coord| <= 1) is the atom's full radius. With 2.0 the billboard is the
