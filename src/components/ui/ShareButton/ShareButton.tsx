@@ -6,6 +6,7 @@ import { viewerHandle } from '../../../utils/viewerHandle';
 import {
   serializeShareableSession,
   createShareLink,
+  ShareRequestError,
   UnshareableStructureError,
 } from '../../../utils/shareSession';
 import { logError } from '../../../utils/errorReporter';
@@ -70,6 +71,11 @@ export function ShareButton() {
       track('share_created');
     } catch (err) {
       if (err instanceof UnshareableStructureError) {
+        setError(err.message);
+      } else if (err instanceof ShareRequestError && err.expected) {
+        // Not a bug: our refusal on a pages.dev address (403), the WAF rate
+        // limit (429), or our storage-down answer (503, logged by the
+        // function). An HTML 403/503 from Cloudflare is reported below.
         setError(err.message);
       } else {
         const message = err instanceof Error ? err.message : 'Failed to create share link';

@@ -206,3 +206,46 @@ describe('old share references (no identity) after the parser changes', () => {
     expect(resolveSharedAtom(m, { atomIndex: 3 }, 0)).toBeNull();
   });
 });
+
+describe('createShareLink errors', () => {
+  it('turns a rate-limit block (429, an HTML page) into a readable message with its status', async () => {
+    const { createShareLink, ShareRequestError } = await import('../shareSession');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>Rate limited</html>', { status: 429, headers: { 'content-type': 'text/html' } })));
+    const err = await createShareLink({} as never).catch((e) => e);
+    expect(err).toBeInstanceOf(ShareRequestError);
+    expect(err.status).toBe(429);
+    expect(err.message).toBe('Too many share links in a short time. Try again in a few seconds.');
+    expect(err.expected).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the server message and status for JSON errors', async () => {
+    const { createShareLink } = await import('../shareSession');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Sharing is not available on this address.' }), { status: 403 })));
+    const err = await createShareLink({} as never).catch((e) => e);
+    expect(err.status).toBe(403);
+    expect(err.message).toBe('Sharing is not available on this address.');
+    expect(err.expected).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it('marks only our own JSON refusals (403, 503) as expected', async () => {
+    const { createShareLink } = await import('../shareSession');
+    const html = (status: number) => new Response('<html>Cloudflare</html>', { status, headers: { 'content-type': 'text/html' } });
+    const json = (status: number, error: string) => new Response(JSON.stringify({ error }), { status });
+    const cases: Array<[Response, number, string, boolean]> = [
+      [html(403), 403, 'Share request failed (403)', false],
+      [html(503), 503, 'Share request failed (503)', false],
+      [json(503, 'Sharing is unavailable right now. Try again later.'), 503, 'Sharing is unavailable right now. Try again later.', true],
+      [json(400, 'Invalid share payload'), 400, 'Invalid share payload', false],
+    ];
+    for (const [response, status, message, expected] of cases) {
+      vi.stubGlobal('fetch', vi.fn(async () => response));
+      const err = await createShareLink({} as never).catch((e) => e);
+      expect(err.status).toBe(status);
+      expect(err.message).toBe(message);
+      expect(err.expected, `${status} ${message}`).toBe(expected);
+    }
+    vi.unstubAllGlobals();
+  });
+});

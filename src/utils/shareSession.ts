@@ -325,6 +325,19 @@ export async function deserializeShareableSession(
   };
 }
 
+/** A failed share request, with the HTTP status (callers decide what to report). */
+export class ShareRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** A known refusal: shown to the user without an error report. */
+    readonly expected: boolean
+  ) {
+    super(message);
+    this.name = 'ShareRequestError';
+  }
+}
+
 /** POST current state to /api/share, return the short ID. */
 export async function createShareLink(payload: ShareableSession): Promise<string> {
   const resp = await fetch('/api/share', {
@@ -333,8 +346,15 @@ export async function createShareLink(payload: ShareableSession): Promise<string
     body: JSON.stringify(payload),
   });
   if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error ?? `Share request failed (${resp.status})`);
+    // The WAF rate limit answers with an HTML page, not our JSON
+    if (resp.status === 429) {
+      throw new ShareRequestError('Too many share links in a short time. Try again in a few seconds.', 429, true);
+    }
+    const err = await resp.json().catch(() => ({}) as { error?: string });
+    // Our own refusals carry a JSON message: 403 on a pages.dev address, 503
+    // when storage is down. An HTML 403/503 is Cloudflare's, a real failure.
+    const expected = (resp.status === 403 || resp.status === 503) && typeof err.error === 'string';
+    throw new ShareRequestError(err.error ?? `Share request failed (${resp.status})`, resp.status, expected);
   }
   const { id } = (await resp.json()) as { id: string };
   return id;

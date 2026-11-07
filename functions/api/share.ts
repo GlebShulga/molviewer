@@ -1,7 +1,9 @@
 /**
  * POST /api/share — store a ShareableSession in KV and return a short ID.
- * Body: ShareableSession JSON (≤ 1 MB).
+ * Body: ShareableSession JSON (≤ 1 MB). Posts from *.pages.dev hosts are
+ * refused (they are outside the zone's WAF rate limit).
  */
+import { readLimited } from '../../site/http/readLimited';
 
 interface Env {
   SHARE_KV: KVNamespace;
@@ -30,20 +32,29 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const contentLength = Number(request.headers.get('content-length') ?? '0');
-  if (contentLength > MAX_BODY_BYTES) {
-    return jsonResponse(413, { error: 'Share payload too large (1 MB max)' });
+  // The WAF rate limit on share posts covers the molviewer.bio zone only, and
+  // the Pages project also answers at molviewer.pages.dev and every preview
+  // host, which may share the production KV. Nothing needs real share posts
+  // there (the E2E share tests mock /api/share), so they are refused. Checked
+  // here, not by path in the middleware: the router sends other spellings of
+  // the path here too (/api/share/, /API/Share).
+  if (new URL(request.url).hostname.endsWith('.pages.dev')) {
+    return jsonResponse(403, { error: 'Sharing is not available on this address.' });
   }
 
-  let raw: string;
+  // Bytes, read no further than the limit: a client can't make us buffer
+  // an arbitrarily large body.
+  let raw: string | null;
   try {
-    raw = await request.text();
+    raw = await readLimited(request, MAX_BODY_BYTES);
   } catch {
     return jsonResponse(400, { error: 'Could not read body' });
   }
-
-  if (raw.length > MAX_BODY_BYTES) {
+  if (raw === null) {
     return jsonResponse(413, { error: 'Share payload too large (1 MB max)' });
+  }
+  if (raw === '') {
+    return jsonResponse(400, { error: 'Empty share payload' });
   }
 
   let parsed: unknown;
@@ -58,7 +69,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const id = generateId();
-  await env.SHARE_KV.put(id, raw, { expirationTtl: TTL_SECONDS });
+  try {
+    await env.SHARE_KV.put(id, raw, { expirationTtl: TTL_SECONDS });
+  } catch (err) {
+    console.error('share: KV put failed', err);
+    return jsonResponse(503, { error: 'Sharing is unavailable right now. Try again later.' });
+  }
 
   return jsonResponse(200, { id });
 };

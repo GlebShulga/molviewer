@@ -12,6 +12,7 @@
  *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms)
  */
 import { CROSS_ORIGIN_EVENTS, isEventName, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
+import { readLimited } from '../../site/http/readLimited';
 
 interface Env {
   EVENTS?: AnalyticsEngineDataset;
@@ -34,35 +35,6 @@ function isCrossOrigin(request: Request): boolean {
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value.slice(0, 96) : '';
-}
-
-/**
- * Read at most `max` bytes of the body; null when it's larger. Unauthenticated
- * endpoint: never buffer an arbitrarily large upload.
- */
-async function readLimited(request: Request, max: number): Promise<string | null> {
-  if (Number(request.headers.get('content-length') ?? '0') > max) return null;
-  if (!request.body) return '';
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > max) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const c of chunks) {
-    bytes.set(c, offset);
-    offset += c.byteLength;
-  }
-  return new TextDecoder().decode(bytes);
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
