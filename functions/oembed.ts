@@ -13,13 +13,18 @@ import { parseStructureRoute } from '../site/routes';
 const DEFAULT_WIDTH = 800;
 const DEFAULT_HEIGHT = 600;
 
-function json(status: number, body: unknown): Response {
+/** A day, except where a later request may get another answer. */
+const MAX_AGE = 86400;
+/** An ID the upstream doesn't know yet may be released any time (new PDB entries). */
+const NOT_FOUND_MAX_AGE = 300;
+
+function json(status: number, body: unknown, maxAge = MAX_AGE): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'access-control-allow-origin': '*',
-      'cache-control': 'public, max-age=86400',
+      'cache-control': `public, max-age=${maxAge}`,
     },
   });
 }
@@ -39,7 +44,9 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
   }
   if (!target) return json(404, { error: 'Not an embeddable MolViewer URL' });
   // Don't hand out an embed for an ID that doesn't exist (unreachable upstream: allow it).
-  if ((await embedTargetExists(target)) === 'no') return json(404, { error: `${target.label} not found` });
+  if ((await embedTargetExists(target)) === 'no') {
+    return json(404, { error: `${target.label} not found` }, NOT_FOUND_MAX_AGE);
+  }
 
   const width = Math.min(DEFAULT_WIDTH, embedSize(reqUrl.searchParams.get('maxwidth'), DEFAULT_WIDTH));
   const height = Math.min(Math.round(width * 0.6), embedSize(reqUrl.searchParams.get('maxheight'), DEFAULT_HEIGHT));
