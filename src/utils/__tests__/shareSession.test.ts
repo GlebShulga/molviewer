@@ -71,7 +71,7 @@ describe('share atom identity', () => {
       },
       null
     );
-    expect(payload.labels[0].atom).toEqual({ chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' });
+    expect(payload.labels[0].atom).toEqual({ chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA', element: 'C' });
     expect(payload.measurements[0].atomRefs[1].atom).toMatchObject({ name: 'C', residueNumber: 1 });
   });
 
@@ -79,25 +79,38 @@ describe('share atom identity', () => {
     const { resolveSharedAtom } = await import('../shareSession');
     const ca = { chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' };
     // Same file: the index still points at CA
-    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: ca })).toBe(1);
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: ca }, Infinity)).toBe(1);
     // An atom was inserted before it: found by identity
-    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'H', 1), atom(2, 'CA', 1)]), { atomIndex: 1, atom: ca })).toBe(2);
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1), atom(1, 'H', 1), atom(2, 'CA', 1)]), { atomIndex: 1, atom: ca }, Infinity)).toBe(2);
     // Gone
-    expect(resolveSharedAtom(molecule([atom(0, 'N', 1)]), { atomIndex: 1, atom: ca })).toBeNull();
+    expect(resolveSharedAtom(molecule([atom(0, 'N', 1)]), { atomIndex: 1, atom: ca }, Infinity)).toBeNull();
   });
 
-  it('uses the index alone for old shares, and drops it when out of range', async () => {
+  it('uses the index alone for old shares, and drops it when out of range or at the cutoff', async () => {
     const { resolveSharedAtom } = await import('../shareSession');
     const m = molecule([atom(0, 'N', 1), atom(1, 'CA', 1)]);
-    expect(resolveSharedAtom(m, { atomIndex: 1 })).toBe(1);
-    expect(resolveSharedAtom(m, { atomIndex: 5 })).toBeNull();
-    expect(resolveSharedAtom(m, { atomIndex: -1 })).toBeNull();
+    expect(resolveSharedAtom(m, { atomIndex: 1 }, Infinity)).toBe(1);
+    expect(resolveSharedAtom(m, { atomIndex: 5 }, Infinity)).toBeNull();
+    expect(resolveSharedAtom(m, { atomIndex: -1 }, Infinity)).toBeNull();
+    // In range, but at or past the point where the indices may have shifted
+    expect(resolveSharedAtom(m, { atomIndex: 0 }, 1)).toBe(0);
+    expect(resolveSharedAtom(m, { atomIndex: 1 }, 1)).toBeNull();
   });
 
   it('picks the atom at the stored index when two atoms share an identity', async () => {
     const { resolveSharedAtom } = await import('../shareSession');
     const twin = { chainId: 'A', residueNumber: 1, residueName: 'ALA', name: 'CA' };
-    expect(resolveSharedAtom(molecule([atom(0, 'CA', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: twin })).toBe(1);
+    expect(resolveSharedAtom(molecule([atom(0, 'CA', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: twin }, Infinity)).toBe(1);
+  });
+
+  it('drops a reference whose identity matches atoms in several chainless segments, and finds the only match', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    // Two segments without chain IDs, both numbered 1-2 (simulation output)
+    const segment = (start: number) => [atom(start, 'N', 1, ''), atom(start + 1, 'CA', 1, ''), atom(start + 2, 'CA', 2, '')];
+    const ca1 = { residueNumber: 1, residueName: 'ALA', name: 'CA' };
+    // The stored index is past the end: the identity alone can't say which segment
+    expect(resolveSharedAtom(molecule([...segment(0), ...segment(3)]), { atomIndex: 9, atom: ca1 }, Infinity)).toBeNull();
+    expect(resolveSharedAtom(molecule(segment(0)), { atomIndex: 9, atom: ca1 }, Infinity)).toBe(1);
   });
 });
 
@@ -107,6 +120,75 @@ describe('share atom identity with alternate locations', () => {
     const a = { id: 0, element: 'C', name: 'CB', residueName: 'SER', residueNumber: 1, chainId: 'A', altLoc: 'A', x: 0, y: 0, z: 0 };
     const b = { ...a, id: 1, altLoc: 'B' };
     expect(atomIdentity(a)).toMatchObject({ altLoc: 'A' });
-    expect(resolveSharedAtom({ name: 'm', atoms: [a, b], bonds: [] }, { atomIndex: 0, atom: atomIdentity(b) })).toBe(1);
+    expect(resolveSharedAtom({ name: 'm', atoms: [a, b], bonds: [] }, { atomIndex: 0, atom: atomIdentity(b) }, Infinity)).toBe(1);
+  });
+});
+
+describe('share atom identity without chain, residue or name (SDF, MOL, XYZ, PubChem)', () => {
+  const atom = (id: number, element: string) => ({ id, element, x: id, y: 0, z: 0 });
+  const water = { name: 'water', atoms: [atom(0, 'O'), atom(1, 'H'), atom(2, 'H')], bonds: [] };
+
+  it('stores the element', async () => {
+    const { atomIdentity } = await import('../shareSession');
+    expect(atomIdentity(water.atoms[0])).toMatchObject({ element: 'O' });
+  });
+
+  it('resolves only the atom at the stored index, and only when its element matches', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    expect(resolveSharedAtom(water, { atomIndex: 1, atom: { element: 'H' } }, Infinity)).toBe(1);
+    // Out of range: never the first atom with that element
+    expect(resolveSharedAtom(water, { atomIndex: 5, atom: { element: 'H' } }, Infinity)).toBeNull();
+    expect(resolveSharedAtom(water, { atomIndex: 1, atom: { element: 'O' } }, Infinity)).toBeNull();
+  });
+
+  it('uses the index of an empty identity (written before identities had an element) when in range', async () => {
+    const { resolveSharedAtom } = await import('../shareSession');
+    expect(resolveSharedAtom(water, { atomIndex: 2, atom: {} }, Infinity)).toBe(2);
+    expect(resolveSharedAtom(water, { atomIndex: 3, atom: {} }, Infinity)).toBeNull();
+  });
+});
+
+describe('old share references (no identity) after the parser changes', () => {
+  const atom = (id: number, altLoc?: string) =>
+    ({ id, element: 'C', name: 'CB', residueName: 'SER', residueNumber: id, chainId: 'A', x: id, y: 0, z: 0, ...(altLoc ? { altLoc } : {}) });
+  const molecule = (altLocs: Record<number, string>, count = 100) =>
+    ({ name: 'm', atoms: Array.from({ length: count }, (_, i) => atom(i, altLocs[i])), bonds: [] });
+  const pdb = { type: 'inline' as const, format: 'pdb' as const, data: '' };
+
+  it('keeps PDB indices before the first alternate location and drops the rest', async () => {
+    const { legacyIndexCutoff, resolveSharedAtom } = await import('../shareSession');
+    const m = molecule({ 50: 'A', 51: 'A' });
+    const cutoff = legacyIndexCutoff(m, pdb);
+    expect(cutoff).toBe(50);
+    expect(resolveSharedAtom(m, { atomIndex: 10 }, cutoff)).toBe(10);
+    expect(resolveSharedAtom(m, { atomIndex: 60 }, cutoff)).toBeNull();
+  });
+
+  it('keeps every mmCIF index when only A was kept, and cuts off at the first other alternate location', async () => {
+    const { legacyIndexCutoff } = await import('../shareSession');
+    for (const source of [{ type: 'rcsb' as const, id: '1ABC' }, { type: 'alphafold' as const, id: 'P69905' }, { type: 'inline' as const, format: 'cif' as const, data: '' }]) {
+      expect(legacyIndexCutoff(molecule({ 20: 'A', 21: 'A' }), source)).toBe(Infinity);
+      // A residue whose only conformer is B: the old parser dropped it
+      expect(legacyIndexCutoff(molecule({ 20: 'A', 30: 'B', 31: 'B' }), source)).toBe(30);
+    }
+  });
+
+  it('drops every XYZ index when the comment line is blank (the old parser read the first atom as the comment)', async () => {
+    const { legacyIndexCutoff } = await import('../shareSession');
+    const m = molecule({}, 2);
+    const xyz = (data: string) => ({ type: 'inline' as const, format: 'xyz' as const, data });
+    expect(legacyIndexCutoff(m, xyz('2\n\nC 0 0 0\nC 1.5 0 0\n'))).toBe(0);
+    expect(legacyIndexCutoff(m, xyz('\n2\n   \nC 0 0 0\nC 1.5 0 0\n'))).toBe(0);
+    expect(legacyIndexCutoff(m, xyz('2\nethane\nC 0 0 0\nC 1.5 0 0\n'))).toBe(Infinity);
+  });
+
+  it('keeps every SDF, MOL and PubChem index, and none without a source', async () => {
+    const { legacyIndexCutoff, resolveSharedAtom } = await import('../shareSession');
+    const m = molecule({});
+    expect(legacyIndexCutoff(m, { type: 'inline', format: 'sdf', data: '' })).toBe(Infinity);
+    expect(legacyIndexCutoff(m, { type: 'inline', format: 'mol', data: '' })).toBe(Infinity);
+    expect(legacyIndexCutoff(m, { type: 'pubchem', cid: 2244 })).toBe(Infinity);
+    expect(legacyIndexCutoff(m, undefined)).toBe(0);
+    expect(resolveSharedAtom(m, { atomIndex: 3 }, 0)).toBeNull();
   });
 });

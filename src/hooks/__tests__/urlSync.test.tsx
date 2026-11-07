@@ -53,6 +53,7 @@ vi.mock('../../utils/structureLoader', () => ({
 
 vi.mock('../../utils/shareSession', () => ({
   loadSharedSession: vi.fn(async () => ({ structures: [] })),
+  legacyIndexCutoff: vi.fn(() => Infinity),
   deserializeShareableSession: vi.fn(
     (_session: unknown, signal?: AbortSignal) =>
       new Promise((resolve, reject) => {

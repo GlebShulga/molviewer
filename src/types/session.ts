@@ -42,7 +42,22 @@ export interface SerializedStructure {
   aromaticRingsDetected: boolean;
   offset: [number, number, number];
   source?: StructureSource;
+  /**
+   * How the stored atoms were read (ATOM_NUMBERING_VERSION when saved).
+   * Missing in sessions saved before it was added, whose atoms are the
+   * older parsers' (Structure.legacyAtoms).
+   */
+  atomNumbering?: number;
 }
+
+/**
+ * Version of how the parsers number and describe atoms. 2: one alternate
+ * location per residue, a blank XYZ comment line kept, insertion codes and
+ * alternate locations recorded, element symbols as "Zn". Raise it when a
+ * parser change renumbers atoms again, and teach legacyIndexCutoff the
+ * difference.
+ */
+export const ATOM_NUMBERING_VERSION = 2;
 
 export interface CameraSnapshot {
   position: [number, number, number];

@@ -59,6 +59,8 @@ export interface SharedAtomIdentity {
   residueName?: string;
   name?: string;
   altLoc?: string;
+  /** The only field SDF, MOL, XYZ and PubChem atoms have. Missing in identities written before it was added. */
+  element?: string;
 }
 
 export type SharedAtomRef = QualifiedAtomRef & { atom?: SharedAtomIdentity };
@@ -73,6 +75,7 @@ export function atomIdentity(atom: Atom): SharedAtomIdentity {
     residueName: atom.residueName,
     name: atom.name,
     altLoc: atom.altLoc,
+    element: atom.element,
   };
 }
 
@@ -86,23 +89,88 @@ function matchesIdentity(atom: Atom, id: SharedAtomIdentity): boolean {
     same(atom.insertionCode, id.insertionCode) &&
     same(atom.residueName, id.residueName) &&
     same(atom.name, id.name) &&
-    same(atom.altLoc, id.altLoc)
+    same(atom.altLoc, id.altLoc) &&
+    // Compared only when stored: identities written before it was added still match
+    (id.element === undefined || same(atom.element, id.element))
   );
+}
+
+/**
+ * Whether an identity can find its atom anywhere but at the stored index.
+ * SDF, MOL, XYZ and PubChem atoms have no chain, residue or name, and an
+ * element alone would find the first atom of that element.
+ */
+function canLocate(id: SharedAtomIdentity): boolean {
+  return id.chainId !== undefined || id.residueNumber !== undefined || id.name !== undefined;
+}
+
+/**
+ * First atom index an old share (references without an identity) can't be
+ * trusted at in `molecule`, loaded now from `source`: Infinity when every
+ * index is as the old parsers numbered it, 0 when none is.
+ *
+ * The parsers changed which atoms they keep in two places. Alternate
+ * locations: the PDB parser kept all of them, now it keeps one per residue;
+ * the mmCIF parser kept '.' and 'A', now the first one seen per residue.
+ * XYZ: the old parser dropped blank lines first, so a blank comment line
+ * made it read the first atom as the comment and number the rest one lower.
+ * Atoms before the first difference keep their indices.
+ *
+ * Production has read XYZ files as today since b431797 (2026-11-06), so an
+ * identity-less reference to a blank-comment XYZ file made since then is
+ * right. Links and Saved sessions carry no creation date to tell the two
+ * apart, so both are dropped (with the notice): those made since the fix
+ * lose their labels, but no older one puts a label on the wrong atom.
+ */
+export function legacyIndexCutoff(molecule: Molecule, source: StructureSource | undefined): number {
+  if (!source) return 0;
+  const firstIndex = (test: (atom: Atom) => boolean) => {
+    const i = molecule.atoms.findIndex(test);
+    return i >= 0 ? i : Infinity;
+  };
+  const format = source.type === 'inline' ? source.format : source.type === 'pubchem' ? 'sdf' : 'cif';
+  switch (format) {
+    case 'pdb':
+      return firstIndex((a) => !!a.altLoc);
+    case 'cif':
+      return firstIndex((a) => !!a.altLoc && a.altLoc !== 'A');
+    case 'xyz': {
+      const lines = source.type === 'inline' ? source.data.split(/\r?\n/) : [];
+      const countLine = lines.findIndex((line) => line.trim());
+      return countLine >= 0 && !lines[countLine + 1]?.trim() ? 0 : Infinity;
+    }
+    default:
+      return Infinity;
+  }
 }
 
 /**
  * Index of the atom a shared reference means in `molecule`, or null. The
  * atom at the stored index wins when it still matches (cheap, and right
- * when two atoms share an identity); otherwise the first atom with that
- * identity. Old references without an identity use the index if in range.
+ * when two atoms share an identity); otherwise the one atom with that
+ * identity, if the identity can locate one. Several matches (a chainless
+ * file whose segments restart their numbering) give null: the identity
+ * can't say which atom was meant, so the reference is dropped and counted
+ * like a missing atom. Old references without an identity use the index if
+ * it is in range and below `legacyCutoff` (legacyIndexCutoff).
  */
-export function resolveSharedAtom(molecule: Molecule, ref: { atomIndex: number; atom?: SharedAtomIdentity }): number | null {
+export function resolveSharedAtom(
+  molecule: Molecule,
+  ref: { atomIndex: number; atom?: SharedAtomIdentity },
+  legacyCutoff: number
+): number | null {
   const { atomIndex, atom: id } = ref;
   const atIndex = Number.isInteger(atomIndex) && atomIndex >= 0 ? molecule.atoms[atomIndex] : undefined;
-  if (!id) return atIndex ? atomIndex : null;
+  if (!id) return atIndex && atomIndex < legacyCutoff ? atomIndex : null;
   if (atIndex && matchesIdentity(atIndex, id)) return atomIndex;
-  const found = molecule.atoms.findIndex((a) => matchesIdentity(a, id));
-  return found >= 0 ? found : null;
+  if (!canLocate(id)) return null;
+  let found: number | null = null;
+  for (let i = 0; i < molecule.atoms.length; i++) {
+    if (!matchesIdentity(molecule.atoms[i], id)) continue;
+    if (found !== null) return null;
+    found = i;
+  }
+  return found;
 }
 
 export interface ShareableSession {
@@ -181,8 +249,11 @@ export function serializeShareableSession(
     });
   }
 
+  // No identity for atoms an older session kept: the opener reads the source
+  // with today's parsers, so it checks those indices as an old link's
   const identityOf = (structureId: string, atomIndex: number): SharedAtomIdentity | undefined => {
-    const atom = state.structures.get(structureId)?.molecule.atoms[atomIndex];
+    const structure = state.structures.get(structureId);
+    const atom = structure?.legacyAtoms ? undefined : structure?.molecule.atoms[atomIndex];
     return atom ? atomIdentity(atom) : undefined;
   };
 

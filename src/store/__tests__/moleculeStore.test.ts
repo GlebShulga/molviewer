@@ -576,4 +576,14 @@ describe('applyShareableSession atom references', () => {
     expect(s.labels.map((l) => l.id)).toEqual(['l3']);
     expect(s.measurements).toEqual([]);
   });
+
+  it('drops and counts old references past the first alternate location the old parser kept differently', () => {
+    const atoms = [atom(0, 'N'), atom(1, 'CA'), { ...atom(2, 'CB'), altLoc: 'B' }, atom(3, 'C')];
+    const result = apply(atoms, [
+      { id: 'before', structureId: 'orig', atomIndex: 1, text: 'old share, before' },
+      { id: 'after', structureId: 'orig', atomIndex: 3, text: 'old share, after' },
+    ]);
+    expect(result.droppedReferences).toBe(1);
+    expect(useMoleculeStore.getState().labels.map((l) => l.id)).toEqual(['before']);
+  });
 });

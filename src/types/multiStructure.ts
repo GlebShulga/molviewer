@@ -46,6 +46,14 @@ export interface Structure {
   offset: [number, number, number];
   /** Origin of the molecule data — used for shareable session URLs */
   source?: StructureSource;
+  /**
+   * The atoms came from a session saved by the older parsers
+   * (SerializedStructure.atomNumbering), not from reading `source` now. A
+   * share link re-reads the source, so it sends bare indices for these,
+   * which the opener checks against the old numbering (legacyIndexCutoff):
+   * identities built from these atoms lack what the parsers record now.
+   */
+  legacyAtoms?: boolean;
 }
 
 export interface ContextMenuState {

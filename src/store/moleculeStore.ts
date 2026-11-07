@@ -24,7 +24,7 @@ import {
   type MeasurementType,
 } from '../utils/measurements';
 import { detectAromaticRings } from '../utils/aromaticDetection';
-import { resolveSharedAtom, type SharedAtomRef } from '../utils/shareSession';
+import { legacyIndexCutoff, resolveSharedAtom, type SharedAtomRef } from '../utils/shareSession';
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { roundAtoms, track, type EventProps } from '../utils/track';
@@ -1141,9 +1141,25 @@ export const useMoleculeStore = create<MoleculeState>()(
       // silently (the skipped structure is reported); ones whose atom can't
       // be found any more are dropped and counted.
       let droppedReferences = 0;
+      // Where each structure's old (identity-less) indices stop being
+      // trustworthy. Only such references read it, and it can walk every atom
+      // (an inline XYZ splits its whole file), so it is worked out on a
+      // structure's first one: shares made since identities were added need none.
+      const legacyCutoffs = new Map<string, number>();
+      const legacyCutoff = (structureId: string): number => {
+        let cutoff = legacyCutoffs.get(structureId);
+        if (cutoff === undefined) {
+          const s = newStructures.get(structureId)!;
+          cutoff = legacyIndexCutoff(s.molecule, s.source);
+          legacyCutoffs.set(structureId, cutoff);
+        }
+        return cutoff;
+      };
       const resolveRef = (ref: SharedAtomRef): QualifiedAtomRef | null => {
         const structureId = idRemap.get(ref.structureId)!;
-        const atomIndex = resolveSharedAtom(newStructures.get(structureId)!.molecule, ref);
+        // A reference with an identity ignores the cutoff
+        const cutoff = ref.atom ? Infinity : legacyCutoff(structureId);
+        const atomIndex = resolveSharedAtom(newStructures.get(structureId)!.molecule, ref, cutoff);
         return atomIndex === null ? null : { structureId, atomIndex };
       };
 

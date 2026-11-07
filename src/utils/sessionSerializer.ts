@@ -9,6 +9,7 @@ import {
   type CameraSnapshot,
   type SurfaceSettingsSerialized,
   SCHEMA_VERSION,
+  ATOM_NUMBERING_VERSION,
   SessionVersionError,
 } from '../types/session';
 import packageJson from '../../package.json';
@@ -46,6 +47,8 @@ function serializeStructure(s: Structure): SerializedStructure {
     aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
+    // Atoms restored from an older session stay marked as such when saved again
+    ...(s.legacyAtoms ? {} : { atomNumbering: ATOM_NUMBERING_VERSION }),
   };
 }
 
@@ -69,6 +72,7 @@ function deserializeStructure(s: SerializedStructure): Structure {
     aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
+    ...((s.atomNumbering ?? 1) < ATOM_NUMBERING_VERSION ? { legacyAtoms: true } : {}),
   };
 }
 

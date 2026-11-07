@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import { serializeSession, deserializeSession } from '../../utils/sessionSerializer';
-import { SessionVersionError, SCHEMA_VERSION } from '../../types/session';
+import { SessionVersionError, SCHEMA_VERSION, ATOM_NUMBERING_VERSION } from '../../types/session';
+import { serializeShareableSession } from '../../utils/shareSession';
 import type { Molecule } from '../../types';
 import type { CameraSnapshot } from '../../types/session';
 import type { Measurement } from '../../utils/measurements';
@@ -434,5 +435,56 @@ describe('measurement values when a session loads', () => {
     expect(values.dih).toBeCloseTo(-90, 6);
     expect(values.dist).toBe(9.99);
     expect(values.lost).toBe(12.5);
+  });
+});
+
+describe('sharing a structure restored from a saved session', () => {
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+  });
+
+  const shareLabels = () => {
+    const s = useMoleculeStore.getState();
+    return serializeShareableSession(
+      { structureOrder: s.structureOrder, structures: s.structures, layoutMode: s.layoutMode, measurements: s.measurements, labels: s.labels, surfaceSettings: s.surfaceSettings, autoRotate: s.autoRotate },
+      null
+    ).labels;
+  };
+  const savedSession = () => {
+    const store = useMoleculeStore.getState();
+    const id = store.addStructure(createMockMolecule('1ABC'), '1ABC', { type: 'rcsb', id: '1ABC' });
+    store.addLabel(id, 1, 'site');
+    return store.buildSession('s', null);
+  };
+
+  it('shares bare indices for a session saved before the parsers changed (its atoms lack insertion codes and alternate locations)', () => {
+    const session = savedSession();
+    delete (session.state.structures[0] as { atomNumbering?: number }).atomNumbering;
+    useMoleculeStore.getState().reset();
+    useMoleculeStore.getState().loadSession(session);
+    const [label] = shareLabels();
+    expect(label.atomIndex).toBe(1);
+    // The opener checks a bare index with legacyIndexCutoff, made for the old numbering
+    expect(label.atom).toBeUndefined();
+  });
+
+  it('keeps that through another save', () => {
+    const session = savedSession();
+    delete (session.state.structures[0] as { atomNumbering?: number }).atomNumbering;
+    useMoleculeStore.getState().reset();
+    useMoleculeStore.getState().loadSession(session);
+    const resaved = useMoleculeStore.getState().buildSession('again', null);
+    useMoleculeStore.getState().reset();
+    useMoleculeStore.getState().loadSession(resaved);
+    expect(shareLabels()[0].atom).toBeUndefined();
+  });
+
+  it('shares atom identities for a session saved now', () => {
+    const session = savedSession();
+    expect(session.state.structures[0].atomNumbering).toBe(ATOM_NUMBERING_VERSION);
+    useMoleculeStore.getState().reset();
+    useMoleculeStore.getState().loadSession(session);
+    expect(shareLabels()[0].atom).toMatchObject({ chainId: 'A', residueNumber: 1, element: 'C' });
   });
 });
