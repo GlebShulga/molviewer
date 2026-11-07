@@ -11,7 +11,7 @@
  *
  * Trailing slashes are accepted everywhere; canonical paths have none.
  */
-import { COMPOUND_SLUG_RE, UNIPROT_RE } from './identifiers';
+import { COMPOUND_SLUG_RE, PDB_ID_RE, UNIPROT_RE } from './identifiers';
 
 export type StructureRoute =
   | { kind: 'pdb'; id: string }
@@ -93,13 +93,24 @@ export interface SourceLike {
  */
 export function sourceRoute(source: SourceLike | null | undefined): StructureRoute | null {
   if (!source || typeof source !== 'object') return null;
+  // Shares are stored by clients, so ids are checked as strictly as
+  // parseStructureRoute checks a path: an id that isn't one has no page.
   // Upper case, like parseStructureRoute: stored shares may hold '4hhb', which
   // must still match /pdb/4HHB and the curated catalog.
-  if (source.type === 'rcsb' && typeof source.id === 'string') return { kind: 'pdb', id: source.id.toUpperCase() };
-  if (source.type === 'alphafold' && typeof source.id === 'string') return { kind: 'af', id: source.id.toUpperCase() };
+  if (source.type === 'rcsb' && typeof source.id === 'string') {
+    const id = source.id.toUpperCase();
+    return PDB_ID_RE.test(id) ? { kind: 'pdb', id } : null;
+  }
+  if (source.type === 'alphafold' && typeof source.id === 'string') {
+    const id = source.id.toUpperCase();
+    return UNIPROT_RE.test(id) ? { kind: 'af', id } : null;
+  }
   if (source.type === 'pubchem') {
-    if (typeof source.slug === 'string' && source.slug) return { kind: 'compound', slug: source.slug };
-    if (typeof source.cid === 'number' && source.cid > 0) return { kind: 'cid', cid: source.cid };
+    const slug = source.slug;
+    if (typeof slug === 'string' && slug.length <= 80 && COMPOUND_SLUG_RE.test(slug)) return { kind: 'compound', slug };
+    // An invalid slug falls through to the CID; CIDs start at 1 and have at most 10 digits
+    const cid = source.cid;
+    if (typeof cid === 'number' && Number.isSafeInteger(cid) && cid > 0 && cid < 1e10) return { kind: 'cid', cid };
   }
   return null;
 }

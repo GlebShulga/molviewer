@@ -241,6 +241,12 @@ describe('renderShareLanding', () => {
     expect(local.meta.robots).toBe('noindex, follow');
   });
 
+  it('gives a share with a crafted source id no canonical link', () => {
+    const { meta } = renderShareLanding('abcdefgh1234', { structures: [{ name: 'x', source: { type: 'rcsb', id: '4HHB/../../evil' } }] }, ORIGIN);
+    expect(meta.canonicalUrl).toBeNull();
+    expect(meta.robots).toBe('noindex, follow');
+  });
+
   it('404s unknown or expired shares', () => {
     const { status, meta } = renderShareLanding('abcdefgh1234', null, ORIGIN);
     expect(status).toBe(404);

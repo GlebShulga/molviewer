@@ -32,6 +32,22 @@ describe('routes', () => {
     expect(normalizePath('/pdb/4HHB//')).toBe('/pdb/4HHB');
   });
 
+  it('gives a stored source a route only when its id is valid', () => {
+    // Shares are stored by clients, so their sources can hold anything
+    expect(sourceRoute({ type: 'rcsb', id: '4hhb' })).toEqual({ kind: 'pdb', id: '4HHB' });
+    expect(sourceRoute({ type: 'rcsb', id: '4HHB"><script>' })).toBeNull();
+    expect(sourceRoute({ type: 'rcsb', id: '../../x' })).toBeNull();
+    expect(sourceRoute({ type: 'alphafold', id: 'p69905' })).toEqual({ kind: 'af', id: 'P69905' });
+    expect(sourceRoute({ type: 'alphafold', id: 'NOT-AN-ACCESSION' })).toBeNull();
+    expect(sourceRoute({ type: 'pubchem', slug: 'Bad Slug!' })).toBeNull();
+    expect(sourceRoute({ type: 'pubchem', slug: 'a'.repeat(81) })).toBeNull();
+    // An invalid slug falls through to a valid CID
+    expect(sourceRoute({ type: 'pubchem', slug: 'Bad Slug!', cid: 2519 })).toEqual({ kind: 'cid', cid: 2519 });
+    expect(sourceRoute({ type: 'pubchem', cid: 1.5 })).toBeNull();
+    expect(sourceRoute({ type: 'pubchem', cid: 12345678901 })).toBeNull();
+    expect(sourceRoute({ type: 'pubchem', cid: Number.MAX_SAFE_INTEGER + 2 })).toBeNull();
+  });
+
   it('classifies pages for analytics', () => {
     expect(pageKind('/')).toBe('home');
     expect(pageKind('/compound/cid/5234')).toBe('compound');
