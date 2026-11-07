@@ -54,7 +54,7 @@
   background-color: var(--accent-color);
   border: none;
   border-radius: 6px;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;

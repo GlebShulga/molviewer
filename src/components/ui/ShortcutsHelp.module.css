@@ -1,7 +1,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: color-mix(in srgb, var(--overlay-color) 60%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16,7 +16,7 @@
   width: 90%;
   max-height: 80vh;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 40%, transparent);
 }
 
 .modalHeader {

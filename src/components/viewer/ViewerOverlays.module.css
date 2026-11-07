@@ -21,7 +21,7 @@
   border: none;
   border-radius: 999px;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

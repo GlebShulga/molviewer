@@ -73,7 +73,7 @@
   background-color: var(--chain-color);
   font-size: 0.65rem;
   font-weight: 700;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .chainLength {

@@ -154,5 +154,5 @@
 .layoutButton.active {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-accent);
 }

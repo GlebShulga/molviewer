@@ -17,6 +17,10 @@
   --success-color: #3fb950;
   --error-color: #f85149;
   --warning-color: #d29922;
+  /* The same in both themes: text on accent and chain-coloured fills, and the black of overlays and shadows (used through color-mix with an alpha) */
+  --text-on-accent: #ffffff;
+  --overlay-color: #000000;
+  --shadow-color: #000000;
 }
 
 [data-theme="light"] {
@@ -31,6 +35,10 @@
   --success-color: #1a7f37;
   --error-color: #cf222e;
   --warning-color: #9a6700;
+  /* The same in both themes: text on accent and chain-coloured fills, and the black of overlays and shadows (used through color-mix with an alpha) */
+  --text-on-accent: #ffffff;
+  --overlay-color: #000000;
+  --shadow-color: #000000;
 }
 
 html, body, #root {

@@ -12,7 +12,7 @@
   white-space: nowrap;
   user-select: none;
   pointer-events: auto;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--shadow-color) 30%, transparent);
 }
 
 .labelText {
@@ -30,7 +30,7 @@
   background: none;
   border: none;
   border-radius: 2px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   line-height: 1;
   cursor: pointer;

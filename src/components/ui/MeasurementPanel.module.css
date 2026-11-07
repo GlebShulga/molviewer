@@ -94,14 +94,14 @@
 
 .highlighted {
   background-color: var(--accent-color);
-  color: white;
+  color: var(--text-on-accent);
   box-shadow: 0 0 8px var(--accent-color);
 }
 
 .highlighted .measurementIcon,
 .highlighted .measurementAtoms,
 .highlighted .measurementValue {
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .measurementIcon {

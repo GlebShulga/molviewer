@@ -29,7 +29,7 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: color-mix(in srgb, var(--overlay-color) 50%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,7 +43,7 @@
   padding: 20px;
   min-width: 360px;
   max-width: 90vw;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color) 30%, transparent);
 }
 
 .modalHeader {
@@ -94,7 +94,7 @@
 .copyButton {
   padding: 8px 12px;
   background: var(--accent-color);
-  color: white;
+  color: var(--text-on-accent);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -105,11 +105,11 @@
 }
 
 .copyButton:hover {
-  background: color-mix(in srgb, var(--accent-color) 85%, black);
+  background: var(--accent-hover);
 }
 
 .errorMessage {
-  color: #ff6b6b;
+  color: var(--error-color);
   font-size: 12px;
   margin-top: 8px;
 }
