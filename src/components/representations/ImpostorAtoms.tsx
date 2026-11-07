@@ -110,6 +110,12 @@ const SphereImpostorMaterial = shaderMaterial(
       gl_FragDepth = ndcDepth * 0.5 + 0.5;
 
       gl_FragColor = vec4(color, 1.0);
+      // Like three's own materials: tone mapping and the sRGB output
+      // conversion when drawing to the screen (no-ops into the post-processing
+      // render target). Without them impostor atoms came out darker than the
+      // same atoms as mesh spheres. (The picking shader must not have these.)
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
     }
   `
 );
