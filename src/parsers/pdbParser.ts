@@ -207,13 +207,14 @@ function getSecondaryStructure(
   residueNumber: number | undefined,
   ranges: SecondaryStructureRange[]
 ): SecondaryStructure | undefined {
-  if (!chainId || residueNumber === undefined || ranges.length === 0) {
+  if (residueNumber === undefined || ranges.length === 0) {
     return undefined;
   }
 
   for (const range of ranges) {
     if (
-      range.chainId === chainId &&
+      // A blank chain ID is '' in HELIX/SHEET records and undefined on atoms
+      (range.chainId || '') === (chainId || '') &&
       residueNumber >= range.startResNum &&
       residueNumber <= range.endResNum
     ) {

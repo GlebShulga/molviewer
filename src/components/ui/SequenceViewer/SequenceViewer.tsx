@@ -6,6 +6,7 @@ import { useSelectedAtomsForStructure } from '../../../hooks';
 import { selectStructureById, selectStructureExists, selectStructureNamesInOrder } from '../../../store/selectors';
 import {
   analyzeResidues,
+  chainKey,
   getOneLetterCode,
   isAminoAcid,
   type Residue,
@@ -125,16 +126,17 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
     // Check hovered atom first - only if hovering on the selected structure
     if (hoveredAtomIndex !== null && hoveredStructureId === selectedStructureId) {
       const atom = molecule.atoms[hoveredAtomIndex];
-      if (atom?.chainId && atom?.residueNumber !== undefined) {
-        return `${atom.chainId}-${atom.residueNumber}`;
+      // chainKey: residues of a file without chain IDs are in chain 'Unknown'
+      if (atom && atom.residueNumber !== undefined) {
+        return `${chainKey(atom)}-${atom.residueNumber}`;
       }
     }
 
     // Then check selected atoms for this structure
     if (selectedAtomIndices.length > 0) {
       const atom = molecule.atoms[selectedAtomIndices[selectedAtomIndices.length - 1]];
-      if (atom?.chainId && atom?.residueNumber !== undefined) {
-        return `${atom.chainId}-${atom.residueNumber}`;
+      if (atom && atom.residueNumber !== undefined) {
+        return `${chainKey(atom)}-${atom.residueNumber}`;
       }
     }
 

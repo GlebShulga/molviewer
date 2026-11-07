@@ -11,6 +11,7 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../../store/moleculeStore';
 import { selectTotalVisibleAtomCount } from '../../../store/selectors';
+import { chainKey } from '../../../utils/residueAnalysis';
 import styles from './ContextMenu.module.css';
 
 /** Padding from viewport edge when adjusting menu position */
@@ -140,24 +141,21 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     hideContextMenu();
   };
 
-  const handleSelectChain = () => {
-    if (!contextMenu.chainId || !molecule) return;
-    const chainId = contextMenu.chainId;
+  // A file without chain IDs is one chain, 'Unknown' (chainKey)
+  const chain = chainKey(atom);
 
+  const handleSelectChain = () => {
     // Select all atoms in the same chain (batched, single state update)
-    selectAtomsByFilter(structureId, (atom) => atom.chainId === chainId);
+    selectAtomsByFilter(structureId, (a) => chainKey(a) === chain);
     hideContextMenu();
   };
 
   const handleSelectResidue = () => {
-    if (contextMenu.residueNumber === undefined || !contextMenu.chainId || !molecule) return;
-    const { chainId, residueNumber } = contextMenu;
+    const { residueNumber } = contextMenu;
+    if (residueNumber === undefined) return;
 
     // Select all atoms in the same residue (batched, single state update)
-    selectAtomsByFilter(
-      structureId,
-      (atom) => atom.chainId === chainId && atom.residueNumber === residueNumber
-    );
+    selectAtomsByFilter(structureId, (a) => chainKey(a) === chain && a.residueNumber === residueNumber);
     hideContextMenu();
   };
 
@@ -166,8 +164,8 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
   if (contextMenu.residueName && contextMenu.residueNumber !== undefined) {
     title = `${contextMenu.residueName}${contextMenu.residueNumber} ${atom.name || atom.element}`;
   }
-  if (contextMenu.chainId) {
-    title += ` (Chain ${contextMenu.chainId})`;
+  if (atom.chainId) {
+    title += ` (Chain ${atom.chainId})`;
   }
 
   return (
@@ -216,12 +214,10 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
           </button>
         )}
 
-        {contextMenu.chainId && (
-          <button className={styles.menuItem} onClick={handleSelectChain}>
-            <Palette size={14} />
-            <span>Select chain {contextMenu.chainId}</span>
-          </button>
-        )}
+        <button className={styles.menuItem} onClick={handleSelectChain}>
+          <Palette size={14} />
+          <span>{atom.chainId ? `Select chain ${atom.chainId}` : 'Select chain'}</span>
+        </button>
 
         <div className={styles.separator} />
 

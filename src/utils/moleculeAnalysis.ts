@@ -1,5 +1,6 @@
 import type { Molecule } from '../types';
 import { getElement, type ElementData } from '../constants/elements';
+import { chainKey } from './residueAnalysis';
 
 export interface ElementCount {
   element: string;
@@ -114,7 +115,7 @@ function analyzeChains(molecule: Molecule): ChainSummary[] {
   const chainMap = new Map<string, { residues: Set<string>; atoms: number }>();
 
   for (const atom of molecule.atoms) {
-    const chainId = atom.chainId || 'Unknown';
+    const chainId = chainKey(atom);
     if (!chainMap.has(chainId)) {
       chainMap.set(chainId, { residues: new Set(), atoms: 0 });
     }

@@ -1,5 +1,6 @@
 import type { Molecule, SecondaryStructure } from '../types';
 import { dihedralAngle } from './measurements';
+import { chainKey } from './residueAnalysis';
 
 interface BackboneAtoms {
   residueNumber: number;
@@ -45,21 +46,32 @@ function classifyFromAngles(phi: number, psi: number): SecondaryStructure {
 }
 
 /**
- * Extract backbone atoms (N, CA, C) grouped by residue
+ * Key of a residue: chain and number, joined with '|' so a negative number
+ * ("A|-3") can't be confused with the separator. Keys are never parsed back.
+ */
+function residueKeyOf(chainId: string, residueNumber: number): string {
+  return `${chainId}|${residueNumber}`;
+}
+
+/**
+ * Extract backbone atoms (N, CA, C) grouped by residue. Residue 0 counts, a
+ * blank chain is chainKey's 'Unknown', and CA is an alpha carbon only when
+ * its element is C (a calcium ion is often named CA too).
  */
 function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
   const backboneMap = new Map<string, BackboneAtoms>();
 
   for (const atom of molecule.atoms) {
-    if (!atom.residueNumber || !atom.chainId || !atom.name) continue;
+    if (atom.residueNumber === undefined || !atom.name) continue;
 
-    const key = `${atom.chainId}-${atom.residueNumber}`;
+    const chainId = chainKey(atom);
+    const key = residueKeyOf(chainId, atom.residueNumber);
     let backbone = backboneMap.get(key);
 
     if (!backbone) {
       backbone = {
         residueNumber: atom.residueNumber,
-        chainId: atom.chainId,
+        chainId,
       };
       backboneMap.set(key, backbone);
     }
@@ -68,7 +80,7 @@ function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
     const pos = { x: atom.x, y: atom.y, z: atom.z };
 
     if (atomName === 'N') backbone.n = pos;
-    else if (atomName === 'CA') backbone.ca = pos;
+    else if (atomName === 'CA' && atom.element?.toUpperCase() === 'C') backbone.ca = pos;
     else if (atomName === 'C') backbone.c = pos;
   }
 
@@ -90,13 +102,14 @@ export function detectSecondaryStructure(molecule: Molecule): void {
   const backboneMap = extractBackboneAtoms(molecule);
   const residueSSMap = new Map<string, SecondaryStructure>();
 
-  // Get sorted residue keys by chain and residue number
+  // Residue keys sorted by chain, then residue number (read from the entries, not from the keys)
   const sortedKeys = Array.from(backboneMap.keys()).sort((a, b) => {
-    const [chainA, resNumA] = a.split('-');
-    const [chainB, resNumB] = b.split('-');
-    if (chainA !== chainB) return chainA.localeCompare(chainB);
-    return parseInt(resNumA) - parseInt(resNumB);
+    const ra = backboneMap.get(a)!;
+    const rb = backboneMap.get(b)!;
+    if (ra.chainId !== rb.chainId) return ra.chainId.localeCompare(rb.chainId);
+    return ra.residueNumber - rb.residueNumber;
   });
+  const chainOf = (key: string | undefined) => (key === undefined ? undefined : backboneMap.get(key)?.chainId);
 
   // Calculate phi/psi angles for each residue
   for (let i = 0; i < sortedKeys.length; i++) {
@@ -105,15 +118,9 @@ export function detectSecondaryStructure(molecule: Molecule): void {
     const prevKey = sortedKeys[i - 1];
     const nextKey = sortedKeys[i + 1];
 
-    // Get previous residue (same chain)
-    const prev = prevKey?.startsWith(curr.chainId + '-')
-      ? backboneMap.get(prevKey)
-      : undefined;
-
-    // Get next residue (same chain)
-    const next = nextKey?.startsWith(curr.chainId + '-')
-      ? backboneMap.get(nextKey)
-      : undefined;
+    // Previous and next residue, in the same chain only
+    const prev = chainOf(prevKey) === curr.chainId ? backboneMap.get(prevKey) : undefined;
+    const next = chainOf(nextKey) === curr.chainId ? backboneMap.get(nextKey) : undefined;
 
     // Need all atoms present
     if (!curr.n || !curr.ca || !curr.c) {
@@ -149,7 +156,7 @@ export function detectSecondaryStructure(molecule: Molecule): void {
   for (let i = 0; i < sortedKeys.length; i++) {
     const key = sortedKeys[i];
     const curr = residueSSMap.get(key)!;
-    const currChain = key.split('-')[0];
+    const currChain = chainOf(key);
 
     // Check neighbors in same chain
     let sameCount = 1;
@@ -157,13 +164,13 @@ export function detectSecondaryStructure(molecule: Molecule): void {
     // Count consecutive same-type residues
     for (let j = i - 1; j >= 0; j--) {
       const pKey = sortedKeys[j];
-      if (!pKey.startsWith(currChain + '-')) break;
+      if (chainOf(pKey) !== currChain) break;
       if (residueSSMap.get(pKey) !== curr) break;
       sameCount++;
     }
     for (let j = i + 1; j < sortedKeys.length; j++) {
       const nKey = sortedKeys[j];
-      if (!nKey.startsWith(currChain + '-')) break;
+      if (chainOf(nKey) !== currChain) break;
       if (residueSSMap.get(nKey) !== curr) break;
       sameCount++;
     }
@@ -180,8 +187,7 @@ export function detectSecondaryStructure(molecule: Molecule): void {
 
   // Assign to atoms
   for (const atom of molecule.atoms) {
-    if (!atom.residueNumber || !atom.chainId) continue;
-    const key = `${atom.chainId}-${atom.residueNumber}`;
-    atom.secondaryStructure = smoothedSSMap.get(key);
+    if (atom.residueNumber === undefined) continue;
+    atom.secondaryStructure = smoothedSSMap.get(residueKeyOf(chainKey(atom), atom.residueNumber));
   }
 }

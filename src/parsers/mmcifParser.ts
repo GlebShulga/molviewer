@@ -375,11 +375,12 @@ function assignSecondaryStructure(atoms: Atom[], ranges: SecondaryStructureRange
   if (ranges.length === 0) return;
 
   for (const atom of atoms) {
-    if (!atom.chainId || atom.residueNumber === undefined) continue;
+    if (atom.residueNumber === undefined) continue;
 
     for (const range of ranges) {
       if (
-        range.chainId === atom.chainId &&
+        // A blank chain is '' or missing on either side
+        (range.chainId || '') === (atom.chainId || '') &&
         atom.residueNumber >= range.startResNum &&
         atom.residueNumber <= range.endResNum
       ) {

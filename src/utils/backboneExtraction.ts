@@ -1,4 +1,5 @@
 import type { Atom, Molecule, SecondaryStructure } from '../types';
+import { chainKey } from './residueAnalysis';
 
 export interface BackboneResidue {
   residueNumber: number;
@@ -36,18 +37,24 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
   for (let atomIndex = 0; atomIndex < molecule.atoms.length; atomIndex++) {
     const atom = molecule.atoms[atomIndex];
 
-    // Skip atoms without residue info
-    if (!atom.residueNumber || !atom.chainId || !atom.residueName || !atom.name) {
+    // Skip atoms without residue info. Residue 0 is a real residue, and a
+    // blank chain is the chain 'Unknown' (chainKey).
+    if (atom.residueNumber === undefined || !atom.residueName || !atom.name) {
       continue;
     }
 
-    const chainId = atom.chainId;
+    const chainId = chainKey(atom);
     const resNum = atom.residueNumber;
     const atomName = atom.name.trim().toUpperCase();
     const isNucleicAcid = NUCLEIC_ACID_RESIDUES.has(atom.residueName.toUpperCase());
 
     // Only process backbone atoms (CA, C, N, O for proteins; P for nucleic acids)
     if (!['CA', 'C', 'N', 'O', 'P'].includes(atomName)) {
+      continue;
+    }
+
+    // A calcium ion is often named CA too (isBackboneAtom)
+    if (atomName === 'CA' && atom.element?.toUpperCase() !== 'C') {
       continue;
     }
 

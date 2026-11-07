@@ -14,11 +14,21 @@ export interface Chain {
   atomCount: number;
 }
 
+/**
+ * The chain an atom belongs to, for grouping and comparing: files without
+ * chain IDs (blank column) put every atom in one chain, 'Unknown'. Use this
+ * wherever atoms are matched or keyed by chain, so chainless files trace,
+ * classify and select like any other.
+ */
+export function chainKey(atom: Pick<Atom, 'chainId'>): string {
+  return atom.chainId || 'Unknown';
+}
+
 export function analyzeResidues(atoms: Atom[]): Chain[] {
   const chainMap = new Map<string, Map<string, Residue>>();
 
   atoms.forEach((atom, index) => {
-    const chainId = atom.chainId || 'Unknown';
+    const chainId = chainKey(atom);
     // Atoms without a residue number get their own residue, not residue 0's
     const residueKey = `${atom.residueName || 'UNK'}_${atom.residueNumber ?? 'none'}`;
 
