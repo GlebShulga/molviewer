@@ -56,17 +56,29 @@ const DENIED_CIDS = new Set<number>([
   145983, // chlorosoman
 ]);
 
-/** Short names, matched as whole words in the text as typed. */
+/**
+ * Short names, matched as whole words (after `normalizeDashes`). Codes that
+ * collide with ordinary notation are narrowed: A-230 to A-242 need the hyphen
+ * (A242 is residue notation, as in "T4 lysozyme A242"), and VX and VR must not
+ * be followed by a number (VX-770 is ivacaftor, VR-1 a receptor). HN-1 to
+ * HN-3 stay as they are: that is how the nitrogen mustards are written.
+ */
 const DENIED_NAMES =
-  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-?23[024]|a-?242|vx|vr|agent ql|sulfur mustard|sulphur mustard|mustard gas|sesquimustard|o-mustard|nitrogen mustard|hn-?[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
+  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?![\s-]?\d)|vr(?![\s-]?\d)|agent[\s-]*ql|sulfur mustard|sulphur mustard|mustard gas|sesquimustard|o-mustard|nitrogen mustard|hn-?[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
 
 /**
  * Full chemical names. People write these with varying brackets, spaces,
- * hyphens and locant prefixes (S-, O-, P-, n-), so both sides are compacted
- * (see `compactName`) and matched as substrings. Bare codes such as VE, VM,
- * DF or QL are deliberately absent: they would match VE-cadherin or DF-1.
+ * hyphens, locant prefixes (S-, O-, P-, n-) and substituent order, and
+ * PubChem writes "sulfanyl" where older names say "thio", so both sides are
+ * compacted (see `compactName`) and matched as substrings; each order in use
+ * is listed. Bare codes such as VE, VM, DF or QL are deliberately absent:
+ * they would match VE-cadherin or DF-1.
  */
 const DENIED_FULL_NAMES = [
+  'bis(2-chloroethyl) sulfide', // HD
+  '1-chloro-2-(2-chloroethylthio)ethane', // HD
+  '1,2-bis(2-chloroethylthio)ethane', // Q
+  'bis(2-chloroethylthioethyl) ether', // T
   '2-chloroethyl chloromethyl sulfide',
   '1-chloro-2-(chloromethylthio)ethane',
   'bis(2-chloroethylthio)methane',
@@ -76,25 +88,38 @@ const DENIED_FULL_NAMES = [
   'bis(2-chloroethylthiomethyl) ether',
   'S-[2-(diethylamino)ethyl] O-ethyl ethylphosphonothioate', // VE
   'S-[2-(diethylamino)ethyl] O-ethyl methylphosphonothioate', // VM
+  'O-ethyl S-[2-(diethylamino)ethyl] ethylphosphonothioate', // VE
+  'O-ethyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VM
   'methylphosphonic difluoride', // DF
   'methylphosphonyl difluoride', // DF
   'O-ethyl O-2-diisopropylaminoethyl methylphosphonite', // QL
   'O-ethyl O-[2-(diisopropylamino)ethyl] methylphosphonite', // QL
   'isopropyl methylphosphonochloridate', // chlorosarin
   '2-propyl methylphosphonochloridate', // chlorosarin
+  'propan-2-yl methylphosphonochloridate', // chlorosarin
   'pinacolyl methylphosphonochloridate', // chlorosoman
 ].map(compactName);
 
-/** Lowercase, drop single-letter locants (S-, O-, P-, n-), keep letters and digits only. */
+/** Unicode hyphens, dashes and minus signs as an ASCII hyphen. */
+function normalizeDashes(text: string): string {
+  return text.replace(/[‐-―−﹘﹣－]/g, '-');
+}
+
+/**
+ * Lowercase, drop single-letter locants (S-, O-, P-, n-), spell "sulfanyl" as
+ * "thio" and "sulphide" as "sulfide", keep letters and digits only.
+ */
 function compactName(name: string): string {
-  return name
+  return normalizeDashes(name)
     .toLowerCase()
     .replace(/(^|[^a-z0-9])[nops]-(?=[a-z[(])/g, '$1')
+    .replace(/sulfanyl/g, 'thio')
+    .replace(/sulphide/g, 'sulfide')
     .replace(/[^a-z0-9]/g, '');
 }
 
 function isDeniedName(name: string): boolean {
-  if (DENIED_NAMES.test(name)) return true;
+  if (DENIED_NAMES.test(normalizeDashes(name))) return true;
   const compact = compactName(name);
   return DENIED_FULL_NAMES.some((n) => compact.includes(n));
 }

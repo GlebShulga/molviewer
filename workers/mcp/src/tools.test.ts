@@ -509,10 +509,26 @@ describe('isDeniedCompound', () => {
   it('covers them by name, in their usual punctuation', () => {
     const names = [
       'A-242',
-      'A242',
+      'A-234',
+      'Novichok A242',
       'Chlorosarin',
       'chlorosoman',
       'Agent QL',
+      'Agent-QL',
+      'agent  ql',
+      'VX',
+      'VX nerve agent',
+      'VR',
+      'HN-3',
+      'bis(2-chloroethyl) sulfide', // HD
+      '1-chloro-2-(2-chloroethylsulfanyl)ethane', // HD, PubChem's IUPAC name
+      '1,2-bis(2-chloroethylthio)ethane', // Q
+      '1,2-bis(2-chloroethylsulfanyl)ethane', // Q
+      'bis(2-chloroethylthioethyl) ether', // T
+      '1,3-bis(2-chloroethylsulfanyl)propane',
+      'O-Ethyl S-[2-(diethylamino)ethyl] ethylphosphonothioate', // VE, O-first
+      'O-Ethyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VM, O-first
+      'propan-2-yl methylphosphonochloridate', // chlorosarin
       '2-Chloroethyl chloromethyl sulfide',
       '2-chloroethylchloromethylsulfide',
       'Bis(2-chloroethylthio)methane',
@@ -531,8 +547,21 @@ describe('isDeniedCompound', () => {
     for (const name of names) expect(isDeniedCompound({ names: [name] }), name).toBe(true);
   });
 
+  it('matches names written with Unicode hyphens and dashes', () => {
+    // U+2010 hyphen, U+2011 non-breaking hyphen, U+2013 en dash, U+2212 minus
+    for (const dash of ['‐', '‑', '–', '−']) {
+      const ve = 'S-[2-(diethylamino)ethyl] O-ethyl ethylphosphonothioate'.replaceAll('-', dash);
+      expect(isDeniedCompound({ names: [ve] }), ve).toBe(true);
+      expect(isDeniedCompound({ names: [`A${dash}234`] }), `A${dash}234`).toBe(true);
+    }
+  });
+
   it('leaves unrelated names alone', () => {
-    for (const name of ['VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine']) {
+    for (const name of [
+      'VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine',
+      // Residue notation and drug or receptor codes that share a prefix with an agent's code
+      'A242', 'T4 lysozyme A242', 'A234 mutant', 'VX-770', 'ivacaftor (VX-770)', 'VX 809', 'VR-1 receptor', 'VR1',
+    ]) {
       expect(isDeniedCompound({ names: [name] }), name).toBe(false);
     }
   });
