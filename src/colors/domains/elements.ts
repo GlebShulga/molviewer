@@ -9,6 +9,15 @@ export interface ElementData {
   covalentRadius: number;
 }
 
+/**
+ * Colors are Jmol's. Covalent radii are Cordero et al. 2008 (Alvarez group,
+ * low-spin values for Fe, Co, Mn). Van der Waals radii: Bondi 1964 and
+ * Mantina 2009 for the main-group elements and alkali/alkaline-earth metals
+ * (as in PubChem's periodic table). The entries added on 2026-11-07 (Cr, Mn,
+ * As, Se, Mo, Ag, Cd, Sn, Cs, Gd, W, Pt, Au, Hg) take their vdW radius from
+ * PubChem's periodic table; the older Fe, Co, Ni, Cu, Zn values have no
+ * recorded source and differ from it.
+ */
 export const ELEMENTS: Record<string, ElementData> = {
   H: {
     symbol: "H",
@@ -191,6 +200,24 @@ export const ELEMENTS: Record<string, ElementData> = {
     vdwRadius: 2.31,
     covalentRadius: 1.76,
   },
+  Cr: {
+    symbol: "Cr",
+    name: "Chromium",
+    atomicNumber: 24,
+    atomicMass: 51.996,
+    color: "#8A99C7",
+    vdwRadius: 1.89,
+    covalentRadius: 1.39,
+  },
+  Mn: {
+    symbol: "Mn",
+    name: "Manganese",
+    atomicNumber: 25,
+    atomicMass: 54.938,
+    color: "#9C7AC7",
+    vdwRadius: 1.97,
+    covalentRadius: 1.39,
+  },
   Fe: {
     symbol: "Fe",
     name: "Iron",
@@ -236,6 +263,24 @@ export const ELEMENTS: Record<string, ElementData> = {
     vdwRadius: 2.01,
     covalentRadius: 1.22,
   },
+  As: {
+    symbol: "As",
+    name: "Arsenic",
+    atomicNumber: 33,
+    atomicMass: 74.922,
+    color: "#BD80E3",
+    vdwRadius: 1.85,
+    covalentRadius: 1.19,
+  },
+  Se: {
+    symbol: "Se",
+    name: "Selenium",
+    atomicNumber: 34,
+    atomicMass: 78.971,
+    color: "#FFA100",
+    vdwRadius: 1.9,
+    covalentRadius: 1.2,
+  },
   Br: {
     symbol: "Br",
     name: "Bromine",
@@ -245,6 +290,42 @@ export const ELEMENTS: Record<string, ElementData> = {
     vdwRadius: 1.85,
     covalentRadius: 1.2,
   },
+  Mo: {
+    symbol: "Mo",
+    name: "Molybdenum",
+    atomicNumber: 42,
+    atomicMass: 95.95,
+    color: "#54B5B5",
+    vdwRadius: 2.09,
+    covalentRadius: 1.54,
+  },
+  Ag: {
+    symbol: "Ag",
+    name: "Silver",
+    atomicNumber: 47,
+    atomicMass: 107.868,
+    color: "#C0C0C0",
+    vdwRadius: 1.72,
+    covalentRadius: 1.45,
+  },
+  Cd: {
+    symbol: "Cd",
+    name: "Cadmium",
+    atomicNumber: 48,
+    atomicMass: 112.414,
+    color: "#FFD98F",
+    vdwRadius: 1.58,
+    covalentRadius: 1.44,
+  },
+  Sn: {
+    symbol: "Sn",
+    name: "Tin",
+    atomicNumber: 50,
+    atomicMass: 118.71,
+    color: "#668080",
+    vdwRadius: 2.17,
+    covalentRadius: 1.39,
+  },
   I: {
     symbol: "I",
     name: "Iodine",
@@ -253,6 +334,60 @@ export const ELEMENTS: Record<string, ElementData> = {
     color: "#940094",
     vdwRadius: 1.98,
     covalentRadius: 1.39,
+  },
+  Cs: {
+    symbol: "Cs",
+    name: "Caesium",
+    atomicNumber: 55,
+    atomicMass: 132.905,
+    color: "#57178F",
+    vdwRadius: 3.43,
+    covalentRadius: 2.44,
+  },
+  Gd: {
+    symbol: "Gd",
+    name: "Gadolinium",
+    atomicNumber: 64,
+    atomicMass: 157.25,
+    color: "#45FFC7",
+    vdwRadius: 2.37,
+    covalentRadius: 1.96,
+  },
+  W: {
+    symbol: "W",
+    name: "Tungsten",
+    atomicNumber: 74,
+    atomicMass: 183.84,
+    color: "#2194D6",
+    vdwRadius: 2.1,
+    covalentRadius: 1.62,
+  },
+  Pt: {
+    symbol: "Pt",
+    name: "Platinum",
+    atomicNumber: 78,
+    atomicMass: 195.084,
+    color: "#D0D0E0",
+    vdwRadius: 2.09,
+    covalentRadius: 1.36,
+  },
+  Au: {
+    symbol: "Au",
+    name: "Gold",
+    atomicNumber: 79,
+    atomicMass: 196.967,
+    color: "#FFD123",
+    vdwRadius: 1.66,
+    covalentRadius: 1.36,
+  },
+  Hg: {
+    symbol: "Hg",
+    name: "Mercury",
+    atomicNumber: 80,
+    atomicMass: 200.592,
+    color: "#B8B8D0",
+    vdwRadius: 2.09,
+    covalentRadius: 1.32,
   },
 };
 
