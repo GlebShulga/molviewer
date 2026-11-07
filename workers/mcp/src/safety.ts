@@ -104,9 +104,12 @@ function isDeniedName(name: string): boolean {
  * (cache.ts), so an answer cached before an agent was added is never served.
  * FNV-1a, synchronous so it is ready at module load.
  */
-export const DENY_LIST_HASH = hashString(
-  [[...DENIED_CIDS].sort((a, b) => a - b).join(','), DENIED_NAMES.source, DENIED_FULL_NAMES.join('|')].join('\n')
-);
+export const DENY_LIST_HASH = denyListHash(DENIED_CIDS, DENIED_NAMES, DENIED_FULL_NAMES);
+
+/** Exported for tests; independent of the order of the CIDs. */
+export function denyListHash(cids: Iterable<number>, names: RegExp, fullNames: string[]): string {
+  return hashString([[...cids].sort((a, b) => a - b).join(','), names.source, fullNames.join('|')].join('\n'));
+}
 
 function hashString(s: string): string {
   let h = 0x811c9dc5;

@@ -4,10 +4,20 @@
  * this also skips the normalizing work and the GraphQL fan-out.
  */
 import type { ToolOutcome } from './tools';
+import { DENY_LIST_HASH } from './safety';
 
 const TTL_SECONDS = 86400;
-/** Bump when the shape of tool results changes. */
+/**
+ * Bump when the shape of tool results changes. Deny-list changes need no
+ * bump: the key also carries DENY_LIST_HASH, so answers cached before an
+ * agent was added (a compound hit, a curated slug) become unreachable.
+ */
 const CACHE_VERSION = 'v9';
+
+/** Cache key for one tool call. `denyHash` is a parameter for tests. */
+export function cacheKey(tool: string, args: unknown, denyHash: string = DENY_LIST_HASH): string {
+  return `https://mcp-cache.molviewer.bio/${CACHE_VERSION}-${denyHash}/${tool}?args=${encodeURIComponent(JSON.stringify(args))}`;
+}
 
 function cacheStore(): Cache | undefined {
   return typeof caches !== 'undefined' ? (caches as unknown as { default?: Cache }).default : undefined;
@@ -22,9 +32,7 @@ export async function cachedOutcome(
 ): Promise<{ outcome: ToolOutcome; cached: boolean }> {
   const cache = cacheStore();
   if (!cache) return { outcome: await fn(), cached: false };
-  const key = new Request(
-    `https://mcp-cache.molviewer.bio/${CACHE_VERSION}/${tool}?args=${encodeURIComponent(JSON.stringify(args))}`
-  );
+  const key = new Request(cacheKey(tool, args));
   const hit = await cache.match(key);
   if (hit) return { outcome: (await hit.json()) as ToolOutcome, cached: true };
 

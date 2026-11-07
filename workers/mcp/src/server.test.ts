@@ -10,6 +10,9 @@ import { fixtureFetch } from '../../../site/upstream/__fixtures__/fixtureFetch';
 import { WIDGET_RESOURCE_URI, readWidgetPayload } from '../../../site/appContract';
 import { createServer, type Env } from './server';
 import worker from './index';
+import { cacheKey, cachedOutcome } from './cache';
+import { DENY_LIST_HASH, denyListHash } from './safety';
+import type { ToolOutcome } from './tools';
 
 let client: Client | null = null;
 
@@ -151,5 +154,49 @@ describe('worker routes', () => {
     const pre = await worker.fetch(new Request('https://mcp.molviewer.bio/mcp', { method: 'OPTIONS' }), {}, ctx);
     expect(pre.status).toBe(204);
     expect(pre.headers.get('access-control-allow-origin')).toBe('*');
+  });
+});
+
+describe('tool-result cache and the deny list', () => {
+  function mapCache() {
+    const store = new Map<string, string>();
+    vi.stubGlobal('caches', {
+      default: {
+        match: async (req: Request) => (store.has(req.url) ? new Response(store.get(req.url)) : undefined),
+        put: async (req: Request, resp: Response) => void store.set(req.url, await resp.text()),
+      },
+    });
+    return store;
+  }
+
+  it('does not serve an answer cached under another deny list', async () => {
+    const store = mapCache();
+    const stale: ToolOutcome = { text: 'cached before the list changed', status: 'ok' };
+    store.set(cacheKey('find_structures', { query: 'x' }, 'old-list'), JSON.stringify(stale));
+    const fresh: ToolOutcome = { text: 'fresh', status: 'ok' };
+    const { outcome, cached } = await cachedOutcome('find_structures', { query: 'x' }, async () => fresh, () => {});
+    expect(cached).toBe(false);
+    expect(outcome.text).toBe('fresh');
+  });
+
+  it('serves an answer cached under the current deny list', async () => {
+    const store = mapCache();
+    const hit: ToolOutcome = { text: 'cached', status: 'ok' };
+    store.set(cacheKey('find_structures', { query: 'x' }), JSON.stringify(hit));
+    const { outcome, cached } = await cachedOutcome('find_structures', { query: 'x' }, async () => ({ text: 'fresh', status: 'ok' }), () => {});
+    expect(cached).toBe(true);
+    expect(outcome.text).toBe('cached');
+  });
+
+  it('keys differ when the deny list differs', () => {
+    expect(cacheKey('show_structure', { id: 'caffeine' }, 'a')).not.toBe(cacheKey('show_structure', { id: 'caffeine' }, 'b'));
+    expect(cacheKey('show_structure', { id: 'caffeine' })).toContain(DENY_LIST_HASH);
+  });
+
+  it('the deny-list hash changes when a CID is added', () => {
+    const base = denyListHash([7871, 7305], /\b(sarin)\b/i, ['x']);
+    expect(denyListHash([7871, 7305, 1], /\b(sarin)\b/i, ['x'])).not.toBe(base);
+    expect(denyListHash([7305, 7871], /\b(sarin)\b/i, ['x'])).toBe(base);
+    expect(denyListHash([7871, 7305], /\b(sarin|soman)\b/i, ['x'])).not.toBe(base);
   });
 });
