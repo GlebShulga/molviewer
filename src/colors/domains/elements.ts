@@ -401,9 +401,18 @@ export const DEFAULT_ELEMENT: ElementData = {
   covalentRadius: 0.75,
 };
 
+/**
+ * "ZN", "zn", " Zn" → "Zn": PDB, mmCIF and XYZ files give element symbols
+ * in any case. The form the element table, the classifier and bond
+ * inference use.
+ */
+export function normalizeElementSymbol(symbol: string): string {
+  const s = symbol.trim();
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 export function getElement(symbol: string): ElementData {
-  const normalized = symbol.charAt(0).toUpperCase() + symbol.slice(1).toLowerCase();
-  return ELEMENTS[normalized] ?? ELEMENTS[symbol.toUpperCase()] ?? DEFAULT_ELEMENT;
+  return ELEMENTS[normalizeElementSymbol(symbol)] ?? ELEMENTS[symbol.toUpperCase()] ?? DEFAULT_ELEMENT;
 }
 
 export function getElementColor(symbol: string): string {

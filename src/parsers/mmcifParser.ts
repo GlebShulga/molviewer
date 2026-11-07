@@ -1,5 +1,6 @@
 import type { Atom, Bond, Molecule, SecondaryStructure } from "../types";
 import { PARSER_CONFIG } from "../config";
+import { normalizeElementSymbol } from "../constants";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { createAltLocFilter } from "./altLoc";
 import { compareResidueIds } from "../utils/residueAnalysis";
@@ -209,7 +210,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
       id: atomIndex,
       serial: isNaN(serial) ? atomIndex + 1 : serial,
       name,
-      element: element.charAt(0).toUpperCase() + element.slice(1).toLowerCase(),
+      element: normalizeElementSymbol(element),
       x,
       y,
       z,

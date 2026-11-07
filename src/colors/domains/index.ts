@@ -3,6 +3,7 @@ export {
   ELEMENTS,
   DEFAULT_ELEMENT,
   getElement,
+  normalizeElementSymbol,
   getElementColor,
   getVdwRadius,
   getCovalentRadius,

@@ -3,6 +3,7 @@ import type { RepresentationType, ColorScheme } from '../store/moleculeStore';
 import { isAminoAcid, isWater, analyzeResidues, residueKey, type Residue } from './residueAnalysis';
 import { hasBackboneData } from './backboneExtraction';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
+import { normalizeElementSymbol } from '../constants';
 
 export type MoleculeComponentType = 'protein' | 'dna' | 'rna' | 'ligand' | 'water' | 'ion';
 
@@ -61,8 +62,7 @@ function isRNAResidue(residueAtoms: Atom[], residueName: string): boolean {
 function isIon(residueAtoms: Atom[]): boolean {
   if (residueAtoms.length !== 1) return false;
   // XYZ files keep symbols as written ("ZN"); the set holds "Zn"
-  const el = residueAtoms[0].element.trim();
-  return ION_ELEMENTS.has(el.charAt(0).toUpperCase() + el.slice(1).toLowerCase());
+  return ION_ELEMENTS.has(normalizeElementSymbol(residueAtoms[0].element));
 }
 
 /**

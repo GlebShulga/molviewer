@@ -1,5 +1,5 @@
 import type { Atom, Bond } from '../types';
-import { getCovalentRadius } from '../constants';
+import { getCovalentRadius, normalizeElementSymbol } from '../constants';
 import { PARSER_CONFIG } from '../config';
 import { SpatialHashGrid } from './spatialIndex';
 
@@ -26,14 +26,8 @@ const METALS = new Set([
   'Sn', 'Gd',
 ]);
 
-/** "ZN", "zn", " Zn" → "Zn": PDB and XYZ files give element symbols in any case. */
-function normalizeSymbol(element: string): string {
-  const s = element.trim();
-  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-}
-
 function isMetal(element: string): boolean {
-  return METALS.has(normalizeSymbol(element));
+  return METALS.has(normalizeElementSymbol(element));
 }
 
 /**

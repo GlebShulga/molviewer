@@ -1,7 +1,7 @@
 import type { Atom, Bond, Molecule, SecondaryStructure, BiologicalAssembly } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
-import { DEFAULT_ELEMENT, getElement } from "../constants";
+import { DEFAULT_ELEMENT, getElement, normalizeElementSymbol } from "../constants";
 import { createAltLocFilter } from "./altLoc";
 import { compareResidueIds } from "../utils/residueAnalysis";
 
@@ -239,11 +239,6 @@ function getSecondaryStructure(
   return 'coil';
 }
 
-/** "ZN" → "Zn", "se" → "Se": the form the element table and the classifier use. */
-function normalizeElement(symbol: string): string {
-  return symbol.charAt(0).toUpperCase() + symbol.slice(1).toLowerCase();
-}
-
 /** Residues whose atoms are all one-letter elements (C, N, O, S, P, H). */
 const STANDARD_RESIDUES = new Set([
   'ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
@@ -269,7 +264,7 @@ const AMBIGUOUS_TWO_LETTER = new Set(['CA', 'CD', 'NE', 'HE', 'NA', 'HG']);
 function parseElement(line: string, residueName: string): string {
   const elementCol = line.substring(76, 78).trim();
   if (elementCol) {
-    return normalizeElement(elementCol);
+    return normalizeElementSymbol(elementCol);
   }
 
   const raw = line.substring(12, 16).padEnd(4);
@@ -282,14 +277,14 @@ function parseElement(line: string, residueName: string): string {
   if ((name.length === 4 && c13 === 'H') || /\d/.test(c13)) return 'H';
 
   const residue = residueName.trim().toUpperCase();
-  if (STANDARD_RESIDUES.has(residue)) return normalizeElement(oneLetter);
+  if (STANDARD_RESIDUES.has(residue)) return normalizeElementSymbol(oneLetter);
 
   if (/[A-Za-z]/.test(c13) && /[A-Za-z]/.test(c14)) {
     const two = (c13 + c14).toUpperCase();
     const known = getElement(two) !== DEFAULT_ELEMENT;
-    if (known && (!AMBIGUOUS_TWO_LETTER.has(two) || residue === two)) return normalizeElement(two);
+    if (known && (!AMBIGUOUS_TWO_LETTER.has(two) || residue === two)) return normalizeElementSymbol(two);
   }
-  return normalizeElement(oneLetter);
+  return normalizeElementSymbol(oneLetter);
 }
 
 function parseAtomLine(line: string, index: number): Atom | null {
