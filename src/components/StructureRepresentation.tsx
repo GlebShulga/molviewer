@@ -37,6 +37,7 @@ export const StructureRepresentation = React.memo(
           opacity={1.0}
           colorScheme={colorScheme}
           probeRadius={surfaceSettings.probeRadius}
+          componentSettings={componentSettings}
         />
       );
     }
@@ -64,6 +65,7 @@ export const StructureRepresentation = React.memo(
               color={surfaceSettings.color}
               wireframe={surfaceSettings.wireframe}
               probeRadius={surfaceSettings.probeRadius}
+              componentSettings={componentSettings}
             />
           )}
         </>
@@ -113,6 +115,7 @@ export const StructureRepresentation = React.memo(
             color={surfaceSettings.color}
             wireframe={surfaceSettings.wireframe}
             probeRadius={surfaceSettings.probeRadius}
+            componentSettings={componentSettings}
           />
         )}
       </>

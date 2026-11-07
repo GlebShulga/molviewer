@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import type { Molecule } from '../../types';
 import type { ColorScheme } from '../../store/moleculeStore';
 import { generateSurface, type SurfaceOptions, type SurfaceData } from '../../utils/surfaceGeneration';
-import { getAtomColor, calculateColorSchemeContext } from '../../utils/atomColor';
+import { calculateColorSchemeContext } from '../../utils/atomColor';
+import { surfaceAtoms, surfaceVertexColors } from '../../utils/surfaceAtoms';
+import type { ComponentSettings } from '../../utils/moleculeTypeClassifier';
 import { DEFAULT_SURFACE_COLOR } from '../../colors';
 import { logError } from '../../utils/errorReporter';
 
@@ -21,61 +23,8 @@ export interface SurfaceProps {
   probeRadius?: number;
   resolution?: number;
   visible?: boolean;
-}
-
-/**
- * Parse a CSS color string to RGB values (0-1 range)
- */
-function parseColor(colorStr: string): [number, number, number] {
-  // Handle hex colors
-  if (colorStr.startsWith('#')) {
-    const hex = colorStr.slice(1);
-    const r = parseInt(hex.slice(0, 2), 16) / 255;
-    const g = parseInt(hex.slice(2, 4), 16) / 255;
-    const b = parseInt(hex.slice(4, 6), 16) / 255;
-    return [r, g, b];
-  }
-
-  // Handle rgb() colors
-  if (colorStr.startsWith('rgb')) {
-    const match = colorStr.match(/\d+/g);
-    if (match && match.length >= 3) {
-      return [
-        parseInt(match[0]) / 255,
-        parseInt(match[1]) / 255,
-        parseInt(match[2]) / 255,
-      ];
-    }
-  }
-
-  // Handle hsl() colors
-  if (colorStr.startsWith('hsl')) {
-    const match = colorStr.match(/[\d.]+/g);
-    if (match && match.length >= 3) {
-      const h = parseFloat(match[0]) / 360;
-      const s = parseFloat(match[1]) / 100;
-      const l = parseFloat(match[2]) / 100;
-      // HSL to RGB conversion
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      return [
-        hue2rgb(p, q, h + 1/3),
-        hue2rgb(p, q, h),
-        hue2rgb(p, q, h - 1/3),
-      ];
-    }
-  }
-
-  // Default fallback
-  return [0.5, 0.5, 0.5];
+  /** Visible components other than water and ions get the surface (surfaceAtoms). */
+  componentSettings?: ComponentSettings[];
 }
 
 export function Surface({
@@ -88,8 +37,15 @@ export function Surface({
   probeRadius = 1.4,
   resolution = 1.0, // High quality: 1Å grid spacing
   visible = true,
+  componentSettings,
 }: SurfaceProps) {
   const meshRef = useRef<THREE.Mesh>(null);
+
+  // The atoms to surface. componentSettings is a new array on every style
+  // change; the subset only changes with the visible component types (its
+  // key), so the mesh isn't rebuilt when a component is restyled.
+  const subset = useMemo(() => surfaceAtoms(molecule, componentSettings), [molecule, componentSettings]);
+  const subsetKey = subset.key;
 
   // Generate stable molecule hash for cache key
   const moleculeHash = useMemo(() => {
@@ -102,8 +58,8 @@ export function Surface({
 
   // Generate cache key with normalized floating-point parameters
   const cacheKey = useMemo(
-    () => `${moleculeHash}-${type}-${probeRadius.toFixed(2)}-${resolution.toFixed(2)}`,
-    [moleculeHash, type, probeRadius, resolution]
+    () => `${moleculeHash}-${subsetKey}-${type}-${probeRadius.toFixed(2)}-${resolution.toFixed(2)}`,
+    [moleculeHash, subsetKey, type, probeRadius, resolution]
   );
 
   // Calculate color context for color schemes that need it
@@ -113,7 +69,8 @@ export function Surface({
   );
 
   const { geometry, useVertexColors } = useMemo(() => {
-    if (!molecule.atoms.length) return { geometry: null, useVertexColors: false };
+    // Nothing to surface: every component hidden, or an empty molecule
+    if (!subset.atoms.length) return { geometry: null, useVertexColors: false };
 
     // Check module-scope cache first (survives unmount/remount)
     const cached = surfaceCache.get(cacheKey);
@@ -131,7 +88,7 @@ export function Surface({
       };
 
       try {
-        surfaceData = generateSurface(molecule.atoms, options);
+        surfaceData = generateSurface(subset.atoms, options);
 
         // Store in cache
         surfaceCache.set(cacheKey, surfaceData);
@@ -160,25 +117,10 @@ export function Surface({
       );
       geom.setIndex(new THREE.BufferAttribute(surfaceData.indices, 1));
 
-      // Add per-vertex colors if colorScheme is specified
+      // Add per-vertex colors if colorScheme is specified: each vertex takes
+      // its nearest atom's colour, with ranges from the whole molecule
       if (colorScheme) {
-        const vertexCount = surfaceData.vertices.length / 3;
-        const colors = new Float32Array(vertexCount * 3);
-
-        for (let i = 0; i < vertexCount; i++) {
-          // Use precomputed nearest atom index from surface generation
-          const nearestAtomIndex = surfaceData.nearestAtomIndices[i];
-          const nearestAtom = molecule.atoms[nearestAtomIndex];
-
-          // Get color for this atom
-          const atomColor = getAtomColor(nearestAtom, colorScheme, colorContext);
-          const [r, g, b] = parseColor(atomColor);
-
-          colors[i * 3] = r;
-          colors[i * 3 + 1] = g;
-          colors[i * 3 + 2] = b;
-        }
-
+        const colors = surfaceVertexColors(surfaceData.nearestAtomIndices, subset, molecule, colorScheme, colorContext);
         geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         return { geometry: geom, useVertexColors: true };
       }
@@ -189,6 +131,8 @@ export function Surface({
       logError(error instanceof Error ? error : new Error(String(error)), { source: 'Surface.geometry' });
       return { geometry: null, useVertexColors: false };
     }
+    // subset is read through cacheKey (its key): same key, same atoms
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [molecule, type, probeRadius, resolution, colorScheme, colorContext, cacheKey]);
 
   // Dispose previous geometry when it changes or on unmount
