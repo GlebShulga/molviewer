@@ -12,14 +12,19 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = 'mol3d-theme';
 
 function getInitialTheme(): Theme {
-  // Check localStorage first
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark') {
-    return stored;
+  // The saved choice first. With site data blocked, even reading
+  // localStorage throws; the system preference decides then.
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+  } catch {
+    // storage unavailable
   }
 
   // Fall back to system preference
-  if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+  if (window.matchMedia?.('(prefers-color-scheme: light)').matches) {
     return 'light';
   }
 
@@ -36,8 +41,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     // Apply theme to document
     document.documentElement.setAttribute('data-theme', theme);
-    // Persist to localStorage
-    localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // storage unavailable: the choice lasts for this visit
+    }
   }, [theme]);
 
   const toggleTheme = () => {

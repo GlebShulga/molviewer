@@ -146,6 +146,10 @@ function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function isStorageBlocked(e: unknown): boolean {
+  return e instanceof DOMException && e.name === 'SecurityError';
+}
+
 function getIndex(): StorageIndex {
   try {
     const data = localStorage.getItem(INDEX_KEY);
@@ -153,6 +157,9 @@ function getIndex(): StorageIndex {
       return JSON.parse(data);
     }
   } catch (e) {
+    // The browser blocks site data (settings, or a third-party frame): no
+    // saved entries. Not a bug, and it would be reported on every start.
+    if (isStorageBlocked(e)) return { version: STORAGE_VERSION, entries: [] };
     console.error('Failed to read molecule index:', e);
     logError(e instanceof Error ? e : new Error(String(e)), { source: 'moleculeStorage', op: 'read-index' });
   }
@@ -358,10 +365,14 @@ export function renameMolecule(id: string, newName: string): void {
 
 export function getStorageUsage(): { used: number; max: number; percentage: number } {
   let localStorageUsed = 0;
-  for (const key of Object.keys(localStorage)) {
-    if (key.startsWith(STORAGE_PREFIX)) {
-      localStorageUsed += (localStorage.getItem(key)?.length || 0) * 2;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(STORAGE_PREFIX)) {
+        localStorageUsed += (localStorage.getItem(key)?.length || 0) * 2;
+      }
     }
+  } catch {
+    // storage unavailable: nothing used
   }
 
   // Note: IndexedDB usage is harder to calculate without async

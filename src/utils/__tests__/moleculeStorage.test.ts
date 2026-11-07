@@ -1,9 +1,15 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { deleteMolecule, getSavedMolecules, loadSessionAsync, renameMolecule, saveSession, updateSession } from '../moleculeStorage';
+import { deleteMolecule, getSavedMolecules, getStorageUsage, loadSessionAsync, renameMolecule, saveSession, updateSession } from '../moleculeStorage';
 import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { AROMATIC_DETECTION_THRESHOLD } from '../../config/rendering';
 import type { Molecule } from '../../types';
+
+const reporter = vi.hoisted(() => ({ logError: vi.fn() }));
+vi.mock('../errorReporter', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../errorReporter')>()),
+  logError: reporter.logError,
+}));
 
 // IndexedDB is fake-indexeddb. Sessions below 50,000 atoms (and 1 MB) go to
 // localStorage, larger ones to IndexedDB, as in the app.
@@ -133,5 +139,45 @@ describe('session writes that fail or race', () => {
     // The index still points at localStorage, so that copy must still be there
     const loaded = await loadSessionAsync(entry.id);
     expect(loaded?.state.structures[0].molecule.atoms).toHaveLength(10);
+  });
+});
+
+describe('storage blocked by the browser', () => {
+  const original = Object.getOwnPropertyDescriptor(window, 'localStorage')!;
+  beforeEach(() => {
+    reporter.logError.mockClear();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      },
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'localStorage', original);
+  });
+
+  it('lists no saved entries without sending an error report', () => {
+    expect(getSavedMolecules()).toEqual([]);
+    expect(reporter.logError).not.toHaveBeenCalled();
+  });
+
+  it('reports zero usage', () => {
+    expect(getStorageUsage()).toMatchObject({ used: 0, percentage: 0 });
+  });
+});
+
+describe('a corrupt index', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    reporter.logError.mockClear();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('is still reported', () => {
+    localStorage.setItem('mol3d_index', '{not json');
+    expect(getSavedMolecules()).toEqual([]);
+    expect(reporter.logError).toHaveBeenCalledTimes(1);
   });
 });
