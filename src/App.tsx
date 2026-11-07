@@ -478,7 +478,7 @@ function AppContent() {
   const handleSequenceResidueHover = useCallback((residue: Parameters<NonNullable<React.ComponentProps<typeof SequenceViewer>['onResidueHover']>>[0]) => {
     if (residue && residue.atoms.length > 0 && molecule && activeStructureId) {
       // Hover the first atom of the residue
-      const atomIndex = residue.startIndex;
+      const atomIndex = residue.atomIndices[0];
       const atom = molecule.atoms[atomIndex];
       if (atom) {
         // Use 4-arg signature with structureId

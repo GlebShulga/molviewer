@@ -8,7 +8,8 @@ export interface Residue {
   insertionCode?: string;
   chainId: string;
   atoms: Atom[];
-  startIndex: number;
+  /** Index in the molecule of each atom in `atoms`: a residue's atoms need not be contiguous in the file. */
+  atomIndices: number[];
 }
 
 export interface Chain {
@@ -101,11 +102,13 @@ export function analyzeResidues(atoms: Atom[]): Chain[] {
         ...(atom.insertionCode ? { insertionCode: atom.insertionCode } : {}),
         chainId,
         atoms: [],
-        startIndex: index,
+        atomIndices: [],
       });
     }
 
-    residueMap.get(key)!.atoms.push(atom);
+    const residue = residueMap.get(key)!;
+    residue.atoms.push(atom);
+    residue.atomIndices.push(index);
   });
 
   const chains: Chain[] = [];

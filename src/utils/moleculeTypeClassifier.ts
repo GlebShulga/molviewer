@@ -117,17 +117,13 @@ export function classifyMolecule(molecule: Molecule): MoleculeClassification {
     componentMap.set(type, { atomIndices: [], residueKeys: new Set() });
   }
 
-  // Build a map from atom index to original molecule index
-  // Since analyzeResidues uses atoms array, the startIndex should correspond to the original index
   for (const chain of chains) {
     for (const residue of chain.residues) {
       const type = classifyResidue(residue);
       const component = componentMap.get(type)!;
 
-      // Add atom indices for this residue
-      for (let i = 0; i < residue.atoms.length; i++) {
-        component.atomIndices.push(residue.startIndex + i);
-      }
+      // Add atom indices for this residue (not contiguous when the file splits it)
+      component.atomIndices.push(...residue.atomIndices);
 
       // Add residue key for Cartoon filtering
       component.residueKeys.add(residueKey(residue.chainId, residue.number, residue.insertionCode));

@@ -165,8 +165,7 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
 
   const handleResidueClick = (residue: Residue) => {
     if (onResidueClick) {
-      const atomIndices = residue.atoms.map((_, i) => residue.startIndex + i);
-      onResidueClick(atomIndices);
+      onResidueClick(residue.atomIndices);
     }
   };
 
