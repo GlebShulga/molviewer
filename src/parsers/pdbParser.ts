@@ -287,11 +287,14 @@ function parseAtomLine(line: string, index: number): Atom | null {
   const name = line.substring(12, 16).trim();
   const residueName = line.substring(17, 20).trim();
   const chainId = line.substring(21, 22).trim();
-  const residueNumber = parseInt(line.substring(22, 26).trim(), 10);
+  const resSeq = parseInt(line.substring(22, 26).trim(), 10);
+  const residueNumber = Number.isNaN(resSeq) ? undefined : resSeq;
   const x = parseFloat(line.substring(30, 38).trim());
   const y = parseFloat(line.substring(38, 46).trim());
   const z = parseFloat(line.substring(46, 54).trim());
-  const occupancy = parseFloat(line.substring(54, 60).trim()) || 1.0;
+  // 0 is a real occupancy; only a blank column means "fully occupied"
+  const occupancyValue = parseFloat(line.substring(54, 60).trim());
+  const occupancy = Number.isFinite(occupancyValue) ? occupancyValue : 1;
   const tempFactorStr = line.substring(60, 66).trim();
   const tempFactor = tempFactorStr ? parseFloat(tempFactorStr) : undefined;
   const element = parseElement(line, residueName);

@@ -193,7 +193,9 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
                           || (labelSeqIdIdx !== undefined ? parseValue(tokens[labelSeqIdIdx]) : null);
     const residueNumber = residueNumberStr ? parseInt(residueNumberStr, 10) : undefined;
 
-    const occupancy = occupancyIdx !== undefined ? parseFloat(tokens[occupancyIdx]) || 1.0 : 1.0;
+    // 0 is a real occupancy; '?' and '.' (and a missing column) mean 1
+    const occupancyValue = occupancyIdx !== undefined ? parseFloat(tokens[occupancyIdx]) : NaN;
+    const occupancy = Number.isFinite(occupancyValue) ? occupancyValue : 1;
     const tempFactor = bFactorIdx !== undefined ? parseFloat(tokens[bFactorIdx]) : undefined;
 
     atoms.push({

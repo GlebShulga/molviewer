@@ -353,3 +353,26 @@ _atom_site.Cartn_z
     expect(molecule.name).toBe('1CRN');
   });
 });
+
+describe('parseMMCIF occupancy', () => {
+  const cif = (occ: string[]) => `data_OCC
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.occupancy
+${occ.map((o, i) => `ATOM ${i + 1} C CA ALA A ${i + 1} ${i * 3}.0 0.0 0.0 ${o}`).join('\n')}
+#
+`;
+
+  it('keeps an occupancy of 0 and reads ? and . as 1', () => {
+    expect(parseMMCIF(cif(['0.00', '?', '.', '0.50'])).atoms.map((a) => a.occupancy)).toEqual([0, 1, 1, 0.5]);
+  });
+});

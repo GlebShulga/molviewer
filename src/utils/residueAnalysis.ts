@@ -19,7 +19,8 @@ export function analyzeResidues(atoms: Atom[]): Chain[] {
 
   atoms.forEach((atom, index) => {
     const chainId = atom.chainId || 'Unknown';
-    const residueKey = `${atom.residueName || 'UNK'}_${atom.residueNumber ?? 0}`;
+    // Atoms without a residue number get their own residue, not residue 0's
+    const residueKey = `${atom.residueName || 'UNK'}_${atom.residueNumber ?? 'none'}`;
 
     if (!chainMap.has(chainId)) {
       chainMap.set(chainId, new Map());

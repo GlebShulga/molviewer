@@ -178,3 +178,18 @@ describe('parsePDB element symbols', () => {
     expect(elementOf('HG1 ', 'SEP')).toBe('H');
   });
 });
+
+describe('parsePDB occupancy and residue numbers', () => {
+  const atomLine = (serial: number, occupancy: string, resSeq: string, x: number) =>
+    `ATOM  ${String(serial).padStart(5)}  CA  ALA A${resSeq.padStart(4)}    ${x.toFixed(3).padStart(8)}${'0.000'.padStart(8)}${'0.000'.padStart(8)}${occupancy.padStart(6)}${'0.00'.padStart(6)}           C`;
+
+  it('keeps an occupancy of 0 and reads a blank one as 1', () => {
+    const m = parsePDB([atomLine(1, '0.00', '1', 0), atomLine(2, '', '2', 4), atomLine(3, '0.50', '3', 8), 'END'].join('\n'));
+    expect(m.atoms.map((a) => a.occupancy)).toEqual([0, 1, 0.5]);
+  });
+
+  it('reads a blank residue number as undefined, not NaN', () => {
+    const m = parsePDB([atomLine(1, '1.00', '', 0), 'END'].join('\n'));
+    expect(m.atoms[0].residueNumber).toBeUndefined();
+  });
+});
