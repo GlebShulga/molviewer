@@ -8,6 +8,8 @@ export interface SurfaceOptions {
   probeRadius?: number;
   resolution?: number;
   type: 'vdw' | 'sas';
+  /** Use the GPU density path when it applies (default true); false forces the CPU path. */
+  preferGpu?: boolean;
 }
 
 export interface SurfaceData {
@@ -101,7 +103,7 @@ export function generateSurface(
   atoms: Atom[],
   options: SurfaceOptions
 ): SurfaceData {
-  const { probeRadius = DEFAULT_PROBE_RADIUS, resolution, type } = options;
+  const { probeRadius = DEFAULT_PROBE_RADIUS, resolution, type, preferGpu = true } = options;
 
   // Bail out for extremely large molecules
   if (atoms.length > MAX_SURFACE_ATOMS) {
@@ -140,7 +142,7 @@ export function generateSurface(
   const step = Math.max(baseResolution, maxSize / effectiveMaxGrid);
 
   // Compute SDF - use GPU for large proteins, CPU for small molecules
-  const useGPU = isGPUDensitySupported() && atoms.length >= 500 && atoms.length <= GPU_MAX_ATOMS;
+  const useGPU = preferGpu && isGPUDensitySupported() && atoms.length >= 500 && atoms.length <= GPU_MAX_ATOMS;
 
   let sdfResult: SDFResult;
   if (useGPU) {
