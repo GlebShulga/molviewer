@@ -376,3 +376,15 @@ describe('ringsWithin', () => {
     expect(ringsWithin(rings, [])).toEqual([]);
   });
 });
+
+describe('porphyrins (known limit)', () => {
+  // Pins the documented limit (see the rule comment in aromaticDetection.ts):
+  // a porphyrin's aromaticity is a macrocycle property, and per-ring electron
+  // counting marks only one of protoporphyrin IX's four pyrrole rings as
+  // PubChem draws it. If this changes, update the comment and this test.
+  it('marks one ring of PubChem protoporphyrin IX (CID 4971)', () => {
+    const fixtures = resolve(__dirname, '../../parsers/__tests__/fixtures');
+    const porphyrin = parseSDF(readFileSync(resolve(fixtures, 'protoporphyrin-ix-cid4971.mol'), 'utf8'));
+    expect(detectAromaticRings(porphyrin)).toHaveLength(1);
+  });
+});

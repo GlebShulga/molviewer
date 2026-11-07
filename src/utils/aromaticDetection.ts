@@ -109,6 +109,12 @@ function otherAtom(bond: Bond, atom: number): number {
  *
  * Only 5- and 6-membered rings are candidates, so azulene's five-ring is not
  * marked either: the double bond into its seven-ring counts 0 here.
+ *
+ * Known limit: porphyrins (heme, chlorophyll) are aromatic as an 18-electron
+ * macrocycle, which per-ring counting can't see, so compounds from SDF or
+ * PubChem get only some pyrrole rings marked (one of four for protoporphyrin
+ * IX, CID 4971; pinned in the tests). Hemes inside PDB entries are not
+ * affected: their inferred bonds are all single, so no ring is searched.
  */
 function isAromaticRing(
   ring: RingCandidate,
