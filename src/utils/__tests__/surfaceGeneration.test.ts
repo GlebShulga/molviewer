@@ -41,3 +41,16 @@ describe('CPU surface grid', () => {
     for (const c of centroid) expect(Math.abs(c)).toBeLessThan(0.1);
   });
 });
+
+describe('surface winding', () => {
+  it('winds triangles so a closed surface has positive volume (faces point outward)', () => {
+    const { vertices, indices } = surface.generateSurface([carbon(0, 0)], { type: 'vdw', resolution: 1.0 });
+    let volume = 0;
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t], indices[t + 1], indices[t + 2]].map((i) => [vertices[3 * i], vertices[3 * i + 1], vertices[3 * i + 2]]);
+      // Signed tetrahedron volume with the origin: a · (b × c) / 6
+      volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+    }
+    expect(volume).toBeGreaterThan(0);
+  });
+});

@@ -674,7 +674,10 @@ function extractIsosurface(
           }
 
           if (triIndices.length === 3) {
-            indices.push(triIndices[0], triIndices[1], triIndices[2]);
+            // Counter-clockwise seen from outside (the table's order is the
+            // reverse), so face normals point out: exported STL/GLB facets,
+            // and front faces drawn after back faces when the surface is translucent
+            indices.push(triIndices[0], triIndices[2], triIndices[1]);
           }
         }
       }

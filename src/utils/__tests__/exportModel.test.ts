@@ -314,6 +314,30 @@ describe('exportModel', () => {
     expect(result.size[0]).toBeCloseTo(206, 0);
   });
 
+  it('writes surface facets whose normals point away from the molecule', async () => {
+    const { generateSurface } = await import('../surfaceGeneration');
+    const data = generateSurface([{ id: 0, element: 'C', x: 0, y: 0, z: 0 }], { type: 'vdw', resolution: 1.0 });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(data.vertices, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
+    geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
+    const scene = new THREE.Scene();
+    scene.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
+
+    const result = await exportModel(scene, 'stl', { mmPerAngstrom: 1 });
+    const view = new DataView(await readBlob(result.blob));
+    const count = view.getUint32(80, true);
+    expect(count).toBeGreaterThan(0);
+    let outward = 0;
+    for (let f = 0; f < count; f++) {
+      const o = 84 + 50 * f;
+      const n = [0, 1, 2].map((k) => view.getFloat32(o + 4 * k, true));
+      const centroid = [0, 1, 2].map((k) => (view.getFloat32(o + 12 + 4 * k, true) + view.getFloat32(o + 24 + 4 * k, true) + view.getFloat32(o + 36 + 4 * k, true)) / 3);
+      if (n[0] * centroid[0] + n[1] * centroid[1] + n[2] * centroid[2] > 0) outward++;
+    }
+    expect(outward / count).toBeGreaterThan(0.99);
+  });
+
   it('writes a GLB with vertex colors', async () => {
     const result = await exportModel(makeScene(), 'glb');
     const buf = await readBlob(result.blob);
