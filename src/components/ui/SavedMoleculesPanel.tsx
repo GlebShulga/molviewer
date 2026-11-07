@@ -200,8 +200,10 @@ export function SavedMoleculesPanel() {
                           onKeyDown={handleKeyDown}
                           onBlur={handleConfirmRename}
                         />
+                        {/* No focus change on press: the input's blur would confirm before Cancel runs */}
                         <button
                           className={clsx(styles.controlButton, styles.small)}
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={handleConfirmRename}
                           title="Confirm"
                         >
@@ -209,6 +211,7 @@ export function SavedMoleculesPanel() {
                         </button>
                         <button
                           className={clsx(styles.controlButton, styles.small)}
+                          onMouseDown={(e) => e.preventDefault()}
                           onClick={handleCancelRename}
                           title="Cancel"
                         >

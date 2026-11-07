@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useMoleculeStore, temporalStore } from '../../../store/moleculeStore';
 import { SavedMoleculesPanel } from '../SavedMoleculesPanel';
 
@@ -81,5 +82,40 @@ describe('SavedMoleculesPanel: an entry that cannot be read', () => {
 
     expect(alertSpy).toHaveBeenCalledWith('This saved molecule could not be read.');
     expect(reporter.logError).not.toHaveBeenCalled();
+  });
+});
+
+describe('SavedMoleculesPanel: rename', () => {
+  async function startRename() {
+    storeEntry('molecule', null);
+    act(() => useMoleculeStore.getState().loadSavedMoleculesIndex());
+    render(<SavedMoleculesPanel />);
+    const user = userEvent.setup();
+    await user.click(screen.getByTitle('Click to rename'));
+    const input = screen.getByLabelText('Edit molecule name');
+    await user.clear(input);
+    await user.type(input, 'New name');
+    return user;
+  }
+  const savedNames = () => useMoleculeStore.getState().savedMolecules.map(m => m.name);
+
+  it('Cancel keeps the old name (the input losing focus to the button must not confirm)', async () => {
+    const user = await startRename();
+    await user.click(screen.getByTitle('Cancel'));
+    expect(savedNames()).toEqual(['Broken molecule']);
+    expect(screen.queryByLabelText('Edit molecule name')).toBeNull();
+  });
+
+  it('Confirm renames', async () => {
+    const user = await startRename();
+    await user.click(screen.getByTitle('Confirm'));
+    expect(savedNames()).toEqual(['New name']);
+    expect(screen.queryByLabelText('Edit molecule name')).toBeNull();
+  });
+
+  it('clicking elsewhere still confirms', async () => {
+    const user = await startRename();
+    await user.click(document.body);
+    expect(savedNames()).toEqual(['New name']);
   });
 });
