@@ -1,6 +1,7 @@
 import type { Atom, Bond, Molecule, SecondaryStructure, BiologicalAssembly } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
+import { DEFAULT_ELEMENT, getElement } from "../constants";
 
 export interface PDBParserOptions {
   inferBonds?: boolean;
@@ -223,18 +224,57 @@ function getSecondaryStructure(
   return 'coil';
 }
 
-function parseElement(line: string): string {
+/** "ZN" → "Zn", "se" → "Se": the form the element table and the classifier use. */
+function normalizeElement(symbol: string): string {
+  return symbol.charAt(0).toUpperCase() + symbol.slice(1).toLowerCase();
+}
+
+/** Residues whose atoms are all one-letter elements (C, N, O, S, P, H). */
+const STANDARD_RESIDUES = new Set([
+  'ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE',
+  'LEU', 'LYS', 'MET', 'PHE', 'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL',
+  'A', 'C', 'G', 'U', 'I', 'DA', 'DC', 'DG', 'DT', 'DU', 'DI',
+]);
+
+/**
+ * Two-letter symbols that are also common atom names (alpha carbon, delta
+ * carbon, epsilon nitrogen, ...). Read as the element only in a residue
+ * named after it: "CA" in residue CA is calcium.
+ */
+const AMBIGUOUS_TWO_LETTER = new Set(['CA', 'CD', 'NE', 'HE', 'NA', 'HG']);
+
+/**
+ * Element from columns 77-78, or from the atom name (columns 13-16) when
+ * that column is blank, following the PDB convention that a two-letter
+ * element starts in column 13 and a one-letter one in column 14.
+ *
+ * Known limits: an organomercury Hg in a ligand not named HG reads as H, and
+ * CHARMM ion residue names (SOD, POT, CAL) aren't recognized as ions.
+ */
+function parseElement(line: string, residueName: string): string {
   const elementCol = line.substring(76, 78).trim();
   if (elementCol) {
-    return elementCol;
+    return normalizeElement(elementCol);
   }
 
-  const atomName = line.substring(12, 16).trim();
-  const firstChar = atomName.charAt(0);
-  if (/\d/.test(firstChar)) {
-    return atomName.charAt(1);
+  const raw = line.substring(12, 16).padEnd(4);
+  const name = raw.trim();
+  const c13 = raw.charAt(0);
+  const c14 = raw.charAt(1);
+  const oneLetter = c13 === ' ' || /\d/.test(c13) ? c14 : c13;
+
+  // Hydrogens: HG21, HE21, HD11 (four characters starting with H) or 1HG2
+  if ((name.length === 4 && c13 === 'H') || /\d/.test(c13)) return 'H';
+
+  const residue = residueName.trim().toUpperCase();
+  if (STANDARD_RESIDUES.has(residue)) return normalizeElement(oneLetter);
+
+  if (/[A-Za-z]/.test(c13) && /[A-Za-z]/.test(c14)) {
+    const two = (c13 + c14).toUpperCase();
+    const known = getElement(two) !== DEFAULT_ELEMENT;
+    if (known && (!AMBIGUOUS_TWO_LETTER.has(two) || residue === two)) return normalizeElement(two);
   }
-  return firstChar;
+  return normalizeElement(oneLetter);
 }
 
 function parseAtomLine(line: string, index: number): Atom | null {
@@ -254,7 +294,7 @@ function parseAtomLine(line: string, index: number): Atom | null {
   const occupancy = parseFloat(line.substring(54, 60).trim()) || 1.0;
   const tempFactorStr = line.substring(60, 66).trim();
   const tempFactor = tempFactorStr ? parseFloat(tempFactorStr) : undefined;
-  const element = parseElement(line);
+  const element = parseElement(line, residueName);
 
   if (isNaN(x) || isNaN(y) || isNaN(z)) {
     return null;

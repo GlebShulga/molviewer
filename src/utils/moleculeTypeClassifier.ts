@@ -61,7 +61,9 @@ function isRNAResidue(residueAtoms: Atom[], residueName: string): boolean {
  */
 function isIon(residueAtoms: Atom[]): boolean {
   if (residueAtoms.length !== 1) return false;
-  return ION_ELEMENTS.has(residueAtoms[0].element);
+  // XYZ files keep symbols as written ("ZN"); the set holds "Zn"
+  const el = residueAtoms[0].element.trim();
+  return ION_ELEMENTS.has(el.charAt(0).toUpperCase() + el.slice(1).toLowerCase());
 }
 
 /**

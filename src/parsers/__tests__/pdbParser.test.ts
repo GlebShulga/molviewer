@@ -127,3 +127,54 @@ END`;
     expect(molecule.bonds).toHaveLength(0);
   });
 });
+
+describe('parsePDB element symbols', () => {
+  /** One ATOM/HETATM line with a 4-character atom name field (columns 13-16) and an optional element column. */
+  const line = (name4: string, residue: string, element = '', record = 'HETATM') =>
+    `${record.padEnd(6)}${'1'.padStart(5)} ${name4} ${residue.padStart(3)} A${'1'.padStart(4)}    ` +
+    `${'0.000'.padStart(8)}${'0.000'.padStart(8)}${'0.000'.padStart(8)}${'1.00'.padStart(6)}${'0.00'.padStart(6)}          ${element.padStart(2)}`;
+  const elementOf = (name4: string, residue: string, element = '') => parsePDB(`${line(name4, residue, element)}\nEND`).atoms[0].element;
+
+  it('writes element columns in "Zn" form', () => {
+    expect(elementOf('ZN  ', ' ZN', 'ZN')).toBe('Zn');
+    expect(elementOf('SE  ', 'MSE', 'SE')).toBe('Se');
+    expect(elementOf(' CA ', 'ALA', ' C')).toBe('C');
+  });
+
+  it('classifies a HETATM ZN as an ion', async () => {
+    const { classifyMolecule } = await import('../../utils/moleculeTypeClassifier');
+    const molecule = parsePDB(`${line('ZN  ', ' ZN', 'ZN')}\nEND`);
+    expect(classifyMolecule(molecule).components.map((c) => c.type)).toEqual(['ion']);
+  });
+
+  it('reads two-letter elements from the atom name when the column is blank', () => {
+    expect(elementOf('FE  ', 'HEM')).toBe('Fe');
+    expect(elementOf('CL1 ', 'LIG')).toBe('Cl');
+    expect(elementOf('BR1 ', 'LIG')).toBe('Br');
+    expect(elementOf('ZN  ', ' ZN')).toBe('Zn');
+  });
+
+  it('keeps common one-letter atom names that look like elements', () => {
+    expect(elementOf('NA  ', 'HEM')).toBe('N');
+    expect(elementOf(' CA ', 'ALA')).toBe('C');
+    expect(elementOf('CA  ', 'ALA')).toBe('C');
+    expect(elementOf('CA  ', 'SEP')).toBe('C');
+    expect(elementOf('CD  ', 'MSE')).toBe('C');
+    expect(elementOf('NE  ', 'AGL')).toBe('N');
+  });
+
+  it('reads ions whose residue is named after the element', () => {
+    expect(elementOf('CA  ', ' CA')).toBe('Ca');
+    expect(elementOf('CA  ', ' ca')).toBe('Ca');
+    expect(elementOf('NA  ', ' NA')).toBe('Na');
+    expect(elementOf('HG  ', ' HG')).toBe('Hg');
+  });
+
+  it('reads hydrogens', () => {
+    expect(elementOf('HG21', 'THR')).toBe('H');
+    expect(elementOf('HE21', 'GLN')).toBe('H');
+    expect(elementOf('1HG2', 'THR')).toBe('H');
+    expect(elementOf(' HG ', 'SEP')).toBe('H');
+    expect(elementOf('HG1 ', 'SEP')).toBe('H');
+  });
+});
