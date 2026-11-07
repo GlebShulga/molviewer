@@ -151,7 +151,9 @@ export function segmentSplineByStructure(splinePoints: SplinePoint[]): SplineSeg
       currentSegment.points.push(point);
       currentSegment.endResidueIndex = point.residueIndex;
     } else {
-      // Save current segment and start new one
+      // The boundary point also closes the segment ending here, so the
+      // two segments meet instead of leaving a gap of one spline step
+      currentSegment.points.push(point);
       segments.push(currentSegment);
       currentSegment = {
         type: point.secondaryStructure,

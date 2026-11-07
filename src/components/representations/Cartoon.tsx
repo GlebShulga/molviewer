@@ -17,6 +17,7 @@ import {
 } from '../../utils';
 import { SECONDARY_STRUCTURE_COLORS } from '../../colors';
 import { residueKey } from '../../utils/residueAnalysis';
+import { splitAtChainBreaks } from '../../utils/backboneExtraction';
 
 export interface CartoonProps {
   molecule: Molecule;
@@ -71,26 +72,11 @@ export function Cartoon({
 
       if (filtered.length < 2) continue;
 
-      // Split into continuous segments (handle gaps from filtering)
-      // If residue numbers jump by more than 1, start a new chain segment
-      let currentSegment = [filtered[0]];
-
-      for (let i = 1; i < filtered.length; i++) {
-        const gap = filtered[i].residueNumber - filtered[i - 1].residueNumber;
-        if (gap > 1) {
-          // Gap detected - save current segment and start new one
-          if (currentSegment.length >= 2) {
-            result.push({ chainId: chain.chainId, residues: currentSegment });
-          }
-          currentSegment = [filtered[i]];
-        } else {
-          currentSegment.push(filtered[i]);
-        }
-      }
-
-      // Don't forget last segment
-      if (currentSegment.length >= 2) {
-        result.push({ chainId: chain.chainId, residues: currentSegment });
+      // Split where the backbone really breaks (filtered-out residues in
+      // between, or a gap in the model), not at residue numbering gaps,
+      // which antibody numbering has along continuous chains
+      for (const piece of splitAtChainBreaks(filtered)) {
+        if (piece.length >= 2) result.push({ chainId: chain.chainId, residues: piece });
       }
     }
 
@@ -178,13 +164,9 @@ export function Cartoon({
           // When using vertex colors, uniform color is white (it gets multiplied)
           color = new THREE.Color(0xffffff);
         } else {
-          // Use representative atom from the segment for coloring
-          const residue =
-            chain.residues.find(
-              (r) =>
-                r.residueNumber >= segment.startResidueIndex &&
-                r.residueNumber <= segment.endResidueIndex
-            ) || chain.residues[0];
+          // Use the segment's first residue for coloring (segments store
+          // indices into chain.residues, not residue numbers)
+          const residue = chain.residues[segment.startResidueIndex] ?? chain.residues[0];
 
           const atom = moleculeWithSS.atoms[residue.atomIndex];
           if (atom) {

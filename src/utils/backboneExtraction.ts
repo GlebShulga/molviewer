@@ -242,6 +242,39 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
   return chains;
 }
 
+/** Longest alpha carbon spacing in a continuous protein chain (normally 3.8 Å, 2.9 Å for cis). */
+const MAX_CA_CA = 4.2;
+/** Longest phosphate spacing in a continuous nucleic acid chain (normally 6-7 Å). */
+const MAX_P_P = 8;
+
+const distance = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
+  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+
+/**
+ * Splits residues (in chain order) where the backbone is broken: alpha
+ * carbons more than 4.2 Å apart, or phosphates more than 8 Å apart for
+ * nucleotides (which have no alpha carbon; their `ca` stays at the origin).
+ * Residue numbering gaps are not breaks: antibody numbering skips numbers
+ * along a continuous chain.
+ */
+export function splitAtChainBreaks(residues: BackboneResidue[]): BackboneResidue[][] {
+  const pieces: BackboneResidue[][] = [];
+  let current: BackboneResidue[] = [];
+  for (const residue of residues) {
+    const prev = current[current.length - 1];
+    if (prev) {
+      const broken = prev.p && residue.p ? distance(prev.p, residue.p) > MAX_P_P : distance(prev.ca, residue.ca) > MAX_CA_CA;
+      if (broken) {
+        pieces.push(current);
+        current = [];
+      }
+    }
+    current.push(residue);
+  }
+  if (current.length) pieces.push(current);
+  return pieces;
+}
+
 /**
  * An atom Cartoon can trace: the alpha carbon of a residue it traces
  * (traceableResidues), or a nucleotide's phosphorus (as extractBackbone
