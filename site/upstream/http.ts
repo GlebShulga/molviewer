@@ -6,8 +6,19 @@ import type { UpstreamOptions } from './types';
 
 export const DEFAULT_TIMEOUT_MS = 4000;
 
-/** Cloudflare edge cache hint for upstream responses (ignored outside Workers). */
-const CF_CACHE = { cacheTtl: 86400, cacheEverything: true };
+/**
+ * Cloudflare edge cache policy for upstream responses (ignored outside
+ * Workers). Successes for a day, "not found" for an hour; anything else is
+ * never cached (a negative TTL means "don't cache"; 0 would cache and expire
+ * at once), so a transient error or AlphaFold's 422 isn't served for a day.
+ */
+const DEFAULT_CF = {
+  cacheEverything: true,
+  cacheTtlByStatus: { '200-299': 86400, '404': 3600, '400-403': -1, '405-499': -1, '500-599': -1 },
+};
+
+/** Seconds a successful RCSB GraphQL answer stays in the Workers cache. */
+const GRAPHQL_TTL_SECONDS = 86400;
 
 /**
  * Explicit User-Agent: the AlphaFold API answers 403 to requests with no User-Agent
@@ -33,10 +44,11 @@ export async function getJson<T>(
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const cf = opts.cf === undefined ? DEFAULT_CF : opts.cf;
   const init = {
     headers: { accept: 'application/json', 'user-agent': USER_AGENT },
     signal: controller.signal,
-    cf: CF_CACHE,
+    ...(cf ? { cf } : {}),
   } as RequestInit & { cf?: unknown };
 
   try {
@@ -65,19 +77,35 @@ export function rcsbGraphqlUrl(query: string, variables: Record<string, unknown>
   )}`;
 }
 
+/** The Workers cache, when running in a Worker or Pages Function (browsers have `caches` without `default`). */
+function workersCache(): Cache | undefined {
+  return (globalThis as { caches?: { default?: Cache } }).caches?.default;
+}
+
 /**
  * Run an RCSB GraphQL query. GraphQL reports failures as HTTP 200 with `errors`,
  * so those are turned into `{ ok: false }` too.
+ *
+ * The edge cache can't tell those failures from answers, so the request
+ * goes out without `cf` caching, and only answers without `errors` are
+ * kept in the Workers cache (a day).
  */
 export async function rcsbGraphql<T>(
   query: string,
   variables: Record<string, unknown>,
   opts: UpstreamOptions
 ): Promise<JsonResponse<T>> {
-  const resp = await getJson<{ data?: T | null; errors?: Array<{ message?: string }> }>(
-    rcsbGraphqlUrl(query, variables),
-    opts
-  );
+  const url = rcsbGraphqlUrl(query, variables);
+  const cache = workersCache();
+  if (cache) {
+    const hit = await cache.match(new Request(url)).catch(() => undefined);
+    if (hit) {
+      const data = (await hit.json().catch(() => null)) as T | null;
+      if (data) return { ok: true, status: 200, data };
+    }
+  }
+
+  const resp = await getJson<{ data?: T | null; errors?: Array<{ message?: string }> }>(url, { ...opts, cf: null });
   if (!resp.ok) return resp;
   const body = resp.data;
   if (!body || body.errors?.length || !body.data) {
@@ -87,6 +115,12 @@ export async function rcsbGraphql<T>(
       status: resp.status,
       message: `GraphQL error from data.rcsb.org: ${detail}`,
     };
+  }
+  if (cache) {
+    const stored = new Response(JSON.stringify(body.data), {
+      headers: { 'content-type': 'application/json', 'cache-control': `public, max-age=${GRAPHQL_TTL_SECONDS}` },
+    });
+    await cache.put(new Request(url), stored).catch(() => {});
   }
   return { ok: true, status: resp.status, data: body.data };
 }

@@ -39,7 +39,7 @@ export const onRequestGet: PagesFunction = async ({ request, params }) => {
     const upstream = await fetch(rcsbImageUrl(id), {
       headers: { 'user-agent': USER_AGENT },
       signal: controller.signal,
-      cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 30 * 86400, '404': 3600, '500-599': 0 } },
+      cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 30 * 86400, '404': 3600, '500-599': -1 } },
     } as RequestInit & { cf?: unknown });
     if (!upstream.ok || !upstream.body || !(upstream.headers.get('content-type') ?? '').startsWith('image/jpeg')) {
       // Release the connection: the body is never read.

@@ -15,6 +15,11 @@ export interface UpstreamOptions {
   fetchImpl?: typeof fetch;
   /** Per-request timeout in milliseconds (default 4000). */
   timeoutMs?: number;
+  /**
+   * Cloudflare `cf` fetch options (edge caching); the default caches
+   * successes and 404s only (see http.ts). `null` sends none.
+   */
+  cf?: Record<string, unknown> | null;
 }
 
 /**
