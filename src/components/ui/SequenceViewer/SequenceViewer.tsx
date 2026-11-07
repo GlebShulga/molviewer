@@ -25,8 +25,9 @@ function getResidueSecondaryStructure(residue: Residue): 'helix' | 'sheet' | 'co
 }
 
 interface SequenceViewerProps {
-  onResidueClick?: (atomIndices: number[]) => void;
-  onResidueHover?: (residue: Residue | null) => void;
+  /** The panel's own structure (not necessarily the active one) and the residue's atoms. */
+  onResidueClick?: (structureId: string, atomIndices: number[]) => void;
+  onResidueHover?: (structureId: string, residue: Residue | null) => void;
 }
 
 export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewerProps) {
@@ -164,14 +165,14 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
   }
 
   const handleResidueClick = (residue: Residue) => {
-    if (onResidueClick) {
-      onResidueClick(residue.atomIndices);
+    if (onResidueClick && selectedStructureId) {
+      onResidueClick(selectedStructureId, residue.atomIndices);
     }
   };
 
   const handleResidueHover = (residue: Residue | null) => {
     setHoveredResidue(residue ? residueId(residue.chainId, residue.name, residue.number, residue.insertionCode) : null);
-    onResidueHover?.(residue);
+    if (selectedStructureId) onResidueHover?.(selectedStructureId, residue);
   };
 
   return (

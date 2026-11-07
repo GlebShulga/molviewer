@@ -44,6 +44,7 @@ import { ColorLegend } from './components/viewer/ColorLegend';
 import { useLandingShown } from './hooks/useLandingShown';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { Sun, Moon, Menu, X, Github } from 'lucide-react';
+import type { Residue } from './utils/residueAnalysis';
 import styles from './App.module.css';
 import './styles/globals.css';
 
@@ -187,7 +188,6 @@ function AppContent() {
 
   const {
     structureOrder,
-    activeStructureId,
     isLoading,
     error,
     measurementMode,
@@ -205,7 +205,6 @@ function AppContent() {
     setError,
   } = useMoleculeStore(useShallow(state => ({
     structureOrder: state.structureOrder,
-    activeStructureId: state.activeStructureId,
     isLoading: state.isLoading,
     error: state.error,
     measurementMode: state.measurementMode,
@@ -467,30 +466,23 @@ function AppContent() {
     setMeasurementMode(mode);
   }, [setMeasurementMode]);
 
-  // Sequence viewer handlers
-  // Note: SequenceViewer manages its own structure selection internally
-  // These handlers receive atom indices for the currently selected structure in SequenceViewer
-  const handleSequenceResidueClick = useCallback((atomIndices: number[]) => {
-    if (atomIndices.length > 0 && activeStructureId) {
-      // Select the first atom of the residue (e.g., CA for amino acids)
-      // Use 2-arg signature with structureId
-      selectAtom(activeStructureId, atomIndices[0]);
-    }
-  }, [selectAtom, activeStructureId]);
+  // Sequence viewer handlers. The panel shows a structure of its own choice,
+  // which need not be the active one, and passes it with each residue.
+  const handleSequenceResidueClick = useCallback((structureId: string, atomIndices: number[]) => {
+    // Select the first atom of the residue (e.g., N or CA for amino acids)
+    if (atomIndices.length > 0) selectAtom(structureId, atomIndices[0]);
+  }, [selectAtom]);
 
-  const handleSequenceResidueHover = useCallback((residue: Parameters<NonNullable<React.ComponentProps<typeof SequenceViewer>['onResidueHover']>>[0]) => {
-    if (residue && residue.atoms.length > 0 && molecule && activeStructureId) {
-      // Hover the first atom of the residue
-      const atomIndex = residue.atomIndices[0];
-      const atom = molecule.atoms[atomIndex];
-      if (atom) {
-        // Use 4-arg signature with structureId
-        setHoveredAtom(atom, atomIndex, activeStructureId, null);
-      }
+  const handleSequenceResidueHover = useCallback((structureId: string, residue: Residue | null) => {
+    // Hover the first atom of the residue, in the structure the panel shows
+    const atomIndex = residue?.atomIndices[0];
+    const atom = atomIndex === undefined ? undefined : useMoleculeStore.getState().structures.get(structureId)?.molecule.atoms[atomIndex];
+    if (atom && atomIndex !== undefined) {
+      setHoveredAtom(atom, atomIndex, structureId, null);
     } else {
       setHoveredAtom(null, null, null, null);
     }
-  }, [molecule, activeStructureId, setHoveredAtom]);
+  }, [setHoveredAtom]);
 
   if (!webgl2Supported) {
     return <WebGLFallback />;
