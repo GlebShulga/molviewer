@@ -218,6 +218,52 @@ describe('moleculeStore', () => {
       expect(useMoleculeStore.getState().structures.size).toBe(1);
     });
 
+    it('does not loop when the order names only an id without a structure', () => {
+      expect(() =>
+        useMoleculeStore.setState({ structureOrder: ['ghost'], structures: new Map(), activeStructureId: null })
+      ).not.toThrow();
+      expect(useMoleculeStore.getState().activeStructureId).toBeNull();
+    });
+
+    it('makes active the first id in the order that has a structure', () => {
+      const id = useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+      const { structures } = useMoleculeStore.getState();
+      expect(() =>
+        useMoleculeStore.setState({ structureOrder: ['ghost', id], structures, activeStructureId: null })
+      ).not.toThrow();
+      expect(useMoleculeStore.getState().activeStructureId).toBe(id);
+    });
+
+    it('keeps an active structure after undoing a Replace', () => {
+      useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+      useMoleculeStore.getState().setMolecule(createMockMolecule('B'));
+      temporalStore.getState().undo();
+      const { activeStructureId, structureOrder, structures } = useMoleculeStore.getState();
+      expect(structureOrder).toHaveLength(1);
+      expect(structures.get(activeStructureId!)?.name).toBe('A');
+    });
+
+    it('keeps an active structure after undoing the removal of the last one', () => {
+      const id = useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+      useMoleculeStore.getState().removeStructure(id);
+      expect(useMoleculeStore.getState().activeStructureId).toBeNull();
+      temporalStore.getState().undo();
+      const { activeStructureId, structures } = useMoleculeStore.getState();
+      expect(activeStructureId).not.toBeNull();
+      expect(structures.has(activeStructureId!)).toBe(true);
+    });
+
+    it('undoes a layout change', () => {
+      useMoleculeStore.getState().addStructure(createMockMolecule('A'), 'A');
+      useMoleculeStore.getState().addStructure(createMockMolecule('B'), 'B');
+      expect(useMoleculeStore.getState().layoutMode).toBe('overlay');
+      useMoleculeStore.getState().setLayoutMode('side-by-side');
+      temporalStore.getState().undo();
+      expect(useMoleculeStore.getState().layoutMode).toBe('overlay');
+      temporalStore.getState().redo();
+      expect(useMoleculeStore.getState().layoutMode).toBe('side-by-side');
+    });
+
     it('undoes label addition', () => {
       const id = useMoleculeStore.getState().addStructure(createMockMolecule(), 'A');
       useMoleculeStore.getState().addLabel(id, 0, 'Test');

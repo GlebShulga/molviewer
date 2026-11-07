@@ -65,6 +65,8 @@ import type { MolViewerSession, CameraSnapshot } from '../types/session';
 interface TemporalState {
   structures: Map<string, Structure>;
   structureOrder: string[];
+  /** Overlay or side by side: undoable, like the offsets it sets on structures */
+  layoutMode: LayoutMode;
   measurements: Measurement[];
   labels: Label3D[];
   surfaceSettings: SurfaceSettings;
@@ -467,6 +469,8 @@ export { MAX_STRUCTURES };
 interface TemporalState {
   structures: Map<string, Structure>;
   structureOrder: string[];
+  /** Overlay or side by side: undoable, like the offsets it sets on structures */
+  layoutMode: LayoutMode;
   measurements: Measurement[];
   labels: Label3D[];
   surfaceSettings: SurfaceSettings;
@@ -1536,6 +1540,7 @@ export const useMoleculeStore = create<MoleculeState>()(
           ])
         ),
         structureOrder: [...state.structureOrder],
+        layoutMode: state.layoutMode,
         measurements: state.measurements.map(m => ({ ...m })),
         labels: state.labels.map(l => ({ ...l })),
         surfaceSettings: { ...state.surfaceSettings },
@@ -1551,6 +1556,23 @@ export const useMoleculeStore = create<MoleculeState>()(
 
 // Export the temporal store for undo/redo access
 export const temporalStore = useMoleculeStore.temporal;
+
+/**
+ * activeStructureId isn't undoable (selection stays out of history), so an
+ * undo or redo can bring back structures with none active, or leave it
+ * naming one that's gone (undo after removing the last structure, or after a
+ * Replace). Then the first structure becomes active. Not recorded in history:
+ * activeStructureId isn't part of it. Ids without a structure are skipped, so
+ * a corrupt order can't make this set the same missing id again and again.
+ */
+useMoleculeStore.subscribe((state) => {
+  const { activeStructureId, structureOrder, structures } = state;
+  if (activeStructureId !== null && structures.has(activeStructureId)) return;
+  const first = structureOrder.find((id) => structures.has(id));
+  if (first !== undefined && first !== activeStructureId) {
+    useMoleculeStore.setState({ activeStructureId: first });
+  }
+});
 
 // Expose the store on window for e2e tests (mirrors the pattern in viewerRefs.ts).
 // Keeps test setup fast for boundary checks that would otherwise require many
