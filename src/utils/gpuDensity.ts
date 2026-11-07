@@ -49,10 +49,12 @@ in vec2 vUv;
 out vec4 fragColor;
 
 void main() {
-  // Compute world position for this voxel
+  // World position of this sample: grid corner (ix, iy, iz), as on the CPU
+  // path and where marching cubes puts vertices. gl_FragCoord is the pixel
+  // centre (ix + 0.5), so floor() gives the integer index, like uZSlice.
   vec3 voxelPos = uBoundsMin + vec3(
-    vUv.x * uGridSize.x,
-    vUv.y * uGridSize.y,
+    floor(gl_FragCoord.x),
+    floor(gl_FragCoord.y),
     uZSlice
   ) * uStep;
 
@@ -96,10 +98,12 @@ in vec2 vUv;
 out vec4 fragColor;
 
 void main() {
-  // Compute world position for this voxel
+  // World position of this sample: grid corner (ix, iy, iz), as on the CPU
+  // path and where marching cubes puts vertices. gl_FragCoord is the pixel
+  // centre (ix + 0.5), so floor() gives the integer index, like uZSlice.
   vec3 voxelPos = uBoundsMin + vec3(
-    vUv.x * uGridSize.x,
-    vUv.y * uGridSize.y,
+    floor(gl_FragCoord.x),
+    floor(gl_FragCoord.y),
     uZSlice
   ) * uStep;
 
@@ -462,10 +466,11 @@ export function computeGaussianDensityGPU(
 
   const startTime = performance.now();
 
-  // Grid dimensions
-  const w = Math.ceil((bounds.maxX - bounds.minX) / step);
-  const h = Math.ceil((bounds.maxY - bounds.minY) / step);
-  const d = Math.ceil((bounds.maxZ - bounds.minZ) / step);
+  // Grid dimensions: one sample per corner, the last at or past the far
+  // bound (as gridDims in surfaceGeneration.ts)
+  const w = Math.ceil((bounds.maxX - bounds.minX) / step) + 1;
+  const h = Math.ceil((bounds.maxY - bounds.minY) / step) + 1;
+  const d = Math.ceil((bounds.maxZ - bounds.minZ) / step) + 1;
   const size = w * h * d;
 
   console.log(`[GPU Density] Grid: ${w}×${h}×${d} (${size} voxels), ${atoms.length} atoms`);
