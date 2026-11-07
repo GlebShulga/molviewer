@@ -12,6 +12,8 @@ export interface Atom {
   serial?: number;
   name?: string;
   occupancy?: number;
+  /** Alternate location the parser kept for this atom ("A", "B", ...); absent when the file has none. */
+  altLoc?: string;
   tempFactor?: number;
   secondaryStructure?: SecondaryStructure;
   /** Formal charge from the file (SDF/MOL only); absent when neutral or unknown. */

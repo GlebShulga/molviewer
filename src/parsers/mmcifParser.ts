@@ -1,6 +1,7 @@
 import type { Atom, Bond, Molecule, SecondaryStructure } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
+import { createAltLocFilter } from "./altLoc";
 
 export interface MMCIFParserOptions {
   inferBonds?: boolean;
@@ -124,6 +125,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
 
   let atomIndex = 0;
   let firstModel: string | null = null;
+  const keepAltLoc = createAltLocFilter();
 
   // Parse data rows
   while (i < lines.length) {
@@ -160,15 +162,6 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
       }
     }
 
-    // Filter alternate conformations: keep only '.' or 'A'
-    if (altIdIdx !== undefined) {
-      const altId = parseValue(tokens[altIdIdx]);
-      if (altId !== null && altId !== 'A' && altId !== '.') {
-        i++;
-        continue;
-      }
-    }
-
     // Parse atom data
     const x = parseFloat(tokens[cartnXIdx]);
     const y = parseFloat(tokens[cartnYIdx]);
@@ -193,6 +186,14 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
                           || (labelSeqIdIdx !== undefined ? parseValue(tokens[labelSeqIdIdx]) : null);
     const residueNumber = residueNumberStr ? parseInt(residueNumberStr, 10) : undefined;
 
+    // One alternate location per residue (the first seen), so a residue
+    // whose only conformer is B is kept
+    const altLoc = (altIdIdx !== undefined ? parseValue(tokens[altIdIdx]) : null) || undefined;
+    if (!keepAltLoc({ altLoc, chainId, residueNumber })) {
+      i++;
+      continue;
+    }
+
     // 0 is a real occupancy; '?' and '.' (and a missing column) mean 1
     const occupancyValue = occupancyIdx !== undefined ? parseFloat(tokens[occupancyIdx]) : NaN;
     const occupancy = Number.isFinite(occupancyValue) ? occupancyValue : 1;
@@ -210,6 +211,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
       residueNumber: isNaN(residueNumber!) ? undefined : residueNumber,
       chainId,
       occupancy,
+      ...(altLoc ? { altLoc } : {}),
       tempFactor: isNaN(tempFactor!) ? undefined : tempFactor,
     });
 

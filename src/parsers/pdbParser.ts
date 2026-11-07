@@ -2,6 +2,7 @@ import type { Atom, Bond, Molecule, SecondaryStructure, BiologicalAssembly } fro
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { DEFAULT_ELEMENT, getElement } from "../constants";
+import { createAltLocFilter } from "./altLoc";
 
 export interface PDBParserOptions {
   inferBonds?: boolean;
@@ -298,6 +299,7 @@ function parseAtomLine(line: string, index: number): Atom | null {
   const tempFactorStr = line.substring(60, 66).trim();
   const tempFactor = tempFactorStr ? parseFloat(tempFactorStr) : undefined;
   const element = parseElement(line, residueName);
+  const altLoc = line.charAt(16).trim();
 
   if (isNaN(x) || isNaN(y) || isNaN(z)) {
     return null;
@@ -315,6 +317,7 @@ function parseAtomLine(line: string, index: number): Atom | null {
     residueNumber,
     chainId: chainId || undefined,
     occupancy,
+    ...(altLoc ? { altLoc } : {}),
     tempFactor,
   };
 }
@@ -380,6 +383,7 @@ export function parsePDB(
   // Second pass: parse ATOM/HETATM and CONECT records
   // For NMR structures with multiple models, only parse the first model
   let inFirstModel = true;
+  const keepAltLoc = createAltLocFilter();
   let seenEndModel = false;
 
   for (const line of lines) {
@@ -403,7 +407,7 @@ export function parsePDB(
       if (!inFirstModel) continue;
 
       const atom = parseAtomLine(line, atoms.length);
-      if (atom) {
+      if (atom && keepAltLoc(atom)) {
         // Assign secondary structure if we have SS data
         if (ssRanges.length > 0) {
           atom.secondaryStructure = getSecondaryStructure(

@@ -193,3 +193,35 @@ describe('parsePDB occupancy and residue numbers', () => {
     expect(m.atoms[0].residueNumber).toBeUndefined();
   });
 });
+
+describe('parsePDB alternate locations', () => {
+  const line = (serial: number, name: string, alt: string, residue: string, resSeq: number, x: number, element = 'C') =>
+    `ATOM  ${String(serial).padStart(5)} ${name.padEnd(4)}${alt}${residue.padStart(3)} A${String(resSeq).padStart(4)}    ` +
+    `${x.toFixed(3).padStart(8)}${'0.000'.padStart(8)}${'0.000'.padStart(8)}${'0.50'.padStart(6)}${'0.00'.padStart(6)}           ${element}`;
+
+  it('keeps one conformer of a residue with A and B side chains', () => {
+    const m = parsePDB(
+      [
+        line(1, ' CA ', ' ', 'SER', 1, 0),
+        line(2, ' CB ', 'A', 'SER', 1, 1.5),
+        line(3, ' CB ', 'B', 'SER', 1, 1.6),
+        line(4, ' OG ', 'A', 'SER', 1, 3.0, 'O'),
+        line(5, ' OG ', 'B', 'SER', 1, 3.1, 'O'),
+        'END',
+      ].join('\n')
+    );
+    expect(m.atoms.map((a) => `${a.name}${a.altLoc ?? ''}`)).toEqual(['CA', 'CBA', 'OGA']);
+  });
+
+  it('keeps a residue that only has a B conformer', () => {
+    const m = parsePDB([line(1, ' CA ', 'A', 'SER', 1, 0), line(2, ' CA ', 'B', 'GLY', 2, 3.8), 'END'].join('\n'));
+    expect(m.atoms.map((a) => `${a.residueName}${a.residueNumber}${a.altLoc}`)).toEqual(['SER1A', 'GLY2B']);
+  });
+
+  it('keeps one residue at a microheterogeneity site', () => {
+    const m = parsePDB(
+      [line(1, ' CA ', 'A', 'SER', 5, 0), line(2, ' CB ', 'A', 'SER', 5, 1.5), line(3, ' CA ', 'B', 'THR', 5, 0.1), line(4, ' CB ', 'B', 'THR', 5, 1.6), 'END'].join('\n')
+    );
+    expect(new Set(m.atoms.map((a) => a.residueName))).toEqual(new Set(['SER']));
+  });
+});

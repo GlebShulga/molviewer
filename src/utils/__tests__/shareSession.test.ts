@@ -100,3 +100,13 @@ describe('share atom identity', () => {
     expect(resolveSharedAtom(molecule([atom(0, 'CA', 1), atom(1, 'CA', 1)]), { atomIndex: 1, atom: twin })).toBe(1);
   });
 });
+
+describe('share atom identity with alternate locations', () => {
+  it('records the altLoc and requires it to match', async () => {
+    const { atomIdentity, resolveSharedAtom } = await import('../shareSession');
+    const a = { id: 0, element: 'C', name: 'CB', residueName: 'SER', residueNumber: 1, chainId: 'A', altLoc: 'A', x: 0, y: 0, z: 0 };
+    const b = { ...a, id: 1, altLoc: 'B' };
+    expect(atomIdentity(a)).toMatchObject({ altLoc: 'A' });
+    expect(resolveSharedAtom({ name: 'm', atoms: [a, b], bonds: [] }, { atomIndex: 0, atom: atomIdentity(b) })).toBe(1);
+  });
+});

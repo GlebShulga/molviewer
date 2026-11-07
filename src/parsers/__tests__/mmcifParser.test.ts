@@ -376,3 +376,34 @@ ${occ.map((o, i) => `ATOM ${i + 1} C CA ALA A ${i + 1} ${i * 3}.0 0.0 0.0 ${o}`)
     expect(parseMMCIF(cif(['0.00', '?', '.', '0.50'])).atoms.map((a) => a.occupancy)).toEqual([0, 1, 1, 0.5]);
   });
 });
+
+describe('parseMMCIF alternate locations', () => {
+  const cif = (rows: string[]) => `data_ALT
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+${rows.join('\n')}
+#
+`;
+
+  it('keeps a residue that only has a B conformer, and one conformer elsewhere', () => {
+    const m = parseMMCIF(
+      cif([
+        'ATOM 1 C CA . SER A 1 0.0 0.0 0.0',
+        'ATOM 2 C CB A SER A 1 1.5 0.0 0.0',
+        'ATOM 3 C CB B SER A 1 1.6 0.0 0.0',
+        'ATOM 4 C CA B GLY A 2 3.8 0.0 0.0',
+      ])
+    );
+    expect(m.atoms.map((a) => `${a.residueName}${a.residueNumber}:${a.name}${a.altLoc ?? ''}`)).toEqual(['SER1:CA', 'SER1:CBA', 'GLY2:CAB']);
+  });
+});

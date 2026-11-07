@@ -57,6 +57,7 @@ export interface SharedAtomIdentity {
   residueNumber?: number;
   residueName?: string;
   name?: string;
+  altLoc?: string;
 }
 
 export type SharedAtomRef = QualifiedAtomRef & { atom?: SharedAtomIdentity };
@@ -64,7 +65,13 @@ export type SharedLabel = Label3D & { atom?: SharedAtomIdentity };
 export type SharedMeasurement = Omit<Measurement, 'atomRefs'> & { atomRefs: SharedAtomRef[] };
 
 export function atomIdentity(atom: Atom): SharedAtomIdentity {
-  return { chainId: atom.chainId, residueNumber: atom.residueNumber, residueName: atom.residueName, name: atom.name };
+  return {
+    chainId: atom.chainId,
+    residueNumber: atom.residueNumber,
+    residueName: atom.residueName,
+    name: atom.name,
+    altLoc: atom.altLoc,
+  };
 }
 
 /** '' and a missing value are the same (JSON drops undefined fields). */
@@ -75,7 +82,8 @@ function matchesIdentity(atom: Atom, id: SharedAtomIdentity): boolean {
     same(atom.chainId, id.chainId) &&
     same(atom.residueNumber, id.residueNumber) &&
     same(atom.residueName, id.residueName) &&
-    same(atom.name, id.name)
+    same(atom.name, id.name) &&
+    same(atom.altLoc, id.altLoc)
   );
 }
 
