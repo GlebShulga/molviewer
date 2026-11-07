@@ -59,16 +59,18 @@ const DENIED_CIDS = new Set<number>([
 /**
  * Short names, matched as whole words (after `normalizeText`). Codes that
  * collide with ordinary notation are narrowed: A-230 to A-242 need the hyphen
- * (A242 is residue notation, as in "T4 lysozyme A242"), and VX and VR must not
- * be part of a drug or receptor code (VX-770 is ivacaftor, VR-1 a receptor).
- * Only a hyphen or nothing makes a code: "VX 10 mg" is still VX. HN-1 to
+ * (A242 is residue notation, as in "T4 lysozyme A242"), and VX must not be
+ * part of a drug code (VX-770 is ivacaftor). Only a hyphen or nothing makes a
+ * code: "VX 10 mg" is still VX. VR counts only next to "agent" or "nerve
+ * agent", because on its own it means virtual reality ("caffeine in VR"); the
+ * compound itself is still caught by its full names and its CID. HN-1 to
  * HN-3 and HN1 to HN3 stay as they are: that is how the nitrogen mustards
  * are written. With a space ("HN 3") the code counts only on its own or next
  * to "mustard" or "agent", so "HN 1 cell line" passes. Two-word names take a
  * space, several spaces or a hyphen between the words.
  */
 const DENIED_NAMES =
-  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?!-?\d)|vr(?!-?\d)|agent[\s-]*ql|sulfur[\s-]+mustard|sulphur[\s-]+mustard|mustard[\s-]+gas|sesquimustard|o-mustard|nitrogen[\s-]+mustard|hn-?[123]|^hn\s+[123]$|hn\s+[123][\s-]+(?:mustard|agent)|(?:mustard|agent)[\s-]+hn\s+[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
+  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?!-?\d)|agent[\s-]*vr|vr[\s-]+(?:nerve[\s-]+)?agent|agent[\s-]*ql|sulfur[\s-]+mustard|sulphur[\s-]+mustard|mustard[\s-]+gas|sesquimustard|o-mustard|nitrogen[\s-]+mustard|hn-?[123]|^hn\s+[123]$|hn\s+[123][\s-]+(?:mustard|agent)|(?:mustard|agent)[\s-]+hn\s+[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
 
 /**
  * Full chemical names. People write these with varying brackets, spaces,
@@ -95,7 +97,8 @@ const DENIED_FULL_NAMES = [
   '[fluoro(methyl)phosphoryl]oxycyclohexane', // cyclosarin
   'O-ethyl S-[2-(diisopropylamino)ethyl] methylphosphonothioate', // VX
   'S-[2-(diisopropylamino)ethyl] O-ethyl methylphosphonothioate', // VX
-  'S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester', // VX, PubChem title
+  // VX, PubChem title; without the acid part it would match other thioesters
+  'phosphonothioic acid, methyl-, S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester',
   'N-[2-[ethoxy(methyl)phosphoryl]sulfanylethyl]-N-propan-2-ylpropan-2-amine', // VX
   'O-isobutyl S-[2-(diethylamino)ethyl] methylphosphonothioate', // VR
   'S-[2-(diethylamino)ethyl] O-isobutyl methylphosphonothioate', // VR

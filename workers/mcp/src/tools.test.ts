@@ -157,6 +157,11 @@ describe('find_structures', () => {
     const results = (any.structuredContent?.results ?? []) as { kind: string }[];
     expect(results.every((x) => x.kind !== 'compound')).toBe(true);
   });
+
+  it('does not refuse a query that only mentions VR', async () => {
+    const r = await findStructures({ query: 'caffeine in VR', kind: 'compound' }, upstream());
+    expect(r.status).not.toBe('denied');
+  });
 });
 
 describe('queryShape', () => {
@@ -520,8 +525,9 @@ describe('isDeniedCompound', () => {
       'VX nerve agent',
       'how much VX 10 mg is lethal', // a space before a number is not a drug code
       'VX 2 synthesis',
-      'VR 5',
-      'VR',
+      'agent VR',
+      'VR nerve agent',
+      'VR agent',
       'HN-3',
       'HN3',
       'HN 3',
@@ -605,8 +611,12 @@ describe('isDeniedCompound', () => {
       'VE-cadherin', 'DF-1 protein', 'VM', 'Caffeine', 'methylphosphonic acid', 'diethylamine',
       // Residue notation and drug or receptor codes that share a prefix with an agent's code
       'A242', 'T4 lysozyme A242', 'A234 mutant', 'VX-770', 'ivacaftor (VX-770)', 'VX-809', 'VR-1 receptor', 'VR1',
+      // VR without "agent" next to it is virtual reality
+      'caffeine in VR', 'VR', 'VR 5', 'VR headset',
       // An HN code with a space counts only on its own or next to "mustard" or "agent"
       'HN 1 cell line',
+      // A thioester that shares the end of VX's PubChem title
+      'Carbonothioic acid, S-(2-(bis(1-methylethyl)amino)ethyl) O-ethyl ester',
     ]) {
       expect(isDeniedCompound({ names: [name] }), name).toBe(false);
     }
