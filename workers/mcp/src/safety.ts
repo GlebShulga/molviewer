@@ -57,15 +57,18 @@ const DENIED_CIDS = new Set<number>([
 ]);
 
 /**
- * Short names, matched as whole words (after `normalizeDashes`). Codes that
+ * Short names, matched as whole words (after `normalizeText`). Codes that
  * collide with ordinary notation are narrowed: A-230 to A-242 need the hyphen
  * (A242 is residue notation, as in "T4 lysozyme A242"), and VX and VR must not
  * be part of a drug or receptor code (VX-770 is ivacaftor, VR-1 a receptor).
  * Only a hyphen or nothing makes a code: "VX 10 mg" is still VX. HN-1 to
- * HN-3 stay as they are: that is how the nitrogen mustards are written.
+ * HN-3 and HN1 to HN3 stay as they are: that is how the nitrogen mustards
+ * are written. With a space ("HN 3") the code counts only on its own or next
+ * to "mustard" or "agent", so "HN 1 cell line" passes. Two-word names take a
+ * space, several spaces or a hyphen between the words.
  */
 const DENIED_NAMES =
-  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?!-?\d)|vr(?!-?\d)|agent[\s-]*ql|sulfur mustard|sulphur mustard|mustard gas|sesquimustard|o-mustard|nitrogen mustard|hn-?[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
+  /\b(sarin|soman|tabun|cyclosarin|chlorosarin|chlorosoman|novichoks?|a-23[024]|a-242|vx(?!-?\d)|vr(?!-?\d)|agent[\s-]*ql|sulfur[\s-]+mustard|sulphur[\s-]+mustard|mustard[\s-]+gas|sesquimustard|o-mustard|nitrogen[\s-]+mustard|hn-?[123]|^hn\s+[123]$|hn\s+[123][\s-]+(?:mustard|agent)|(?:mustard|agent)[\s-]+hn\s+[123]|mechlorethamine|lewisites?|saxitoxin)\b/i;
 
 /**
  * Full chemical names. People write these with varying brackets, spaces,
@@ -101,9 +104,10 @@ const DENIED_FULL_NAMES = [
   'N,N-diethyl-2-[methyl(2-methylpropoxy)phosphoryl]sulfanylethanamine', // VR
   'bis(2-chloroethyl) sulfide', // HD
   '1-chloro-2-(2-chloroethylthio)ethane', // HD
-  '1,2-bis(2-chloroethylthio)ethane', // Q
+  'bis(2-chloroethylthio)ethane', // Q, with or without "1,2-"
   'bis(2-chloroethylthioethyl) ether', // T
   '2-chloroethyl chloromethyl sulfide',
+  'chloromethyl 2-chloroethyl sulfide',
   '1-chloro-2-(chloromethylthio)ethane',
   'bis(2-chloroethylthio)methane',
   '1,3-bis(2-chloroethylthio)propane',
@@ -124,28 +128,36 @@ const DENIED_FULL_NAMES = [
   'pinacolyl methylphosphonochloridate', // chlorosoman
 ].map(compactName);
 
-/** Unicode hyphens, dashes and minus signs as an ASCII hyphen. */
-function normalizeDashes(text: string): string {
-  return text.replace(/[‐-―−﹘﹣－]/g, '-');
+/**
+ * NFKC (fullwidth letters to ASCII), no format characters (zero-width
+ * spaces), Unicode hyphens, dashes and minus signs as an ASCII hyphen.
+ */
+function normalizeText(text: string): string {
+  return text
+    .normalize('NFKC')
+    .replace(/\p{Cf}/gu, '')
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-');
 }
 
 /**
- * Lowercase, drop single-letter locants (S-, O-, P-, n-, also before a digit
- * as in "S-2-diethylaminoethyl"), spell "sulph" as "sulf", "sulfanyl" as
- * "thio" and "sulfane" as "sulfide", keep letters and digits only.
+ * After `normalizeText`: lowercase, drop single-letter locants (S-, O-, P-,
+ * n-, also before a digit as in "S-2-diethylaminoethyl"), spell "sulph" as
+ * "sulf", "sulfanyl" as "thio", "sulfane" as "sulfide" and "thiolate" as
+ * "thioate", keep letters and digits only.
  */
 function compactName(name: string): string {
-  return normalizeDashes(name)
+  return normalizeText(name)
     .toLowerCase()
     .replace(/(^|[^a-z0-9])[nops]-(?=[a-z0-9[(])/g, '$1')
     .replace(/sulph/g, 'sulf')
     .replace(/sulfanyl/g, 'thio')
     .replace(/sulfane/g, 'sulfide')
+    .replace(/thiolate/g, 'thioate')
     .replace(/[^a-z0-9]/g, '');
 }
 
 function isDeniedName(name: string): boolean {
-  if (DENIED_NAMES.test(normalizeDashes(name))) return true;
+  if (DENIED_NAMES.test(normalizeText(name).trim())) return true;
   const compact = compactName(name);
   return DENIED_FULL_NAMES.some((n) => compact.includes(n));
 }
