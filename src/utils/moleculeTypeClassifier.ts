@@ -122,8 +122,10 @@ export function classifyMolecule(molecule: Molecule): MoleculeClassification {
       const type = classifyResidue(residue);
       const component = componentMap.get(type)!;
 
-      // Add atom indices for this residue (not contiguous when the file splits it)
-      component.atomIndices.push(...residue.atomIndices);
+      // Add atom indices for this residue (not contiguous when the file splits it).
+      // A loop, not push(...): an XYZ file is one residue of every atom, and
+      // spreading 150k+ arguments overflows the call stack.
+      for (const index of residue.atomIndices) component.atomIndices.push(index);
 
       // Add residue key for Cartoon filtering
       component.residueKeys.add(residueKey(residue.chainId, residue.number, residue.insertionCode));

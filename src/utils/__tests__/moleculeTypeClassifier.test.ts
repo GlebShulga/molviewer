@@ -31,3 +31,12 @@ describe('residue atom indices', () => {
     expect(components.find((c) => c.type === 'water')!.atomIndices).toEqual([2]);
   });
 });
+
+describe('large files', () => {
+  it('classifies 200,000 atoms in one residue (an XYZ file) without overflowing the call stack', () => {
+    const atoms: Atom[] = Array.from({ length: 200_000 }, (_, id) => ({ id, element: 'C', x: id, y: 0, z: 0 }));
+    const { components } = classifyMolecule({ name: 'big', atoms, bonds: [] });
+    expect(components).toHaveLength(1);
+    expect(components[0].atomIndices).toHaveLength(200_000);
+  });
+});
