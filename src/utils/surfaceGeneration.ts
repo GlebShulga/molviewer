@@ -17,7 +17,7 @@ export interface SurfaceData {
   nearestAtomIndices: Int32Array;
 }
 
-interface Bounds {
+export interface Bounds {
   minX: number;
   minY: number;
   minZ: number;
@@ -281,15 +281,59 @@ function computeGaussianDensity(
  * For each voxel, compute the minimum signed distance to any atom surface.
  * Uses spatial hash grid to only check nearby atoms (O(1) average case per voxel).
  */
+/**
+ * Grid samples per axis. Samples sit on grid corners (where marching cubes
+ * puts its vertices), and the extra sample puts the last one at or past the
+ * far bound for any step, so the mesh closes there.
+ */
+export function gridDims(bounds: Bounds, step: number): { w: number; h: number; d: number } {
+  return {
+    w: Math.ceil((bounds.maxX - bounds.minX) / step) + 1,
+    h: Math.ceil((bounds.maxY - bounds.minY) / step) + 1,
+    d: Math.ceil((bounds.maxZ - bounds.minZ) / step) + 1,
+  };
+}
+
+/** Position of grid sample (i, j, k): a grid corner, as in extractIsosurface. */
+export function gridSamplePosition(bounds: Bounds, step: number, i: number, j: number, k: number): { x: number; y: number; z: number } {
+  return { x: bounds.minX + i * step, y: bounds.minY + j * step, z: bounds.minZ + k * step };
+}
+
+/**
+ * Signed distance from a point to the union of hard spheres among
+ * `candidates` (atom indices near the point): the smallest signed distance,
+ * so a point inside any sphere is inside, even where another sphere's
+ * surface is closer. `nearest` is that atom (it colours the vertex).
+ */
+export function hardSphereSignedDistance(
+  point: { x: number; y: number; z: number },
+  atoms: Atom[],
+  radii: ArrayLike<number>,
+  candidates: Iterable<number>
+): { sd: number; nearest: number } {
+  let sd = Infinity;
+  let nearest = 0;
+  for (const i of candidates) {
+    const atom = atoms[i];
+    const dx = point.x - atom.x;
+    const dy = point.y - atom.y;
+    const dz = point.z - atom.z;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) - radii[i];
+    if (d < sd) {
+      sd = d;
+      nearest = i;
+    }
+  }
+  return { sd, nearest };
+}
+
 function computeSignedDistanceField(
   atoms: Atom[],
   atomRadii: number[],
   bounds: Bounds,
   step: number
 ): SDFResult {
-  const w = Math.ceil((bounds.maxX - bounds.minX) / step);
-  const h = Math.ceil((bounds.maxY - bounds.minY) / step);
-  const d = Math.ceil((bounds.maxZ - bounds.minZ) / step);
+  const { w, h, d } = gridDims(bounds, step);
   const size = w * h * d;
   const wh = w * h;
 
@@ -318,14 +362,15 @@ function computeSignedDistanceField(
   const nearbyBuffer: number[] = [];
 
   // For each voxel, compute minimum signed distance to any atom surface
+  // Samples on grid corners (gridSamplePosition), where extractIsosurface puts vertices
   for (let iz = 0; iz < d; iz++) {
-    const vz = bounds.minZ + (iz + 0.5) * step;
+    const vz = bounds.minZ + iz * step;
 
     for (let iy = 0; iy < h; iy++) {
-      const vy = bounds.minY + (iy + 0.5) * step;
+      const vy = bounds.minY + iy * step;
 
       for (let ix = 0; ix < w; ix++) {
-        const vx = bounds.minX + (ix + 0.5) * step;
+        const vx = bounds.minX + ix * step;
         const idx = iz * wh + iy * w + ix;
 
         // Get cell coordinates for this voxel (+2 for padding offset)
@@ -376,21 +421,9 @@ function computeSignedDistanceField(
             signedDist = DENSITY_ISOVALUE - density;
           } else {
             // Hard sphere SDF (faster for large proteins)
-            let minDist = Infinity;
-            nearestAtom = 0;
-            for (const i of nearbyAtomIndices) {
-              const atom = atoms[i];
-              const dx = vx - atom.x;
-              const dy = vy - atom.y;
-              const dz = vz - atom.z;
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-              const sd = dist - atomRadii[i];
-              if (Math.abs(sd) < Math.abs(minDist)) {
-                minDist = sd;
-                nearestAtom = i;
-              }
-            }
-            signedDist = minDist;
+            const hard = hardSphereSignedDistance({ x: vx, y: vy, z: vz }, atoms, atomRadii, nearbyAtomIndices);
+            signedDist = hard.sd;
+            nearestAtom = hard.nearest;
           }
         } else {
           // No nearby atoms within ±1 cells (~2×cellSize ≈ 9-10Å).
