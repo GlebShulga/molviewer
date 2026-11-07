@@ -166,14 +166,52 @@ interface GPUResources {
 
 let cachedSupport: boolean | null = null;
 
+/** Attributes of the density context; the same for the support check and the runs. */
+const DENSITY_CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
+  antialias: false,
+  depth: false,
+  stencil: false,
+  preserveDrawingBuffer: true,
+};
+
+export interface DensityContext {
+  gl: WebGL2RenderingContext;
+  canvas: HTMLCanvasElement;
+}
+
+/**
+ * A getter for the one WebGL2 context GPU density uses. Browsers keep only
+ * a handful of live WebGL contexts (about 16) and drop the oldest, which
+ * can be the viewer's own: creating one for the support check and another
+ * for every surface, never released, ran into that. The context is created
+ * on first use and again only after it is lost. `createCanvas` is a
+ * parameter for tests.
+ */
+export function makeDensityContextGetter(createCanvas: () => HTMLCanvasElement): () => DensityContext | null {
+  let current: DensityContext | null = null;
+  return () => {
+    if (current && !current.gl.isContextLost()) return current;
+    current = null;
+    const canvas = createCanvas();
+    const gl = canvas.getContext('webgl2', DENSITY_CONTEXT_ATTRIBUTES) as WebGL2RenderingContext | null;
+    if (!gl) return null;
+    canvas.addEventListener('webglcontextlost', () => {
+      current = null;
+    });
+    current = { gl, canvas };
+    return current;
+  };
+}
+
+const getDensityContext = makeDensityContextGetter(() => document.createElement('canvas'));
+
 /**
  * Check if GPU density computation is supported
  */
 export function isGPUDensitySupported(): boolean {
   if (cachedSupport !== null) return cachedSupport;
 
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl2');
+  const gl = getDensityContext()?.gl;
   if (!gl) {
     cachedSupport = false;
     return false;
@@ -262,19 +300,12 @@ function initGPUResources(
   gridW: number,
   gridH: number
 ): GPUResources {
-  // Create offscreen canvas and context
-  const canvas = document.createElement('canvas');
+  // The shared offscreen context (getDensityContext), sized to this grid
+  const context = getDensityContext();
+  if (!context) throw new Error('WebGL2 not available');
+  const { gl, canvas } = context;
   canvas.width = gridW;
   canvas.height = gridH;
-
-  const gl = canvas.getContext('webgl2', {
-    antialias: false,
-    depth: false,
-    stencil: false,
-    preserveDrawingBuffer: true,
-  });
-
-  if (!gl) throw new Error('WebGL2 not available');
 
   // Enable float textures
   gl.getExtension('EXT_color_buffer_float');
