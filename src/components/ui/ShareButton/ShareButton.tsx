@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, type TouchEvent } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Share2, Check, Copy, X } from 'lucide-react';
 import { useMoleculeStore } from '../../../store/moleculeStore';
@@ -13,6 +14,7 @@ import { logError } from '../../../utils/errorReporter';
 import { track } from '../../../utils/track';
 import { sourceToPath } from '../../../utils/urlParams';
 import { useActiveStructure } from '../../../hooks';
+import { useModalDialog } from '../../../hooks/useModalDialog';
 import { embedSnippet, embedTarget } from '../../../../site/embed';
 import styles from './ShareButton.module.css';
 
@@ -42,8 +44,16 @@ export function ShareButton() {
   const { copied, copy, reset: resetCopied } = useClipboard(setError);
 
   const activeStructure = useActiveStructure();
+  const creatingRef = useRef(false);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
 
   const handleShare = useCallback(async () => {
+    // aria-disabled, not disabled, while creating: the button keeps focus so
+    // it can take it back when the dialog closes
+    if (creatingRef.current) return;
+    creatingRef.current = true;
     setError(null);
     setUrl(null);
     setTab('link');
@@ -83,6 +93,7 @@ export function ShareButton() {
         logError(err instanceof Error ? err : new Error(String(err)), { source: 'ShareButton' });
       }
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   }, []);
@@ -108,25 +119,49 @@ export function ShareButton() {
   }, [resetCopied]);
 
   const hasStructures = useMoleculeStore(s => s.structureOrder.length > 0);
+  const dialogRef = useModalDialog({
+    isOpen: open,
+    onClose: close,
+    initialFocusRef: closeButtonRef,
+    returnFocusRef: shareButtonRef,
+  });
+  // Touches in the dialog would otherwise bubble (through the portal) to the
+  // bottom sheet's swipe-to-close handler
+  const stopTouch = (e: TouchEvent) => e.stopPropagation();
 
   return (
     <>
       <button
+        ref={shareButtonRef}
         className={styles.shareButton}
         onClick={handleShare}
-        disabled={!hasStructures || creating}
+        disabled={!hasStructures}
+        aria-disabled={creating || undefined}
         title="Create a shareable link to this view"
       >
         <Share2 size={16} />
         {creating ? 'Creating link…' : 'Share Link'}
       </button>
 
-      {open && (
-        <div className={styles.modalBackdrop} onClick={close}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      {open && createPortal(
+        <div
+          className={styles.modalBackdrop}
+          onClick={close}
+          onTouchStart={stopTouch}
+          onTouchMove={stopTouch}
+          onTouchEnd={stopTouch}
+        >
+          <div
+            ref={dialogRef}
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+          >
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Share this session</h3>
-              <button className={styles.closeButton} onClick={close} aria-label="Close">
+              <h3 id={titleId} className={styles.modalTitle}>Share this session</h3>
+              <button ref={closeButtonRef} className={styles.closeButton} onClick={close} aria-label="Close">
                 <X size={18} />
               </button>
             </div>
@@ -215,7 +250,8 @@ export function ShareButton() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

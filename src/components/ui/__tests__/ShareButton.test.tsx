@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useMoleculeStore, temporalStore } from '../../../store/moleculeStore';
 import { ShareButton } from '../ShareButton';
+import { useKeyboardShortcuts } from '../../../hooks/useKeyboardShortcuts';
 
 const reporter = vi.hoisted(() => ({ logError: vi.fn() }));
 vi.mock('../../../utils/errorReporter', async (importOriginal) => ({
@@ -62,5 +63,94 @@ describe('ShareButton errors', () => {
     await shareWith(new Response(JSON.stringify({ error: 'Invalid share payload' }), { status: 400 }));
     expect(await screen.findByText('Invalid share payload')).toBeTruthy();
     expect(reporter.logError).toHaveBeenCalled();
+  });
+});
+
+function ShareWithShortcuts() {
+  useKeyboardShortcuts();
+  return <ShareButton />;
+}
+
+describe('ShareButton modal', () => {
+  let structureId: string;
+
+  beforeEach(() => {
+    useMoleculeStore.getState().reset();
+    temporalStore.getState().clear();
+    act(() => {
+      structureId = useMoleculeStore.getState().addStructure(
+        { name: '1CRN', atoms: [{ id: 0, element: 'C', x: 0, y: 0, z: 0 }], bonds: [] },
+        '1CRN',
+        { type: 'rcsb', id: '1CRN' }
+      );
+      useMoleculeStore.getState().selectAtom(structureId, 0);
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  function openModal(response: Promise<Response>) {
+    vi.stubGlobal('fetch', vi.fn(() => response));
+    render(<ShareWithShortcuts />);
+    const button = screen.getByTitle('Create a shareable link to this view');
+    button.focus();
+    fireEvent.click(button);
+    return button;
+  }
+
+  it('is a labelled modal dialog rendered outside the sidebar', async () => {
+    openModal(Promise.resolve(new Response(JSON.stringify({ id: 'abc' }), { status: 200 })));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Share this session');
+    // Portalled to the body, so it isn't clipped by or inside the sidebar
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+  });
+
+  it('closes on Escape without clearing the selection, and focus returns to the Share button', async () => {
+    const button = openModal(Promise.resolve(new Response(JSON.stringify({ id: 'abc' }), { status: 200 })));
+    await screen.findByRole('dialog');
+    await screen.findByDisplayValue(/\/s\/abc$/);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(useMoleculeStore.getState().selectedAtoms).toEqual([{ structureId, atomIndex: 0 }]);
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('returns focus to the Share button when closed while the link is still being created', async () => {
+    let resolve!: (r: Response) => void;
+    const button = openModal(new Promise<Response>(r => { resolve = r; }));
+    await screen.findByRole('dialog');
+    expect(screen.getAllByText('Creating link…').length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(button);
+    // Still focusable while creating, and clicks are ignored
+    expect(button.hasAttribute('disabled')).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(button);
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await act(async () => {
+      resolve(new Response(JSON.stringify({ id: 'abc' }), { status: 200 }));
+    });
+  });
+
+  it('keeps touches inside the modal from reaching the sheet behind it', async () => {
+    const onTouchStart = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    render(
+      <aside onTouchStart={onTouchStart}>
+        <ShareButton />
+      </aside>
+    );
+    fireEvent.click(screen.getByTitle('Create a shareable link to this view'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.touchStart(dialog, { touches: [{ clientY: 10 }] });
+    expect(onTouchStart).not.toHaveBeenCalled();
   });
 });

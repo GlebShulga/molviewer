@@ -15,12 +15,13 @@
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.shareButton:hover:not(:disabled) {
+.shareButton:hover:not(:disabled):not([aria-disabled='true']) {
   background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-secondary));
   border-color: var(--accent-color);
 }
 
-.shareButton:disabled {
+.shareButton:disabled,
+.shareButton[aria-disabled='true'] {
   opacity: 0.5;
   cursor: not-allowed;
 }
