@@ -9,8 +9,8 @@
  * Runs after `vite build` (see site/build/vitePlugin.ts). Fails the build on
  * broken internal links.
  */
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { pages as contentPages } from '../content/pages';
 import { SCREENSHOTS } from '../content/screenshots';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
@@ -35,6 +35,7 @@ import {
 import { renderCompoundPage } from './compoundPage';
 import { renderSitemaps } from './sitemap';
 import { findBrokenLinks } from './linkCheck';
+import { linkCheckInput } from './paths';
 import { afCardSpec, compoundCardSpec, pdbCardSpec, renderOgCards, renderSquareFallback, type CardSpec } from './ogCards';
 import { shortName } from '../render/pdbPage';
 
@@ -51,19 +52,6 @@ const RELATED_COMPOUNDS = 12;
 /** `/pdb-viewer` -> `pdb-viewer.html`, `/learn/x` -> `learn/x.html` (Pages serves them without the extension). */
 function fileFor(path: string): string {
   return `${path.replace(/^\//, '')}.html`;
-}
-
-function listPublicFiles(publicDir: string): Set<string> {
-  const out = new Set<string>();
-  const walk = (dir: string) => {
-    for (const name of readdirSync(dir)) {
-      const full = join(dir, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else out.add(`/${relative(publicDir, full).split('\\').join('/')}`);
-    }
-  };
-  walk(publicDir);
-  return out;
 }
 
 export interface GenerateResult {
@@ -130,11 +118,16 @@ export async function generateSite(outDir: string, publicDir: string, cacheDir: 
   });
 
   const allPages = [...staticPages, ...compoundPages];
-  const broken = findBrokenLinks([...allPages, { path: '/', html: shell }], {
-    staticPaths: new Set(allPages.map((p) => p.path)),
-    compoundSlugs: new Set(COMPOUNDS.map((c) => c.slug)),
-    publicFiles: listPublicFiles(publicDir),
-  });
+  // staticPaths() is what request-time pages are checked against (tests),
+  // so it must list exactly the pages written here
+  const linkInput = linkCheckInput(publicDir);
+  const rendered = new Set(allPages.map((p) => p.path));
+  const drift = [
+    ...[...rendered].filter((p) => !linkInput.staticPaths.has(p)).map((p) => `rendered but not in staticPaths(): ${p}`),
+    ...[...linkInput.staticPaths].filter((p) => !rendered.has(p)).map((p) => `in staticPaths() but not rendered: ${p}`),
+  ];
+  if (drift.length) throw new Error(`site generator: site/build/paths.ts is out of date:\n  ${drift.join('\n  ')}`);
+  const broken = findBrokenLinks([...allPages, { path: '/', html: shell }], linkInput);
   if (broken.length) {
     throw new Error(`site generator: ${broken.length} broken internal link(s):\n  ${broken.join('\n  ')}`);
   }

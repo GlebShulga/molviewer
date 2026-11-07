@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { applyShellMeta, PAGE_INFO_EMPTY, pageInfoBlock } from './shell';
@@ -400,5 +400,49 @@ describe('renderFooter', () => {
     const explore = html.slice(html.indexOf('<h2>Explore</h2>'), html.indexOf('<h2>Project</h2>'));
     expect(explore).toContain(CHATGPT_APP_URL);
     expect(html.slice(html.indexOf('<h2>Project</h2>'))).not.toContain(CHATGPT_APP_URL);
+  });
+});
+
+describe('links in pages rendered at request time', () => {
+  // The build checks the static pages; these are rendered by Functions, so
+  // their links are checked here against the same list of pages.
+  it('has no broken internal links in PDB, AlphaFold, share and CID pages', async () => {
+    const { linkCheckInput } = await import('../build/paths');
+    const { findBrokenLinks } = await import('../build/linkCheck');
+    const { fetchImpl } = fixtureFetch();
+    const pages: { path: string; html: string }[] = [];
+    for (const id of ['3DNI', '4HHB']) {
+      const { meta } = renderPdbLanding(id, await fetchPdbDetails(id, { fetchImpl }), ORIGIN);
+      pages.push({ path: `/pdb/${id}`, html: applyShellMeta(SHELL, meta) });
+    }
+    const af = renderAfLanding('P69905', await fetchAfDetails('P69905', { fetchImpl }), ORIGIN);
+    pages.push({ path: '/af/P69905', html: applyShellMeta(SHELL, af.meta) });
+    const share = renderShareLanding('abcdefgh1234', { structures: [{ name: '4HHB', source: { type: 'rcsb', id: '4HHB' } }] }, ORIGIN);
+    pages.push({ path: '/s/abcdefgh1234', html: applyShellMeta(SHELL, share.meta) });
+
+    // The CID page is built inline in its handler (fetchPubchemSummary takes no options)
+    vi.stubGlobal('fetch', fixtureFetch().fetchImpl);
+    try {
+      const { onRequest } = await import('../../functions/compound/cid/[cid]');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: Response = await (onRequest as any)({
+        request: new Request(`${ORIGIN}/compound/cid/9890`),
+        params: { cid: '9890' },
+        next: async () => new Response(SHELL, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+      });
+      expect(res.status).toBe(200);
+      const html = await res.text();
+      expect(html).toContain('1,1,2-Trifluoroethane');
+      pages.push({ path: '/compound/cid/9890', html });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    const input = linkCheckInput(resolve(__dirname, '../../public'));
+    expect(findBrokenLinks(pages, input)).toEqual([]);
+    // And the check does catch one
+    expect(findBrokenLinks([{ path: '/x', html: '<a href="/collections/no-such-collection">' }], input)).toEqual([
+      '/x -> /collections/no-such-collection',
+    ]);
   });
 });

@@ -1,0 +1,14 @@
+{
+ "PropertyTable": {
+  "Properties": [
+   {
+    "CID": 9890,
+    "MolecularFormula": "C2H3F3",
+    "MolecularWeight": "84.04",
+    "SMILES": "C(C(F)F)F",
+    "IUPACName": "1,1,2-trifluoroethane",
+    "Title": "1,1,2-Trifluoroethane"
+   }
+  ]
+ }
+}
