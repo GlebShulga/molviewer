@@ -7,5 +7,3 @@ export { ImpostorAtoms, type ImpostorAtomsProps, type AtomData, IMPOSTOR_THRESHO
 export { AromaticRings, type AromaticRingsProps } from './AromaticRings';
 export { Cartoon, type CartoonProps } from './Cartoon';
 export { ComponentRepresentation, type ComponentRepresentationProps } from './ComponentRepresentation';
-export { LODAtoms, type LODAtomsProps } from './LODAtoms';
-export { InstancedAssembly, useInstancedRendering, type InstancedAssemblyProps, type AtomRenderData } from './InstancedAssembly';

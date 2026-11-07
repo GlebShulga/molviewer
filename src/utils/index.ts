@@ -1,7 +1,6 @@
 export { inferBondsFromDistance } from './bondInference';
 export { SpatialHashGrid, createSpatialIndex } from './spatialIndex';
 export { getAtomColor, calculateColorSchemeContext, type ColorSchemeContext } from './atomColor';
-export { createSphereGeometry, createCylinderGeometry } from './geometryFactory';
 export { validateFile, getFileExtension, FileValidationError, detectFormat } from './fileValidation';
 export { detectAromaticRings } from './aromaticDetection';
 export { detectSecondaryStructure } from './secondaryStructureDetection';
@@ -18,7 +17,6 @@ export {
   type SavedMoleculeEntry,
 } from './moleculeStorage';
 export { GPUPickingManager } from './gpuPicking';
-export { MoleculeOctree, type OctreeNode, type VisibleData, type ClusterData, type OctreeOptions } from './octree';
 export {
   detectSymmetryFromAssembly,
   shouldUseInstancing,
