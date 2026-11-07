@@ -467,12 +467,17 @@ function AppContent() {
     setMeasurementMode(mode);
   }, [setMeasurementMode]);
 
-  // Sequence viewer handlers. The panel shows a structure of its own choice,
-  // which need not be the active one, and passes it with each residue.
+  // Sequence viewer and residue navigator handlers. The sequence panel shows
+  // a structure of its own choice, which need not be the active one; both
+  // panels pass the structure with each residue.
   const handleSequenceResidueClick = useCallback((structureId: string, atomIndices: number[]) => {
     // Select the first atom of the residue (e.g., N or CA for amino acids)
     if (atomIndices.length > 0) selectAtom(structureId, atomIndices[0]);
   }, [selectAtom]);
+
+  const handleNavigatorResidueSelect = useCallback((structureId: string, residue: Residue) => {
+    handleSequenceResidueClick(structureId, residue.atomIndices);
+  }, [handleSequenceResidueClick]);
 
   const handleSequenceResidueHover = useCallback((structureId: string, residue: Residue | null) => {
     // Hover the first atom of the residue, in the structure the panel shows
@@ -577,7 +582,10 @@ function AppContent() {
               onHighlightMeasurement={setHighlightedMeasurement}
             />
           </Suspense>
-          <ResidueNavigator />
+          <ResidueNavigator
+            onResidueSelect={handleNavigatorResidueSelect}
+            onResidueHover={handleSequenceResidueHover}
+          />
           <ExportPanel onExport={handleExport} />
         </aside>
 

@@ -15,9 +15,10 @@ import { CollapsibleSection } from './CollapsibleSection';
 import { getChainColor } from '../../constants/elements';
 import styles from './ResidueNavigator.module.css';
 
+/** Both callbacks name the structure the residue belongs to: the active one. */
 export interface ResidueNavigatorProps {
-  onResidueSelect?: (residue: Residue) => void;
-  onResidueHover?: (residue: Residue | null) => void;
+  onResidueSelect?: (structureId: string, residue: Residue) => void;
+  onResidueHover?: (structureId: string, residue: Residue | null) => void;
 }
 
 export function ResidueNavigator({
@@ -25,6 +26,7 @@ export function ResidueNavigator({
   onResidueHover,
 }: ResidueNavigatorProps) {
   const molecule = useMoleculeStore(selectActiveStructureMolecule);
+  const structureId = useMoleculeStore(s => s.activeStructureId);
   const [expandedChains, setExpandedChains] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [hoveredResidue, setHoveredResidue] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function ResidueNavigator({
     (chain) => chain.residues.length > 0 && chain.residues[0].name !== 'UNK'
   );
 
-  if (!molecule || !hasResidues) {
+  if (!molecule || !structureId || !hasResidues) {
     return null;
   }
 
@@ -57,7 +59,7 @@ export function ResidueNavigator({
 
   const handleResidueHover = (residue: Residue | null) => {
     setHoveredResidue(residue ? residueId(residue.chainId, residue.name, residue.number, residue.insertionCode) : null);
-    onResidueHover?.(residue);
+    onResidueHover?.(structureId, residue);
   };
 
   const filterResidues = (residues: Residue[]): Residue[] => {
@@ -131,7 +133,7 @@ export function ResidueNavigator({
                         <button
                           key={key}
                           className={clsx(styles.residueItem, isHovered && styles.hovered)}
-                          onClick={() => onResidueSelect?.(residue)}
+                          onClick={() => onResidueSelect?.(structureId, residue)}
                           onMouseEnter={() => handleResidueHover(residue)}
                           onMouseLeave={() => handleResidueHover(null)}
                         >

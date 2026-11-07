@@ -16,12 +16,25 @@ function metAndLigandOne(): Molecule {
   return { name: 'complex', atoms, bonds: [] };
 }
 
-describe('ResidueNavigator with two residues numbered 1 in one chain', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    useMoleculeStore.getState().reset();
-    temporalStore.getState().clear();
+/** Chain A: ALA 1, GLY 2. The GLY atoms come first in the file. */
+function peptide(name: string): Molecule {
+  const atom = (id: number, atomName: string, residueName: string, residueNumber: number) => ({
+    id, name: atomName, element: atomName.charAt(0), residueName, residueNumber, chainId: 'A', x: id * 1.5, y: 0, z: 0,
   });
+  return {
+    name,
+    atoms: [atom(0, 'N', 'GLY', 2), atom(1, 'CA', 'GLY', 2), atom(2, 'N', 'ALA', 1), atom(3, 'CA', 'ALA', 1)],
+    bonds: [],
+  };
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  useMoleculeStore.getState().reset();
+  temporalStore.getState().clear();
+});
+
+describe('ResidueNavigator with two residues numbered 1 in one chain', () => {
   afterEach(() => vi.restoreAllMocks());
 
   const open = () => {
@@ -45,5 +58,38 @@ describe('ResidueNavigator with two residues numbered 1 in one chain', () => {
     fireEvent.mouseEnter(row('LIG'));
     expect(row('LIG').className).toMatch(/hovered/);
     expect(row('MET').className).not.toMatch(/hovered/);
+  });
+});
+
+describe('ResidueNavigator', () => {
+  function renderWithTwoStructures() {
+    const store = useMoleculeStore.getState();
+    store.addStructure(peptide('first'), 'first');
+    const second = store.addStructure(peptide('second'), 'second');
+    store.setActiveStructure(second);
+    const onResidueSelect = vi.fn();
+    const onResidueHover = vi.fn();
+    render(<ResidueNavigator onResidueSelect={onResidueSelect} onResidueHover={onResidueHover} />);
+    fireEvent.click(screen.getByText('Residues'));
+    fireEvent.click(screen.getByText('2 residues'));
+    return { second, onResidueSelect, onResidueHover };
+  }
+
+  it('passes the active structure and the residue (with its atom indices) on click', () => {
+    const { second, onResidueSelect } = renderWithTwoStructures();
+    fireEvent.click(screen.getByText('GLY'));
+    expect(onResidueSelect).toHaveBeenCalledTimes(1);
+    const [structureId, residue] = onResidueSelect.mock.calls[0];
+    expect(structureId).toBe(second);
+    expect(residue).toMatchObject({ name: 'GLY', number: 2, atomIndices: [0, 1] });
+  });
+
+  it('passes the active structure on hover, and null when the pointer leaves', () => {
+    const { second, onResidueHover } = renderWithTwoStructures();
+    const ala = screen.getByText('ALA').closest('button')!;
+    fireEvent.mouseEnter(ala);
+    expect(onResidueHover).toHaveBeenLastCalledWith(second, expect.objectContaining({ name: 'ALA', atomIndices: [2, 3] }));
+    fireEvent.mouseLeave(ala);
+    expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
   });
 });
