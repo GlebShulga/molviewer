@@ -11,7 +11,7 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../../store/moleculeStore';
 import { selectTotalVisibleAtomCount } from '../../../store/selectors';
-import { chainKey } from '../../../utils/residueAnalysis';
+import { atomResidueId, chainKey } from '../../../utils/residueAnalysis';
 import styles from './ContextMenu.module.css';
 
 /** Padding from viewport edge when adjusting menu position */
@@ -151,15 +151,27 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
   };
 
   const handleSelectResidue = () => {
-    const { residueNumber } = contextMenu;
-    if (residueNumber === undefined) return;
+    if (contextMenu.residueNumber === undefined) return;
+    const atomIndex = contextMenu.atomIndex!;
 
-    // Select all atoms in the same residue (batched, single state update);
-    // 52 and 52A are different residues
-    selectAtomsByFilter(
-      structureId,
-      (a) => chainKey(a) === chain && a.residueNumber === residueNumber && a.insertionCode === atom.insertionCode
-    );
+    // Select all atoms in the same residue (batched, single state update):
+    // chain, name, number and insertion code (residueId), so 52 and 52A are
+    // different residues, and so are MET 1 and a ligand numbered 1
+    const id = atomResidueId(atom);
+    if (atom.chainId) {
+      selectAtomsByFilter(structureId, (a) => atomResidueId(a) === id);
+    } else {
+      // Without chain IDs, segments from simulation packages restart their
+      // numbering, so a residue is the run of atoms around this one with its
+      // id. A file listing a residue's hydrogens apart from its heavy atoms
+      // selects only the run clicked.
+      const inRun = (i: number) => !molecule.atoms[i].chainId && atomResidueId(molecule.atoms[i]) === id;
+      let first = atomIndex;
+      while (first > 0 && inRun(first - 1)) first--;
+      let last = atomIndex;
+      while (last < molecule.atoms.length - 1 && inRun(last + 1)) last++;
+      selectAtomsByFilter(structureId, (_, i) => i >= first && i <= last);
+    }
     hideContextMenu();
   };
 
@@ -218,10 +230,13 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
           </button>
         )}
 
-        <button className={styles.menuItem} onClick={handleSelectChain}>
-          <Palette size={14} />
-          <span>{atom.chainId ? `Select chain ${atom.chainId}` : 'Select chain'}</span>
-        </button>
+        {/* Not for a file without chain IDs: its one chain is everything */}
+        {atom.chainId && (
+          <button className={styles.menuItem} onClick={handleSelectChain}>
+            <Palette size={14} />
+            <span>Select chain {atom.chainId}</span>
+          </button>
+        )}
 
         <div className={styles.separator} />
 
