@@ -15,7 +15,7 @@ export function validateFile(file: File): void {
   if (!ALLOWED_EXTENSIONS.test(file.name)) {
     const ext = file.name.split('.').pop() || 'unknown';
     throw new FileValidationError(
-      `Unsupported file format: .${ext}. Supported formats: PDB, CIF, SDF, MOL, XYZ`
+      `Unsupported file format: .${ext}. Supported formats: PDB, CIF, CIF.GZ, SDF, MOL, XYZ`
     );
   }
 

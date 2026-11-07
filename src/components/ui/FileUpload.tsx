@@ -82,17 +82,28 @@ export function FileUpload() {
     return parseByFilename(content, filename);
   }, []);
 
-  const loadMolecule = useCallback((molecule: Molecule, name?: string, source?: StructureSource) => {
-    if (hasStructures && addMode && canAddMore) {
-      // Add as new structure
-      addStructure(molecule, name, source);
-    } else {
-      // Replace all structures
-      setMolecule(molecule, source);
+  // In Add mode at the limit nothing is read or fetched: the user picks
+  // Replace or removes a structure first (Add mode used to replace all 10)
+  const atLimit = hasStructures && addMode && !canAddMore;
+  const refuseAtLimit = useCallback((): boolean => {
+    if (!atLimit) return false;
+    setError(`Maximum of ${MAX_STRUCTURES} structures: remove one or switch to Replace`);
+    return true;
+  }, [atLimit, setError]);
+
+  /** Adds or replaces; false when the store refused it (the limit was reached meanwhile). */
+  const loadMolecule = useCallback((molecule: Molecule, name?: string, source?: StructureSource): boolean => {
+    if (hasStructures && addMode) {
+      // Add as new structure; the store refuses an 11th with its own message
+      return addStructure(molecule, name, source) !== '';
     }
-  }, [hasStructures, addMode, canAddMore, addStructure, setMolecule]);
+    // Replace all structures
+    setMolecule(molecule, source);
+    return true;
+  }, [hasStructures, addMode, addStructure, setMolecule]);
 
   const handleFile = useCallback(async (file: File) => {
+    if (refuseAtLimit()) return;
     setLoading(true);
     setError(null);
 
@@ -114,7 +125,7 @@ export function FileUpload() {
       const inlineFormat = detectInlineFormat(file.name);
       const inlineSource: StructureSource | undefined =
         inlineFormat ? { type: 'inline', format: inlineFormat, data: content } : undefined;
-      loadMolecule(molecule, name, inlineSource);
+      if (!loadMolecule(molecule, name, inlineSource)) return;
       track('structure_loaded', { source: 'file', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to parse file'));
@@ -122,7 +133,7 @@ export function FileUpload() {
     } finally {
       setLoading(false);
     }
-  }, [parseFile, loadMolecule, setLoading, setError]);
+  }, [parseFile, loadMolecule, refuseAtLimit, setLoading, setError]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -146,12 +157,15 @@ export function FileUpload() {
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Cleared so picking the same file again fires a change (and loads it again)
+    e.target.value = '';
     if (file) {
       handleFile(file);
     }
   }, [handleFile]);
 
   const loadSample = useCallback(async (sample: SampleMolecule) => {
+    if (refuseAtLimit()) return;
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your internet connection.');
       return;
@@ -170,7 +184,7 @@ export function FileUpload() {
       if (isRcsb) {
         const pdbId = sample.file.slice(5); // strip 'rcsb:'
         ({ molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal));
-        loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId });
+        if (!loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId })) return;
       } else {
         const response = await fetch(sample.file, { signal: controller.signal });
         if (!response.ok) {
@@ -184,7 +198,7 @@ export function FileUpload() {
           : inlineFormat
             ? { type: 'inline', format: inlineFormat, data: content }
             : undefined;
-        loadMolecule(molecule, sample.name, sampleSource);
+        if (!loadMolecule(molecule, sample.name, sampleSource)) return;
       }
       track('structure_loaded', { source: 'sample', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
@@ -194,7 +208,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [parseFile, loadMolecule, setLoading, setError]);
+  }, [parseFile, loadMolecule, refuseAtLimit, setLoading, setError]);
 
   const fetchPDB = useCallback(async (id: string) => {
     const trimmedId = id.trim().toUpperCase();
@@ -209,6 +223,7 @@ export function FileUpload() {
       return;
     }
 
+    if (refuseAtLimit()) return;
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your internet connection.');
       return;
@@ -223,7 +238,7 @@ export function FileUpload() {
     try {
       const source = { type: 'rcsb', id: trimmedId } as const;
       const { molecule } = await loadStructureFromSource(source, controller.signal);
-      loadMolecule(molecule, trimmedId, source);
+      if (!loadMolecule(molecule, trimmedId, source)) return;
       track('structure_loaded', { source: 'rcsb', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setPdbId(''); // Clear input on success
     } catch (err) {
@@ -237,7 +252,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [loadMolecule, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
 
   const handlePdbSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -256,6 +271,7 @@ export function FileUpload() {
       return;
     }
 
+    if (refuseAtLimit()) return;
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your internet connection.');
       return;
@@ -270,7 +286,7 @@ export function FileUpload() {
     try {
       const source = { type: 'alphafold', id: trimmedId } as const;
       const { molecule, name } = await loadStructureFromSource(source, controller.signal);
-      loadMolecule(molecule, name, source);
+      if (!loadMolecule(molecule, name, source)) return;
       track('structure_loaded', { source: 'af', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setUniprotId(''); // Clear input on success
     } catch (err) {
@@ -284,7 +300,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [loadMolecule, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
 
   const handleAlphaFoldSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -298,6 +314,7 @@ export function FileUpload() {
       return;
     }
 
+    if (refuseAtLimit()) return;
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your internet connection.');
       return;
@@ -314,7 +331,7 @@ export function FileUpload() {
       // Curated compounds keep their canonical address (/compound/caffeine).
       const source = { type: 'pubchem', cid, slug: slugForCid(cid) } as const;
       const { molecule, name, warning } = await loadStructureFromSource(source, controller.signal);
-      loadMolecule(molecule, name, source);
+      if (!loadMolecule(molecule, name, source)) return;
       track('structure_loaded', { source: 'pubchem', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
       setCompoundQuery('');
       // Loading clears errors; show the 2D notice after the structure is in.
@@ -326,7 +343,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       setLoading(false);
     }
-  }, [loadMolecule, setLoading, setError]);
+  }, [loadMolecule, refuseAtLimit, setLoading, setError]);
 
   const handlePubchemSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -339,11 +356,11 @@ export function FileUpload() {
       {hasStructures && (
         <div className={styles.modeToggle}>
           <button
-            className={clsx(styles.modeButton, addMode && canAddMore && styles.active)}
+            className={clsx(styles.modeButton, addMode && styles.active)}
             onClick={() => setAddMode(true)}
             disabled={!canAddMore}
             title={canAddMore ? 'Add new structure' : `Maximum ${MAX_STRUCTURES} structures`}
-            aria-pressed={addMode && canAddMore}
+            aria-pressed={addMode}
           >
             <Plus size={14} />
             Add
@@ -377,7 +394,7 @@ export function FileUpload() {
       >
         <input
           type="file"
-          accept=".pdb,.cif,.mmcif,.sdf,.mol,.xyz"
+          accept=".pdb,.cif,.cif.gz,.mmcif,.sdf,.mol,.xyz"
           onChange={handleFileInput}
           id="file-input"
           className={styles.fileInput}
@@ -385,7 +402,7 @@ export function FileUpload() {
         <label htmlFor="file-input" className={styles.fileLabel}>
           <span className={styles.uploadIcon}>+</span>
           <span>Drop a file here or click to upload</span>
-          <span className={styles.fileTypes}>PDB, CIF, SDF, MOL, XYZ</span>
+          <span className={styles.fileTypes}>PDB, CIF, CIF.GZ, SDF, MOL, XYZ</span>
         </label>
       </div>
 
