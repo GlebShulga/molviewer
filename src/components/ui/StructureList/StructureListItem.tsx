@@ -43,6 +43,8 @@ export function StructureListItem({
       aria-label={`${structure.name}, ${atomCount.toLocaleString()} atoms`}
       tabIndex={0}
       onKeyDown={(e) => {
+        // Keys on the buttons inside belong to them (Enter on Remove removes)
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onSelect();
