@@ -1,7 +1,16 @@
 import type { Atom, Molecule } from '../types';
 import type { RepresentationType, ColorScheme } from '../store/moleculeStore';
-import { isAminoAcid, isWater, analyzeResidues, residueKey, type Residue } from './residueAnalysis';
-import { hasBackboneData } from './backboneExtraction';
+import {
+  isAminoAcid,
+  isWater,
+  analyzeResidues,
+  residueKey,
+  DNA_RESIDUES,
+  RNA_RESIDUES,
+  NUCLEIC_ACID_RESIDUES,
+  type Residue,
+} from './residueAnalysis';
+import { hasBackboneData, isAlphaCarbon } from './backboneExtraction';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { normalizeElementSymbol } from '../constants';
 import { availableColor, isComponentStyleLimited } from './representationAvailability';
@@ -29,12 +38,6 @@ export interface ComponentSettings {
   colorScheme: ColorScheme;
   visible: boolean;
 }
-
-// DNA residue names (unambiguous deoxy-nucleotides)
-const DNA_RESIDUES = new Set(['DA', 'DT', 'DC', 'DG', 'DU']);
-
-// RNA residue names (need additional validation)
-const RNA_RESIDUES = new Set(['A', 'U', 'C', 'G']);
 
 // Ion elements
 const ION_ELEMENTS = new Set([
@@ -74,10 +77,67 @@ function isDNA(residueName: string): boolean {
   return DNA_RESIDUES.has(residueName.toUpperCase());
 }
 
+/** Longest N-C distance read as a peptide bond (1.33 Å in proteins). */
+const PEPTIDE_BOND_MAX = 2.0;
+
+function named(atom: Atom, name: string): boolean {
+  return atom.name?.trim().toUpperCase() === name;
+}
+
+function withinPeptideBond(a: Atom, b: Atom): boolean {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz <= PEPTIDE_BOND_MAX * PEPTIDE_BOND_MAX;
+}
+
+/**
+ * Whether a residue that isn't one of the 20 standard amino acids is part
+ * of a peptide chain: modified (MSE) and simulation-named (HIE, CYX) amino
+ * acids, and the residues of non-standard peptides (cyclosporin, D-peptides).
+ * It needs atoms named N and C, an alpha carbon, and a peptide bond: its N
+ * within PEPTIDE_BOND_MAX of a C of the residue just before it in the file,
+ * or its C of an N of the residue just after it. The bond keeps out ligands
+ * with amino-acid atom names (SAM, SAH), which Cartoon would drop as a lone
+ * residue, so nothing would draw them.
+ * File order, not residue numbers, so chainless segments that restart their
+ * numbering link too; distance, not molecule.bonds, so sessions saved by
+ * builds that skipped bond inference for files with CONECT records classify
+ * the same.
+ */
+function inPeptideChain(
+  residue: Residue,
+  atoms: Atom[],
+  residueOfAtom: (index: number) => Residue | undefined
+): boolean {
+  if (NUCLEIC_ACID_RESIDUES.has(residue.name.toUpperCase())) return false;
+  if (
+    !residue.atoms.some((a) => named(a, 'N')) ||
+    !residue.atoms.some((a) => named(a, 'C')) ||
+    !residue.atoms.some(isAlphaCarbon)
+  ) {
+    return false;
+  }
+  // The residue the file lists next to atom `index`, `step` -1 (before) or +1 (after)
+  const neighbour = (index: number, step: number): Residue | undefined => {
+    let i = index + step;
+    while (i >= 0 && i < atoms.length && residueOfAtom(i) === residue) i += step;
+    return i >= 0 && i < atoms.length ? residueOfAtom(i) : undefined;
+  };
+  for (const index of residue.atomIndices) {
+    const atom = atoms[index];
+    const [step, partner] = named(atom, 'N') ? [-1, 'C'] : named(atom, 'C') ? [1, 'N'] : [0, ''];
+    if (!step) continue;
+    const other = neighbour(index, step);
+    if (other?.atoms.some((a) => named(a, partner) && withinPeptideBond(a, atom))) return true;
+  }
+  return false;
+}
+
 /**
  * Classify a residue into a molecule component type
  */
-function classifyResidue(residue: Residue): MoleculeComponentType {
+function classifyResidue(residue: Residue, peptideLinked: (residue: Residue) => boolean): MoleculeComponentType {
   const residueName = residue.name.toUpperCase();
 
   // Check in order of specificity
@@ -85,7 +145,7 @@ function classifyResidue(residue: Residue): MoleculeComponentType {
   if (isIon(residue.atoms)) return 'ion';
   if (isDNA(residueName)) return 'dna';
   if (isRNAResidue(residue.atoms, residueName)) return 'rna';
-  if (isAminoAcid(residueName)) return 'protein';
+  if (isAminoAcid(residueName) || peptideLinked(residue)) return 'protein';
 
   // Fallback to ligand for unknown residues
   return 'ligand';
@@ -109,9 +169,25 @@ export function classifyMolecule(molecule: Molecule): MoleculeClassification {
     componentMap.set(type, { atomIndices: [], residueKeys: new Set() });
   }
 
+  // Which residue each atom is in, for the peptide-link check: built only
+  // when a residue needs it (a residue outside the 20 standard amino acids)
+  let residueAt: (Residue | undefined)[] | undefined;
+  const residueOfAtom = (index: number): Residue | undefined => {
+    if (!residueAt) {
+      residueAt = new Array<Residue | undefined>(molecule.atoms.length);
+      for (const chain of chains) {
+        for (const residue of chain.residues) {
+          for (const i of residue.atomIndices) residueAt[i] = residue;
+        }
+      }
+    }
+    return residueAt[index];
+  };
+  const peptideLinked = (residue: Residue) => inPeptideChain(residue, molecule.atoms, residueOfAtom);
+
   for (const chain of chains) {
     for (const residue of chain.residues) {
-      const type = classifyResidue(residue);
+      const type = classifyResidue(residue, peptideLinked);
       const component = componentMap.get(type)!;
 
       // Add atom indices for this residue (not contiguous when the file splits it).

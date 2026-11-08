@@ -183,6 +183,15 @@ export function isAminoAcid(residueName: string): boolean {
   return residueName.toUpperCase() in AMINO_ACID_CODES;
 }
 
+/** DNA residue names (unambiguous deoxy-nucleotides). */
+export const DNA_RESIDUES: ReadonlySet<string> = new Set(['DA', 'DT', 'DC', 'DG', 'DU']);
+
+/** RNA residue names. One letter, so the classifier also asks for a phosphate or ribose atom. */
+export const RNA_RESIDUES: ReadonlySet<string> = new Set(['A', 'U', 'C', 'G']);
+
+/** Nucleotide residue names, RNA and DNA. */
+export const NUCLEIC_ACID_RESIDUES: ReadonlySet<string> = new Set([...RNA_RESIDUES, ...DNA_RESIDUES]);
+
 /** Water residue names, in PDB files and from simulation packages. */
 const WATER_RESIDUES = new Set(['HOH', 'WAT', 'H2O', 'SOL', 'TIP', 'TIP3', 'TIP4', 'SPC']);
 

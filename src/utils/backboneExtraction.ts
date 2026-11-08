@@ -1,5 +1,12 @@
 import type { Atom, Molecule, SecondaryStructure } from '../types';
-import { atomResidueId, chainKey, compareResidueIds, isAminoAcid, residueLabel } from './residueAnalysis';
+import {
+  atomResidueId,
+  chainKey,
+  compareResidueIds,
+  isAminoAcid,
+  NUCLEIC_ACID_RESIDUES,
+  residueLabel,
+} from './residueAnalysis';
 
 export interface BackboneResidue {
   residueNumber: number;
@@ -21,11 +28,14 @@ export interface BackboneChain {
   residues: BackboneResidue[];
 }
 
-// Nucleic acid residue names
-const NUCLEIC_ACID_RESIDUES = new Set([
-  'A', 'U', 'G', 'C',           // RNA
-  'DA', 'DT', 'DC', 'DG', 'DU', // DNA
-]);
+/**
+ * An amino acid's alpha carbon: named CA with element C. Not a calcium ion,
+ * which PDB files also name CA; files without an element column give a
+ * protein's CA the element C (the parsers read it from the name).
+ */
+export function isAlphaCarbon(atom: Pick<Atom, 'name' | 'element'>): boolean {
+  return atom.name?.trim().toUpperCase() === 'CA' && atom.element?.toUpperCase() === 'C';
+}
 
 /** What an atom list's backbone answers are, each filled on first use. */
 interface BackboneFacts {
@@ -56,10 +66,15 @@ function backboneFacts(atoms: Atom[]): BackboneFacts {
  * The residues Cartoon traces, as atomResidueId keys (chain, name, number
  * and insertion code, so a ligand that shares a residue's number is a
  * residue of its own): amino acids and nucleotides by name, and any other
- * residue with atoms named N and C beside its CA, as modified amino acids
- * (MSE) and simulation names (HIE, CYX) have.
- * Not ligands, water or ions: their atoms can carry backbone names (a ligand
- * carbon named CA) and, in MD and docking output, a residue's number.
+ * residue with atoms named N and C, as modified amino acids (MSE) and
+ * simulation names (HIE, CYX) have. No CA is required: a cap such as NME
+ * (N and C only) stays in, and its N gives the last residue its psi angle
+ * (detectSecondaryStructure); Cartoon traces only residues with a CA.
+ * Not water or ions, and not ligands without both names: their atoms can
+ * carry backbone names (a ligand carbon named CA) and, in MD and docking
+ * output, a residue's number. A ligand with amino-acid atom names (SAM) is
+ * in; the classifier keeps it a ligand (no peptide link), so the protein's
+ * Cartoon filter leaves it out.
  *
  * Walked once per atom list (backboneCache), so detectSecondaryStructure
  * and extractBackbone on Cartoon's copy share one pass. The set is shared
