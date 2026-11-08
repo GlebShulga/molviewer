@@ -232,4 +232,24 @@ describe('parsePDB alternate locations', () => {
     );
     expect(new Set(m.atoms.map((a) => a.residueName))).toEqual(new Set(['SER']));
   });
+
+  it('keeps one conformer of each chainless ligand without a residue number', () => {
+    // Blank chain and residue number columns: the ligands share no position
+    const het = (serial: number, name: string, alt: string, residue: string, x: number) =>
+      `HETATM${String(serial).padStart(5)} ${name.padEnd(4)}${alt}${residue.padStart(3)}  ${''.padStart(4)}    ` +
+      `${x.toFixed(3).padStart(8)}${'0.000'.padStart(8)}${'0.000'.padStart(8)}${'0.50'.padStart(6)}${'0.00'.padStart(6)}           C`;
+    const m = parsePDB(
+      [
+        het(1, ' C1 ', 'A', 'LIG', 0),
+        het(2, ' C1 ', 'B', 'LIG', 0.2),
+        het(3, ' C2 ', 'A', 'LIG', 1.5),
+        het(4, ' C2 ', 'B', 'LIG', 1.7),
+        het(5, ' C1 ', 'B', 'ACT', 10),
+        het(6, ' C2 ', 'B', 'ACT', 11.5),
+        'END',
+      ].join('\n')
+    );
+    expect(m.atoms.map((a) => `${a.residueName}:${a.name}${a.altLoc}`)).toEqual(['LIG:C1A', 'LIG:C2A', 'ACT:C1B', 'ACT:C2B']);
+    expect(m.atoms.every((a) => a.residueNumber === undefined && !a.chainId)).toBe(true);
+  });
 });

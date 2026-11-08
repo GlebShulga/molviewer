@@ -187,7 +187,7 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
     // One alternate location per residue (the first seen), so a residue
     // whose only conformer is B is kept
     const altLoc = (altIdIdx !== undefined ? parseValue(tokens[altIdIdx]) : null) || undefined;
-    if (!keepAltLoc({ altLoc, chainId, residueNumber, insertionCode })) {
+    if (!keepAltLoc({ altLoc, chainId, residueNumber, insertionCode, residueName })) {
       i++;
       continue;
     }
