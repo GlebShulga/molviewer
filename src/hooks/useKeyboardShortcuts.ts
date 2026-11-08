@@ -62,7 +62,7 @@ export function useKeyboardShortcuts(
         // Keys 1 and 2 follow the buttons' atom-count limit (desktops, and an iPad with a keyboard)
         const setAtomStyle = (rep: 'ball-and-stick' | 'stick') => {
           const molecule = selectActiveStructure(useMoleculeStore.getState())?.molecule;
-          if (molecule && isStyleLimited(rep, molecule)) showToast(styleLimitNote(rep));
+          if (molecule && isStyleLimited(rep, molecule)) showToast(styleLimitNote(rep, molecule));
           else setRepresentation(rep);
         };
         switch (key) {

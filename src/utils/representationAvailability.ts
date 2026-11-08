@@ -2,6 +2,8 @@ import type { ColorScheme, Molecule, RepresentationType } from '../types';
 import { hasBackboneData } from './backboneExtraction';
 import { isTouchScreen } from './touch';
 import { DESKTOP_ATOM_STYLE_LIMIT } from '../../site/appContract';
+import { CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
+import { calculateColorSchemeContext, type ColorSchemeContext } from './atomColor';
 
 /**
  * Whether a style can be picked, and if not, why: a short predicate shown
@@ -59,29 +61,49 @@ export function atomStyleLimitLabel(touch: boolean): string {
   return atomStyleLimit(touch).toLocaleString('en-US');
 }
 
-function limitReason(touch: boolean): string {
-  return `over ${atomStyleLimitLabel(touch)} atoms${touch ? ' on a touch screen' : ''}; use Cartoon or Spacefill`;
+/**
+ * What a structure shows when the limit blocks Ball & Stick or Stick: Cartoon
+ * when it has a backbone, Spacefill otherwise (a large ligand set, an XYZ
+ * file, a membrane), which stays fast at any size through impostors.
+ */
+export type LimitFallback = 'cartoon' | 'spacefill';
+
+export function limitFallback(hasBackbone: boolean): LimitFallback {
+  return hasBackbone ? 'cartoon' : 'spacefill';
 }
+
+function limitReason(touch: boolean, hasBackbone: boolean): string {
+  const instead = hasBackbone ? 'Cartoon or Spacefill' : 'Spacefill';
+  return `over ${atomStyleLimitLabel(touch)} atoms${touch ? ' on a touch screen' : ''}; use ${instead}`;
+}
+
+const CARTOON_REASON = 'needs a protein or nucleic-acid backbone';
 
 const HIDDEN: Availability = { available: false, reason: 'the structure is hidden' };
 const OK: Availability = { available: true };
 
-function overAtomStyleLimit(rep: RepresentationType, facts: Omit<StructureFacts, 'visible'>): boolean {
-  return (rep === 'ball-and-stick' || rep === 'stick')
-    && facts.hasBackbone && facts.atomCount > atomStyleLimit(facts.touch);
+function isAtomStyle(rep: RepresentationType): boolean {
+  return rep === 'ball-and-stick' || rep === 'stick';
+}
+
+function overAtomStyleLimit(rep: RepresentationType, atomCount: number, touch: boolean): boolean {
+  return isAtomStyle(rep) && atomCount > atomStyleLimit(touch);
 }
 
 /**
  * One rule for the toolbar and the sheet. Only real limits: the one atom-count
  * cap is Ball & Stick and Stick (atomStyleLimit: 1,000 atoms on a touch screen,
- * 100,000 on a desktop), and only with a backbone, so Cartoon is there
- * instead. Spacefill has none (impostor rendering handles large structures).
+ * 100,000 on a desktop), with or without a backbone; Cartoon or Spacefill
+ * is there instead (limitFallback). Spacefill has none (impostor rendering
+ * handles large structures).
  */
 export function representationAvailability(rep: RepresentationType, facts: StructureFacts): Availability {
   if (!facts.visible) return HIDDEN;
-  if (overAtomStyleLimit(rep, facts)) return { available: false, reason: limitReason(facts.touch) };
+  if (overAtomStyleLimit(rep, facts.atomCount, facts.touch)) {
+    return { available: false, reason: limitReason(facts.touch, facts.hasBackbone) };
+  }
   if (rep === 'cartoon' && !facts.hasBackbone) {
-    return { available: false, reason: 'needs a protein or nucleic-acid backbone' };
+    return { available: false, reason: CARTOON_REASON };
   }
   if (rep === 'surface-vdw') {
     if (facts.atomCount < SURFACE_MIN_ATOMS) return { available: false, reason: `needs at least ${SURFACE_MIN_ATOMS} atoms` };
@@ -96,20 +118,53 @@ export function representationAvailability(rep: RepresentationType, facts: Struc
  * keys, the widget).
  */
 export function isStyleLimited(rep: RepresentationType, molecule: Molecule): boolean {
-  // The cheap checks first: the backbone check can walk every atom
-  if (!overAtomStyleLimit(rep, { touch: isTouchScreen(), atomCount: molecule.atoms.length, hasBackbone: true })) return false;
-  return hasBackboneData(molecule);
+  return overAtomStyleLimit(rep, molecule.atoms.length, isTouchScreen());
 }
 
-/** Why a link or session opened in Cartoon instead of the style it asked for. */
-export function styleFallbackMessage(requested: RepresentationType): string {
+/**
+ * Whether the limit blocks this style for `atomCount` atoms on this device:
+ * one component's atoms, for a ligand set beside a polymer, whose own count
+ * is what it draws in that style.
+ */
+export function isComponentStyleLimited(rep: RepresentationType, atomCount: number): boolean {
+  return overAtomStyleLimit(rep, atomCount, isTouchScreen());
+}
+
+/** The style to show instead of a limited one (limitFallback) for this molecule. */
+export function styleLimitFallback(molecule: Molecule): LimitFallback {
+  return limitFallback(hasBackboneData(molecule));
+}
+
+/**
+ * The style a link, session or the widget shows for `rep` on this molecule,
+ * for the paths that set a style without the buttons: Cartoon without a
+ * backbone shows CARTOON_FALLBACK_REPRESENTATION (it would draw nothing), and
+ * the atom-count limit then applies as usual (limitFallback). The backbone
+ * check can walk every atom, so it runs only when the answer depends on it.
+ */
+export function styleToShow(rep: RepresentationType, molecule: Molecule): RepresentationType {
+  let hasBackbone: boolean | undefined;
+  const backbone = () => (hasBackbone ??= hasBackboneData(molecule));
+  const style = rep === 'cartoon' && !backbone() ? CARTOON_FALLBACK_REPRESENTATION : rep;
+  return isStyleLimited(style, molecule) ? limitFallback(backbone()) : style;
+}
+
+/**
+ * Why a link or session opened in `shown` instead of the style it asked for:
+ * Cartoon for want of a backbone (the reason the buttons give), any other
+ * style for the atom-count limit.
+ */
+export function styleFallbackMessage(requested: RepresentationType, shown: RepresentationType): string {
+  if (requested === 'cartoon') {
+    return `Showing ${REPRESENTATION_LABELS[shown]}: Cartoon ${CARTOON_REASON}`;
+  }
   const touch = isTouchScreen();
-  return `Showing Cartoon: ${REPRESENTATION_LABELS[requested]} is limited to ${atomStyleLimitLabel(touch)} atoms${touch ? ' on touch screens' : ''}`;
+  return `Showing ${REPRESENTATION_LABELS[shown]}: ${REPRESENTATION_LABELS[requested]} is limited to ${atomStyleLimitLabel(touch)} atoms${touch ? ' on touch screens' : ''}`;
 }
 
 /** The reason the buttons show, for the keyboard shortcuts. */
-export function styleLimitNote(rep: RepresentationType): string {
-  return `${REPRESENTATION_LABELS[rep]}: ${limitReason(isTouchScreen())}`;
+export function styleLimitNote(rep: RepresentationType, molecule: Molecule): string {
+  return `${REPRESENTATION_LABELS[rep]}: ${limitReason(isTouchScreen(), hasBackboneData(molecule))}`;
 }
 
 export interface ColorFacts {
@@ -140,4 +195,45 @@ export function colorSchemeAvailability(scheme: ColorScheme, facts: ColorFacts):
     default:
       return OK;
   }
+}
+
+/** The facts colorSchemeAvailability needs, from a molecule's color context (calculateColorSchemeContext). */
+export function colorFacts(context: ColorSchemeContext, representation: RepresentationType, visible = true): ColorFacts {
+  return {
+    visible,
+    representation,
+    hasBackbone: context.hasBackboneData === true,
+    hasResidueData: context.hasResidueData === true,
+    hasBfactorData: context.hasBfactorData === true,
+    hasResidueNumbers: context.hasResidueNumbers === true,
+    hasSecondaryStructure: context.hasSecondaryStructure === true,
+  };
+}
+
+/**
+ * `scheme` if the buttons would offer it for a molecule shown in `shown`, CPK
+ * otherwise. For where Cartoon fell back: a protein's default Secondary
+ * structure needs a backbone or helix and sheet records, and without them the
+ * atoms draw in CPK while the control would show a greyed-out scheme.
+ * `context` is the molecule's calculateColorSchemeContext, which walks every
+ * atom, so callers compute it once and only when Cartoon fell back.
+ */
+export function availableColor(scheme: ColorScheme, shown: RepresentationType, context: ColorSchemeContext): ColorScheme {
+  return colorSchemeAvailability(scheme, colorFacts(context, shown)).available ? scheme : 'cpk';
+}
+
+/**
+ * The color a link or the widget applies along with a style that styleToShow
+ * turned from `requested` into `shown`: when Cartoon fell back, one the
+ * buttons would offer (availableColor), else `scheme` as asked.
+ */
+export function colorToShow(
+  scheme: ColorScheme,
+  requested: RepresentationType,
+  shown: RepresentationType,
+  molecule: Molecule
+): ColorScheme {
+  return requested === 'cartoon' && shown !== 'cartoon'
+    ? availableColor(scheme, shown, calculateColorSchemeContext(molecule))
+    : scheme;
 }

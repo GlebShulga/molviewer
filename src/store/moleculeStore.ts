@@ -29,9 +29,18 @@ import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { roundAtoms, track, type EventProps } from '../utils/track';
 import { showToast } from '../utils/toast';
-import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
+import {
+  availableColor,
+  isComponentStyleLimited,
+  isStyleLimited,
+  styleFallbackMessage,
+  styleLimitFallback,
+  type LimitFallback,
+} from '../utils/representationAvailability';
+import { hasBackboneData } from '../utils/backboneExtraction';
+import { calculateColorSchemeContext } from '../utils/atomColor';
 import { AROMATIC_DETECTION_THRESHOLD, GPU_PICKING_THRESHOLD } from '../config';
-import { SMART_DEFAULTS } from '../config/smartDefaults';
+import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { DEFAULT_SURFACE_COLOR } from '../colors';
 import {
   loadMoleculeAsync,
@@ -199,19 +208,120 @@ export function withValidColor(structure: Structure): Structure {
 }
 
 /**
- * Cartoon instead of a style the atom-count limit blocks on this device
- * (isStyleLimited), for structures that arrive without the buttons: shared and
- * saved sessions. `fellBackFrom` is the blocked style, for the toast.
+ * A color scheme the buttons would grey out for the style each part is shown
+ * in becomes CPK (availableColor), on the structure and on every component:
+ * setStructureColorScheme writes the scheme onto ligands, ions and water too.
+ * For where Cartoon fell back on a molecule without a backbone, so a protein
+ * without helix and sheet records doesn't keep a Secondary structure it
+ * can't show. Walks every atom once (calculateColorSchemeContext).
+ * Returns the same object when nothing changes.
  */
-export function styleSafeStructure(structure: Structure): { structure: Structure; fellBackFrom?: RepresentationType } {
-  // Only the surface is drawn: whatever the polymer components hold is unseen
+export function withAvailableColor(structure: Structure): Structure {
+  const context = calculateColorSchemeContext(structure.molecule);
+  const colorScheme = availableColor(structure.colorScheme, structure.representation, context);
+  const componentSettings = structure.componentSettings.map((cs) => {
+    const scheme = availableColor(cs.colorScheme, cs.representation, context);
+    return scheme === cs.colorScheme ? cs : { ...cs, colorScheme: scheme };
+  });
+  if (colorScheme === structure.colorScheme && componentSettings.every((cs, i) => cs === structure.componentSettings[i])) {
+    return structure;
+  }
+  return { ...structure, colorScheme, componentSettings };
+}
+
+/** What the part of `asked` that was in Cartoon (the structure, else its first such component) shows in `shown`. */
+function cartoonShownAs(asked: Structure, shown: Structure): RepresentationType {
+  if (asked.representation === 'cartoon') return shown.representation;
+  const i = asked.componentSettings.findIndex((cs) => cs.representation === 'cartoon');
+  return shown.componentSettings[i].representation;
+}
+
+/**
+ * The style a structure that arrives without the buttons (shared and saved
+ * sessions) can show here. Three steps:
+ * 0. Cartoon on a molecule without a backbone (hasBackboneData) draws nothing:
+ *    the structure and any component in Cartoon go to
+ *    CARTOON_FALLBACK_REPRESENTATION, with colors it can show
+ *    (withAvailableColor).
+ * 1. The atom-count limit on the structure's style, as the buttons limit it
+ *    (isStyleLimited): with a backbone the polymer components go to Cartoon;
+ *    without one, every component in an atom style goes to Spacefill.
+ * 2. Each component in an atom style over the limit on its own atoms (a
+ *    ligand set beside a polymer) goes to Spacefill, as
+ *    generateComponentSettings starts it.
+ * For the toast: `fellBackFrom` is the style asked for and `fellBackTo` the
+ * one finally shown, from the first step that changed something.
+ */
+export function styleSafeStructure(
+  structure: Structure
+): { structure: Structure; fellBackFrom?: RepresentationType; fellBackTo?: RepresentationType } {
+  // Only the surface is drawn: whatever the components hold is unseen
   if (isSurfaceRepresentation(structure.representation)) return { structure };
-  const styles = [
-    structure.representation,
-    ...structure.componentSettings.filter((cs) => POLYMER_COMPONENTS.has(cs.type)).map((cs) => cs.representation),
-  ];
-  const fellBackFrom = styles.find((rep) => isStyleLimited(rep, structure.molecule));
-  return fellBackFrom ? { structure: withRepresentation(structure, 'cartoon'), fellBackFrom } : { structure };
+
+  // Step 0, before the cheap limit check below: a small chainless file in
+  // Cartoon is under the limit. The backbone check can walk every atom, so it
+  // runs only when something is in Cartoon.
+  let result = structure;
+  const inCartoon = (rep: RepresentationType) => rep === 'cartoon';
+  const cartoonFellBack =
+    (inCartoon(structure.representation) || structure.componentSettings.some((cs) => inCartoon(cs.representation))) &&
+    !hasBackboneData(structure.molecule);
+  if (cartoonFellBack) {
+    const traceable = (rep: RepresentationType) => (inCartoon(rep) ? CARTOON_FALLBACK_REPRESENTATION : rep);
+    result = withAvailableColor({
+      ...structure,
+      representation: traceable(structure.representation),
+      componentSettings: structure.componentSettings.map((cs) =>
+        inCartoon(cs.representation) ? { ...cs, representation: traceable(cs.representation) } : cs
+      ),
+    });
+  }
+
+  const limited = (rep: RepresentationType) => isStyleLimited(rep, result.molecule);
+  // The cheap check: the backbone check can walk every atom. A component over
+  // the limit is in a structure over it.
+  if (!limited(result.representation) && !result.componentSettings.some((cs) => limited(cs.representation))) {
+    return cartoonFellBack
+      ? { structure: result, fellBackFrom: 'cartoon', fellBackTo: cartoonShownAs(structure, result) }
+      : { structure };
+  }
+
+  // Step 1: the structure's style
+  const beforeLimit = result;
+  // Without a backbone (step 0 found none) the limit's fallback is Spacefill
+  const fallback: LimitFallback = cartoonFellBack ? 'spacefill' : styleLimitFallback(beforeLimit.molecule);
+  const counted = fallback === 'cartoon'
+    ? beforeLimit.componentSettings.filter((cs) => POLYMER_COMPONENTS.has(cs.type))
+    : beforeLimit.componentSettings;
+  const structureFrom = [beforeLimit.representation, ...counted.map((cs) => cs.representation)].find(limited);
+  if (structureFrom && fallback === 'cartoon') {
+    result = withRepresentation(beforeLimit, 'cartoon');
+  } else if (structureFrom) {
+    result = withValidColor({
+      ...beforeLimit,
+      representation: limited(beforeLimit.representation) ? 'spacefill' : beforeLimit.representation,
+      componentSettings: beforeLimit.componentSettings.map((cs) =>
+        limited(cs.representation) ? { ...cs, representation: 'spacefill' as const } : cs
+      ),
+    });
+  }
+
+  // Step 2: components over the limit on their own atoms
+  const overOwn = (cs: ComponentSettings) => isComponentStyleLimited(cs.representation, cs.atomIndices.length);
+  const componentFrom = result.componentSettings.find(overOwn)?.representation;
+  if (componentFrom) {
+    result = {
+      ...result,
+      componentSettings: result.componentSettings.map((cs) =>
+        overOwn(cs) ? { ...cs, representation: 'spacefill' as const } : cs
+      ),
+    };
+  }
+
+  if (cartoonFellBack) return { structure: result, fellBackFrom: 'cartoon', fellBackTo: cartoonShownAs(structure, result) };
+  if (structureFrom) return { structure: result, fellBackFrom: structureFrom, fellBackTo: fallback };
+  if (componentFrom) return { structure: result, fellBackFrom: componentFrom, fellBackTo: 'spacefill' };
+  return { structure };
 }
 
 /**
@@ -249,14 +359,14 @@ function cancelPendingSavedLoad(): void {
  * Cartoon + CPK.
  */
 function sessionStructures(structures: Map<string, Structure>): Map<string, Structure> {
-  let fellBackFrom: RepresentationType | undefined;
+  let fellBack: { from: RepresentationType; to: RepresentationType } | undefined;
   const result = new Map<string, Structure>();
   for (const [id, structure] of structures) {
     const safe = styleSafeStructure(structure);
-    fellBackFrom ??= safe.fellBackFrom;
+    if (safe.fellBackFrom && safe.fellBackTo) fellBack ??= { from: safe.fellBackFrom, to: safe.fellBackTo };
     result.set(id, withValidColor(safe.structure));
   }
-  if (fellBackFrom) showToast(styleFallbackMessage(fellBackFrom));
+  if (fellBack) showToast(styleFallbackMessage(fellBack.from, fellBack.to));
   return result;
 }
 

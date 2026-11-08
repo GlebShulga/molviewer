@@ -4,6 +4,7 @@ import { useMoleculeStore, type RepresentationType, type ColorScheme } from '../
 import { useActiveStructure } from '../../hooks';
 import { calculateColorSchemeContext } from '../../utils/atomColor';
 import {
+  colorFacts,
   colorSchemeAvailability,
   representationAvailability,
   type Availability,
@@ -94,15 +95,7 @@ export function ControlPanel() {
   });
 
   const schemeOptions: Option<ColorScheme>[] = COLOR_SCHEMES.map((scheme) => {
-    const availability = colorSchemeAvailability(scheme.value, {
-      visible,
-      representation,
-      hasBackbone,
-      hasResidueData: colorContext.hasResidueData === true,
-      hasBfactorData: colorContext.hasBfactorData === true,
-      hasResidueNumbers: colorContext.hasResidueNumbers === true,
-      hasSecondaryStructure: colorContext.hasSecondaryStructure === true,
-    });
+    const availability = colorSchemeAvailability(scheme.value, colorFacts(colorContext, representation, visible));
     const description = scheme.value === 'bfactor' && isAlphaFold
       ? 'pLDDT confidence, AlphaFold DB colors: dark blue > 90, light blue 70-90, yellow 50-70, orange < 50'
       : scheme.description;

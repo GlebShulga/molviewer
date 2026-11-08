@@ -16,7 +16,7 @@ import { loadSharedSession, deserializeShareableSession } from '../utils/shareSe
 import { loadStructureFromSource, resolvePubchemCid } from '../utils/structureLoader';
 import { cidForSlug, slugForCid } from '../../site/compoundSlugs';
 import { entryKind, roundAtoms, track } from '../utils/track';
-import { isStyleLimited, styleFallbackMessage } from '../utils/representationAvailability';
+import { colorToShow, styleFallbackMessage, styleToShow } from '../utils/representationAvailability';
 import { showToast } from '../utils/toast';
 import type { StructureSource } from '../types';
 
@@ -151,13 +151,20 @@ export function useInitialUrlLoad(): void {
 
         if (structId) {
           const molecule = store().structures.get(structId)?.molecule;
-          if (viewParams.repr && molecule && isStyleLimited(viewParams.repr, molecule)) {
-            store().setStructureRepresentation(structId, 'cartoon');
-            showToast(styleFallbackMessage(viewParams.repr));
-          } else if (viewParams.repr) {
-            store().setStructureRepresentation(structId, viewParams.repr);
+          // Cartoon without a backbone, or a style over the atom-count limit,
+          // shows what the buttons would allow (styleToShow), with a toast
+          const shown = viewParams.repr && molecule ? styleToShow(viewParams.repr, molecule) : viewParams.repr;
+          if (viewParams.repr && shown) {
+            store().setStructureRepresentation(structId, shown);
+            if (shown !== viewParams.repr) showToast(styleFallbackMessage(viewParams.repr, shown));
           }
-          if (viewParams.color) store().setStructureColorScheme(structId, viewParams.color);
+          // After the style: a scheme Cartoon's fallback can't show becomes CPK
+          if (viewParams.color) {
+            const color = viewParams.repr && shown && molecule
+              ? colorToShow(viewParams.color, viewParams.repr, shown, molecule)
+              : viewParams.color;
+            store().setStructureColorScheme(structId, color);
+          }
           // ?view= from Copy Link: applied by App once the viewer is ready, like a share's camera.
           if (viewParams.camera) store().setPendingCameraSnapshot(viewParams.camera);
         }

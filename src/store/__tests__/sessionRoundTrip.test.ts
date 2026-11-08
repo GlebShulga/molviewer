@@ -7,10 +7,13 @@ import type { Molecule } from '../../types';
 import type { CameraSnapshot } from '../../types/session';
 import type { Measurement } from '../../utils/measurements';
 
+/** Backbone atoms (N, CA, C, repeating), so Cartoon can trace it and a session saved in Cartoon stays in it. */
 function createMockMolecule(name: string, atomCount = 3): Molecule {
+  const backbone = [['N', 'N'], ['CA', 'C'], ['C', 'C']];
   const atoms = Array.from({ length: atomCount }, (_, i) => ({
     id: i,
-    element: 'C',
+    name: backbone[i % 3][0],
+    element: backbone[i % 3][1],
     x: i * 1.5,
     y: 0,
     z: 0,

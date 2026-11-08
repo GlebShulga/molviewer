@@ -16,7 +16,7 @@ import { THEME_COLORS } from '../config';
 import { PLDDT_BANDS } from '../colors';
 import { loadStructureFromSource } from '../utils/structureLoader';
 import { calculateColorSchemeContext } from '../utils/atomColor';
-import { atomStyleLimitLabel, isStyleLimited } from '../utils/representationAvailability';
+import { atomStyleLimitLabel, colorToShow, isStyleLimited, styleToShow } from '../utils/representationAvailability';
 import { isTouchScreen } from '../utils/touch';
 import { track } from '../utils/track';
 import type { ColorScheme, RepresentationType, StructureSource } from '../types';
@@ -112,12 +112,14 @@ export default function WidgetApp({ host }: { host: HostBridge }) {
         if (controller.signal.aborted) return;
         const id = store().addStructure(molecule, name, toSource(payload.load));
         if (id) {
-          // Ball & Stick and Stick stop at 1,000 atoms on touch screens and 100,000
-          // on desktops, as in the app.
-          // The atom count is known only now, so the dropdown is corrected here.
-          const repr = isStyleLimited(initial.repr, molecule) ? 'cartoon' : initial.repr;
+          // As in the app (styleToShow): Cartoon without a backbone shows Ball &
+          // Stick, and Ball & Stick and Stick stop at 1,000 atoms on touch screens
+          // and 100,000 on desktops, for Cartoon (Spacefill without a backbone),
+          // with a color the style shown can take (colorToShow). The molecule is
+          // known only now, so the dropdowns are corrected here.
+          const repr = styleToShow(initial.repr, molecule);
           store().setStructureRepresentation(id, repr);
-          store().setStructureColorScheme(id, initial.color);
+          store().setStructureColorScheme(id, colorToShow(initial.color, initial.repr, repr, molecule));
           setView(appliedView(id, initial));
         }
         store().setAutoRotate(initial.spin);

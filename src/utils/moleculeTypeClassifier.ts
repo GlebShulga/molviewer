@@ -4,6 +4,8 @@ import { isAminoAcid, isWater, analyzeResidues, residueKey, type Residue } from 
 import { hasBackboneData } from './backboneExtraction';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
 import { normalizeElementSymbol } from '../constants';
+import { availableColor, isComponentStyleLimited } from './representationAvailability';
+import { calculateColorSchemeContext, type ColorSchemeContext } from './atomColor';
 
 export type MoleculeComponentType = 'protein' | 'dna' | 'rna' | 'ligand' | 'water' | 'ion';
 
@@ -176,25 +178,41 @@ export function getPrimaryComponent(classification: MoleculeClassification): Mol
 }
 /**
  * Component settings for a classification, with the smart defaults for each
- * type (Cartoon falls back when the molecule has no backbone to trace).
+ * type. Cartoon falls back when the molecule has no backbone to trace, for
+ * every polymer (protein, DNA, RNA), and so does a color scheme the buttons
+ * would grey out for the style shown instead (availableColor): a protein's
+ * Secondary structure without a backbone or helix and sheet records.
  */
 export function generateComponentSettings(
   classification: MoleculeClassification,
   molecule: Molecule
 ): ComponentSettings[] {
   const hasBB = hasBackboneData(molecule);
+  // Walks every atom: computed once, and only when Cartoon fell back
+  let colorContext: ColorSchemeContext | undefined;
   return classification.components.map((component) => {
     const defaults = SMART_DEFAULTS[component.type];
-    const representation =
-      component.type === 'protein' && defaults.representation === 'cartoon' && !hasBB
-        ? CARTOON_FALLBACK_REPRESENTATION
-        : defaults.representation;
+    const cartoonFellBack = defaults.representation === 'cartoon' && !hasBB;
+    let representation = cartoonFellBack ? CARTOON_FALLBACK_REPRESENTATION : defaults.representation;
+    // What would start in Ball & Stick or Stick over the atom-style limit
+    // starts in Spacefill instead (styleLimitFallback). Without a backbone
+    // the whole structure counts, as the buttons count it (ligands, and a
+    // protein Cartoon can't trace). With one the polymer is in Cartoon, and
+    // a ligand set beside it counts its own atoms: a few ligands stay in
+    // Ball & Stick, a set over the limit is drawn in Spacefill.
+    const atomCount = hasBB ? component.atomIndices.length : molecule.atoms.length;
+    if (isComponentStyleLimited(representation, atomCount)) {
+      representation = 'spacefill';
+    }
+    const colorScheme = cartoonFellBack
+      ? availableColor(defaults.colorScheme, representation, (colorContext ??= calculateColorSchemeContext(molecule)))
+      : defaults.colorScheme;
     return {
       type: component.type,
       atomIndices: component.atomIndices,
       residueFilter: component.residueFilter,
       representation,
-      colorScheme: defaults.colorScheme,
+      colorScheme,
       visible: defaults.visible,
     };
   });

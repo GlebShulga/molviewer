@@ -9,6 +9,7 @@ import { useMoleculeStore, temporalStore } from '../../store/moleculeStore';
 import { useUrlSyncStore, initialUrlSyncState } from '../../store/urlSyncStore';
 import { useUrlSync, computeUrlTarget, computeTitle, DEFAULT_TITLE } from '../useUrlSync';
 import { useInitialUrlLoad, UNSUPPORTED_URL_PARAM } from '../useInitialUrlLoad';
+import { useToastStore } from '../../utils/toast';
 import type { Molecule, StructureSource } from '../../types';
 
 // ---- mocks: network loaders ------------------------------------------------
@@ -16,10 +17,21 @@ import type { Molecule, StructureSource } from '../../types';
 type Deferred = { resolve: () => void; reject: (e: Error) => void };
 const pending: Deferred[] = [];
 
+/**
+ * PDB and AlphaFold entries: one alanine with a backbone Cartoon can trace
+ * (N, CA, C). A PubChem compound (CID ...): three carbons with no residue
+ * data, as an SDF gives, so a ligand without a backbone.
+ */
 function mockMolecule(name: string): Molecule {
+  const names = [['N', 'N'], ['CA', 'C'], ['C', 'C']];
+  const atoms = name.startsWith('CID ')
+    ? [0, 1, 2].map((i) => ({ id: i, element: 'C', x: i * 1.5, y: 0, z: 0 }))
+    : [0, 1, 2].map((i) => ({
+        id: i, name: names[i][0], element: names[i][1], x: i * 1.5, y: 0, z: 0, residueName: 'ALA', residueNumber: 1, chainId: 'A',
+      }));
   return {
     name,
-    atoms: [0, 1, 2].map((i) => ({ id: i, element: 'C', x: i * 1.5, y: 0, z: 0, residueName: 'ALA', residueNumber: 1, chainId: 'A' })),
+    atoms,
     bonds: [{ atom1Index: 0, atom2Index: 1, order: 1 as const }],
   };
 }
@@ -316,6 +328,19 @@ describe('useUrlSync + useInitialUrlLoad', () => {
     await resolveAll();
     await waitFor(() => expect(currentUrl()).toBe('/pdb/1CRN?repr=cartoon'));
     expect(useMoleculeStore.getState().pendingCameraSnapshot).toEqual({ position: [10, 20, 30], target: [1, 2, 3], zoom: 1.5 });
+  });
+
+  it('?repr=cartoon on a compound (no backbone) opens in Ball & Stick with CPK, its ligand too, with the Cartoon toast', async () => {
+    useToastStore.setState({ message: null });
+    openAt('/compound/cid/2519?repr=cartoon&color=secondaryStructure');
+    mountApp();
+    await resolveAll();
+    await waitFor(() => expect(useUrlSyncStore.getState().initialLoadSettled).toBe(true));
+    const s = [...useMoleculeStore.getState().structures.values()][0];
+    expect(s.representation).toBe('ball-and-stick');
+    expect(s.colorScheme).toBe('cpk');
+    expect(s.componentSettings.find((c) => c.type === 'ligand')?.colorScheme).toBe('cpk');
+    expect(useToastStore.getState().message).toBe('Showing Ball & Stick: Cartoon needs a protein or nucleic-acid backbone');
   });
 
   it('Add mode keeps the first structure; removing it moves on; removing the last goes home', async () => {
