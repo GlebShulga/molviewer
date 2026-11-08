@@ -403,6 +403,7 @@ function readKeyValueBlock(lines: string[], startIndex: number, prefix: string):
     const key = line.split(/\s+/, 1)[0];
     const rest = line.slice(key.length).trim();
     i++;
+    // Each value as one token of the data line
     let value: string;
     if (rest) {
       value = tokenizeLine(rest)[0];
@@ -412,7 +413,7 @@ function readKeyValueBlock(lines: string[], startIndex: number, prefix: string):
       i++;
       while (i < lines.length && !lines[i].startsWith(';')) text.push(lines[i++]);
       i++; // the closing ';'
-      value = text.join(' ').trim();
+      value = quoteTextField(text.join(' ').trim());
     } else {
       value = tokenizeLine(lines[i]?.trim() ?? '')[0] ?? '?';
       i++;
@@ -420,14 +421,22 @@ function readKeyValueBlock(lines: string[], startIndex: number, prefix: string):
     keys.push(key);
     values.push(value);
   }
-  return { loopLines: [...keys, values.map(quoteValue).join(' ')], endIndex: i };
+  return { loopLines: [...keys, values.join(' ')], endIndex: i };
 }
 
-/** A value as one token of a data line: quoted when it holds spaces and isn't quoted already. */
-function quoteValue(value: string): string {
-  if (value === '') return '?';
-  if (/^['"]/.test(value) || !/\s/.test(value)) return value;
-  return value.includes("' ") ? `"${value}"` : `'${value}'`;
+/**
+ * A ';' text field as one token of a data line, always quoted (it may start
+ * with a quote and still hold spaces: `'A' and B`). A quote closes a token
+ * only before whitespace (tokenizeLine), so double quotes carry any text
+ * without `"` followed by whitespace, and single quotes any text without
+ * `'` followed by whitespace. Text holding both can't be written on one
+ * line, so it is unknown ('?').
+ */
+function quoteTextField(text: string): string {
+  if (text === '') return '?';
+  if (!/"\s/.test(text)) return `"${text}"`;
+  if (!/'\s/.test(text)) return `'${text}'`;
+  return '?';
 }
 
 /**

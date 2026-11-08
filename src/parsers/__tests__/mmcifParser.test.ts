@@ -455,6 +455,41 @@ ${atomLoop(4)}`;
     expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['helix', 'helix', 'helix', 'coil']);
   });
 
+  it('keeps the columns after a text field that starts with a quote and holds spaces', () => {
+    const cif = `data_QUOTE
+_struct_conf.conf_type_id HELX_P
+_struct_conf.details
+;'A' and B
+;
+_struct_conf.beg_auth_asym_id A
+_struct_conf.beg_auth_seq_id 2
+_struct_conf.end_auth_seq_id 3
+#
+${atomLoop(4)}`;
+    expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['coil', 'helix', 'helix', 'coil']);
+  });
+
+  it('reads a single atom after a text field that starts with a quote', () => {
+    const cif = `data_ATOMQ
+_atom_site.group_PDB HETATM
+_atom_site.id 1
+_atom_site.details
+;'bound' ion, one site
+;
+_atom_site.type_symbol ZN
+_atom_site.label_atom_id ZN
+_atom_site.label_comp_id ZN
+_atom_site.label_asym_id B
+_atom_site.Cartn_x 1.5
+_atom_site.Cartn_y -2.0
+_atom_site.Cartn_z 3.25
+#
+`;
+    const m = parseMMCIF(cif);
+    expect(m.atoms).toHaveLength(1);
+    expect(m.atoms[0]).toMatchObject({ element: 'Zn', chainId: 'B', x: 1.5, y: -2, z: 3.25 });
+  });
+
   it('reads a single sheet strand', () => {
     const cif = `data_SHEET
 _struct_sheet_range.sheet_id A
