@@ -1,24 +1,15 @@
-import type { Atom, Bond, Molecule, SecondaryStructure, BiologicalAssembly } from "../types";
+import type { Atom, Bond, Molecule, BiologicalAssembly } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { DEFAULT_ELEMENT, getElement, normalizeElementSymbol } from "../constants";
 import { createAltLocFilter } from "./altLoc";
-import { compareResidueIds } from "../utils/residueAnalysis";
+import { secondaryStructureAt, type SecondaryStructureRange } from "./secondaryStructureRanges";
 
 export interface PDBParserOptions {
   inferBonds?: boolean;
   bondTolerance?: number;
   /** Parse BIOMT records for biological assemblies (default: true) */
   parseAssemblies?: boolean;
-}
-
-interface SecondaryStructureRange {
-  type: SecondaryStructure;
-  chainId: string;
-  startResNum: number;
-  startInsertionCode?: string;
-  endResNum: number;
-  endInsertionCode?: string;
 }
 
 const DEFAULT_OPTIONS: PDBParserOptions = {
@@ -210,34 +201,6 @@ function parseSheetRecord(line: string): SecondaryStructureRange | null {
   };
 }
 
-/**
- * Assign secondary structure to an atom based on parsed ranges
- */
-function getSecondaryStructure(
-  chainId: string | undefined,
-  residueNumber: number | undefined,
-  insertionCode: string | undefined,
-  ranges: SecondaryStructureRange[]
-): SecondaryStructure | undefined {
-  if (residueNumber === undefined || ranges.length === 0) {
-    return undefined;
-  }
-
-  for (const range of ranges) {
-    if (
-      // A blank chain ID is '' in HELIX/SHEET records and undefined on atoms
-      (range.chainId || '') === (chainId || '') &&
-      // Number, then insertion code: a range ending at 52B covers 52A
-      compareResidueIds(residueNumber, insertionCode, range.startResNum, range.startInsertionCode) >= 0 &&
-      compareResidueIds(residueNumber, insertionCode, range.endResNum, range.endInsertionCode) <= 0
-    ) {
-      return range.type;
-    }
-  }
-
-  // If we have SS data but this residue isn't in helix/sheet, it's a coil
-  return 'coil';
-}
 
 /** Residues whose atoms are all one-letter elements (C, N, O, S, P, H). */
 const STANDARD_RESIDUES = new Set([
@@ -422,7 +385,7 @@ export function parsePDB(
       if (atom && keepAltLoc(atom)) {
         // Assign secondary structure if we have SS data
         if (ssRanges.length > 0) {
-          atom.secondaryStructure = getSecondaryStructure(
+          atom.secondaryStructure = secondaryStructureAt(
             atom.chainId,
             atom.residueNumber,
             atom.insertionCode,

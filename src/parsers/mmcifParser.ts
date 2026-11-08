@@ -1,24 +1,15 @@
-import type { Atom, Bond, Molecule, SecondaryStructure } from "../types";
+import type { Atom, Bond, Molecule } from "../types";
 import { PARSER_CONFIG } from "../config";
 import { normalizeElementSymbol } from "../constants";
 import { inferBondsFromDistance } from "../utils/bondInference";
 import { createAltLocFilter } from "./altLoc";
-import { compareResidueIds } from "../utils/residueAnalysis";
+import { secondaryStructureAt, type SecondaryStructureRange } from "./secondaryStructureRanges";
 
 export interface MMCIFParserOptions {
   inferBonds?: boolean;
   bondTolerance?: number;
   /** Placeholder for future assembly support (not implemented in v1) */
   parseAssemblies?: boolean;
-}
-
-interface SecondaryStructureRange {
-  type: SecondaryStructure;
-  chainId: string;
-  startResNum: number;
-  startInsertionCode?: string;
-  endResNum: number;
-  endInsertionCode?: string;
 }
 
 const DEFAULT_OPTIONS: MMCIFParserOptions = {
@@ -391,25 +382,8 @@ function assignSecondaryStructure(atoms: Atom[], ranges: SecondaryStructureRange
   if (ranges.length === 0) return;
 
   for (const atom of atoms) {
-    if (atom.residueNumber === undefined) continue;
-
-    for (const range of ranges) {
-      if (
-        // A blank chain is '' or missing on either side
-        (range.chainId || '') === (atom.chainId || '') &&
-        // Number, then insertion code: a range starting at 52A leaves 52 out
-        compareResidueIds(atom.residueNumber, atom.insertionCode, range.startResNum, range.startInsertionCode) >= 0 &&
-        compareResidueIds(atom.residueNumber, atom.insertionCode, range.endResNum, range.endInsertionCode) <= 0
-      ) {
-        atom.secondaryStructure = range.type;
-        break;
-      }
-    }
-
-    // If we have SS data but this residue isn't in helix/sheet, it's a coil
-    if (atom.secondaryStructure === undefined) {
-      atom.secondaryStructure = 'coil';
-    }
+    const ss = secondaryStructureAt(atom.chainId, atom.residueNumber, atom.insertionCode, ranges);
+    if (ss) atom.secondaryStructure = ss;
   }
 }
 
