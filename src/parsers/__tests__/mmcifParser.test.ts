@@ -486,3 +486,45 @@ _atom_site.Cartn_z 3.25
     expect(m.atoms[0]).toMatchObject({ element: 'Zn', residueName: 'ZN', chainId: 'B', x: 1.5, y: -2, z: 3.25 });
   });
 });
+
+describe('parseMMCIF blank and comment lines after loop_', () => {
+  const atomHeaders = `_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+ATOM 1 C CA ALA A 1 0.0 0.0 0.0
+ATOM 2 C CA ALA A 2 3.8 0.0 0.0
+ATOM 3 C CA ALA A 3 7.6 0.0 0.0
+#
+`;
+
+  it('reads an atom loop with a blank line after loop_', () => {
+    expect(parseMMCIF(`data_BLANK\nloop_\n\n${atomHeaders}`).atoms).toHaveLength(3);
+  });
+
+  it('reads an atom loop with a comment line after loop_', () => {
+    expect(parseMMCIF(`data_COMMENT\nloop_\n# atoms\n${atomHeaders}`).atoms).toHaveLength(3);
+  });
+
+  it('reads a helix loop with a blank and a comment line after loop_', () => {
+    const cif = `data_HELIX
+loop_
+
+# helices
+_struct_conf.conf_type_id
+_struct_conf.beg_auth_asym_id
+_struct_conf.beg_auth_seq_id
+_struct_conf.end_auth_seq_id
+HELX_P A 2 3
+#
+loop_
+${atomHeaders}`;
+    expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['coil', 'helix', 'helix']);
+  });
+});

@@ -458,20 +458,24 @@ export function parseMMCIF(
 
     // Look for loop_ blocks
     if (line === 'loop_') {
-      // Check what kind of loop this is by looking at the next line
-      if (i + 1 < lines.length) {
-        const nextLine = lines[i + 1].trim();
+      // What kind of loop this is: its first header, past any blank or
+      // comment lines (CIF allows them; read as key-value pairs, the headers
+      // would pair up two by two)
+      let header = i + 1;
+      while (header < lines.length && (!lines[header].trim() || lines[header].trim().startsWith('#'))) header++;
+      if (header < lines.length) {
+        const nextLine = lines[header].trim();
 
         if (nextLine.startsWith('_atom_site.')) {
-          const result = parseAtomSiteLoop(lines, i + 1);
+          const result = parseAtomSiteLoop(lines, header);
           atoms = result.atoms;
           i = result.endIndex - 1;
         } else if (nextLine.startsWith('_struct_conf.')) {
-          const result = parseStructConf(lines, i + 1);
+          const result = parseStructConf(lines, header);
           ssRanges.push(...result.ranges);
           i = result.endIndex - 1;
         } else if (nextLine.startsWith('_struct_sheet_range.')) {
-          const result = parseStructSheetRange(lines, i + 1);
+          const result = parseStructSheetRange(lines, header);
           ssRanges.push(...result.ranges);
           i = result.endIndex - 1;
         }
