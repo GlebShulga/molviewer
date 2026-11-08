@@ -11,7 +11,7 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import { useMoleculeStore } from '../../../store/moleculeStore';
 import { selectTotalVisibleAtomCount } from '../../../store/selectors';
-import { atomResidueId, chainKey, residueLabel } from '../../../utils/residueAnalysis';
+import { chainKey, residueLabel, sameResidue } from '../../../utils/residueAnalysis';
 import styles from './ContextMenu.module.css';
 
 /** Padding from viewport edge when adjusting menu position */
@@ -155,17 +155,16 @@ export function ContextMenu({ onFocusAtom, onAddLabel }: ContextMenuProps) {
     const atomIndex = contextMenu.atomIndex!;
 
     // Select all atoms in the same residue (batched, single state update):
-    // chain, name, number and insertion code (residueId), so 52 and 52A are
+    // chain, name, number and insertion code (sameResidue), so 52 and 52A are
     // different residues, and so are MET 1 and a ligand numbered 1
-    const id = atomResidueId(atom);
     if (atom.chainId) {
-      selectAtomsByFilter(structureId, (a) => atomResidueId(a) === id);
+      selectAtomsByFilter(structureId, (a) => sameResidue(a, atom));
     } else {
       // Without chain IDs, segments from simulation packages restart their
       // numbering, so a residue is the run of atoms around this one with its
       // id. A file listing a residue's hydrogens apart from its heavy atoms
       // selects only the run clicked.
-      const inRun = (i: number) => !molecule.atoms[i].chainId && atomResidueId(molecule.atoms[i]) === id;
+      const inRun = (i: number) => !molecule.atoms[i].chainId && sameResidue(molecule.atoms[i], atom);
       let first = atomIndex;
       while (first > 0 && inRun(first - 1)) first--;
       let last = atomIndex;

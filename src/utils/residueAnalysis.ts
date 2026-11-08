@@ -59,6 +59,22 @@ export function atomResidueId(atom: Pick<Atom, 'chainId' | 'residueName' | 'resi
   return residueId(chainKey(atom), atom.residueName, atom.residueNumber, atom.insertionCode);
 }
 
+type ResidueFields = Pick<Atom, 'chainId' | 'residueName' | 'residueNumber' | 'insertionCode'>;
+
+/**
+ * Whether two atoms are in the same residue by atomResidueId's fields
+ * (chainKey, name with 'UNK' for none, number, insertion code), compared
+ * without building strings: for scans over every atom.
+ */
+export function sameResidue(a: ResidueFields, b: ResidueFields): boolean {
+  return (
+    a.residueNumber === b.residueNumber &&
+    (a.insertionCode ?? '') === (b.insertionCode ?? '') &&
+    (a.residueName || 'UNK') === (b.residueName || 'UNK') &&
+    chainKey(a) === chainKey(b)
+  );
+}
+
 /** A residue number as shown to people: "52", "52A". */
 export function residueLabel(number: number | undefined, insertionCode?: string): string {
   return `${number ?? ''}${insertionCode ?? ''}`;
