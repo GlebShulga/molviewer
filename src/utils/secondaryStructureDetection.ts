@@ -1,7 +1,7 @@
 import type { Molecule, SecondaryStructure } from '../types';
 import { dihedralAngle } from './measurements';
 import { chainKey, compareResidueIds, residueKey } from './residueAnalysis';
-import { tracedAtomFilter } from './backboneExtraction';
+import { isAlphaCarbon, tracedAtomFilter } from './backboneExtraction';
 
 interface BackboneAtoms {
   residueNumber: number;
@@ -61,8 +61,8 @@ function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
 
   for (const atom of molecule.atoms) {
     const atomName = atom.name?.trim().toUpperCase();
-    const isAlphaCarbon = atomName === 'CA' && atom.element?.toUpperCase() === 'C';
-    if (atomName !== 'N' && atomName !== 'C' && !isAlphaCarbon) continue;
+    const alphaCarbon = isAlphaCarbon(atom);
+    if (atomName !== 'N' && atomName !== 'C' && !alphaCarbon) continue;
     if (!traced(atom)) continue;
 
     const chainId = chainKey(atom);
@@ -81,7 +81,7 @@ function extractBackboneAtoms(molecule: Molecule): Map<string, BackboneAtoms> {
     const pos = { x: atom.x, y: atom.y, z: atom.z };
 
     if (atomName === 'N') backbone.n = pos;
-    else if (isAlphaCarbon) backbone.ca = pos;
+    else if (alphaCarbon) backbone.ca = pos;
     else backbone.c = pos;
   }
 

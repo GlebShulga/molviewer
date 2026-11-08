@@ -162,7 +162,7 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
     const isNucleicAcid = NUCLEIC_ACID_RESIDUES.has(atom.residueName.toUpperCase());
 
     // A calcium ion is often named CA too (isBackboneAtom)
-    if (atomName === 'CA' && atom.element?.toUpperCase() !== 'C') {
+    if (atomName === 'CA' && !isAlphaCarbon(atom)) {
       continue;
     }
 
@@ -253,7 +253,7 @@ export function extractBackbone(molecule: Molecule): BackboneChain[] {
 export function isBackboneAtom(atom: Atom, traceable: ReadonlySet<string>): boolean {
   if (atom.residueNumber === undefined) return false;
   const name = atom.name?.trim().toUpperCase();
-  if (name === 'CA') return atom.element?.toUpperCase() === 'C' && traceable.has(atomResidueId(atom));
+  if (name === 'CA') return isAlphaCarbon(atom) && traceable.has(atomResidueId(atom));
   if (name === 'P') return NUCLEIC_ACID_RESIDUES.has(atom.residueName?.toUpperCase() ?? '');
   return false;
 }
@@ -299,8 +299,7 @@ function findBackbone(molecule: Molecule): boolean {
   // acid's alpha carbon in a chain with an ID
   for (const atom of molecule.atoms) {
     if (
-      atom.chainId && atom.residueNumber !== undefined && atom.name?.trim().toUpperCase() === 'CA' &&
-      atom.element?.toUpperCase() === 'C' && isAminoAcid(atom.residueName ?? '')
+      atom.chainId && atom.residueNumber !== undefined && isAlphaCarbon(atom) && isAminoAcid(atom.residueName ?? '')
     ) {
       return true;
     }

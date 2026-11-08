@@ -1,7 +1,7 @@
 import type { Atom, Molecule } from '../types';
 import type { ColorScheme } from '../store/moleculeStore';
 import { UNIPROT_RE } from '../../site/identifiers';
-import { hasBackboneData } from './backboneExtraction';
+import { hasBackboneData, isAlphaCarbon } from './backboneExtraction';
 import {
   getElementColor,
   getChainColor,
@@ -132,12 +132,12 @@ export function calculateColorSchemeContext(molecule: Molecule): ColorSchemeCont
     const isStandardResidue = !!atom.residueName && !!ALL_RESIDUE_COLORS[atom.residueName.toUpperCase()];
     // Modified amino acids (MSE, HIE, ...) are in the chain too: an alpha
     // carbon tells them apart from ligands and water (calcium is CA too)
-    const isAlphaCarbon = atom.name?.trim().toUpperCase() === 'CA' && atom.element?.toUpperCase() === 'C';
+    const alphaCarbon = isAlphaCarbon(atom);
     if (atom.residueNumber !== undefined) {
       hasResidueNumbers = true;
       minAnyResNum = Math.min(minAnyResNum, atom.residueNumber);
       maxAnyResNum = Math.max(maxAnyResNum, atom.residueNumber);
-      if (isStandardResidue || isAlphaCarbon) {
+      if (isStandardResidue || alphaCarbon) {
         minResNum = Math.min(minResNum, atom.residueNumber);
         maxResNum = Math.max(maxResNum, atom.residueNumber);
       }
