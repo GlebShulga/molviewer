@@ -9,10 +9,15 @@ import type {
 import type { Measurement } from '../utils/measurements';
 import type {
   MoleculeClassification,
-  ComponentSettings,
+  ComponentStyle,
 } from '../utils/moleculeTypeClassifier';
 
-export const SCHEMA_VERSION = 1;
+/**
+ * 2: components store their style only (no atom lists, Cartoon filter or
+ * classification), which builds before it read and crashed without. This
+ * build reads 1 and 2.
+ */
+export const SCHEMA_VERSION = 2;
 
 export interface SurfaceSettingsSerialized {
   type: 'vdw' | 'sas';
@@ -23,13 +28,6 @@ export interface SurfaceSettingsSerialized {
   color: string;
 }
 
-/**
- * `Set<string>` is not JSON-serializable, so `residueFilter` is stored as an array.
- */
-export type SerializedComponentSettings = Omit<ComponentSettings, 'residueFilter'> & {
-  residueFilter?: string[];
-};
-
 export interface SerializedStructure {
   id: string;
   name: string;
@@ -37,8 +35,10 @@ export interface SerializedStructure {
   visible: boolean;
   representation: RepresentationType;
   colorScheme: ColorScheme;
-  componentSettings: SerializedComponentSettings[];
-  classification: MoleculeClassification | null;
+  /** Each component's style. v1 sessions also hold atom lists and a Cartoon filter, ignored on load. */
+  componentSettings: ComponentStyle[];
+  /** v1 sessions only, ignored on load: the molecule is classified again. */
+  classification?: MoleculeClassification | null;
   aromaticRingsDetected: boolean;
   offset: [number, number, number];
   source?: StructureSource;

@@ -63,8 +63,7 @@ function openShare(molecule: Molecule, representation: RepresentationType, color
     representation,
     colorScheme,
     visible: true,
-    // Share links store each component's atom list too; loads rebuild it
-    componentSettings: [{ type: 'protein', atomIndices: [], representation, colorScheme, visible: true }],
+    componentSettings: [{ type: 'protein', representation, colorScheme, visible: true }],
   };
   store().applyShareableSession({
     structures: [{ molecule, source: SOURCE, shareableStructure: shared }],

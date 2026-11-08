@@ -52,7 +52,7 @@ test.describe('Share & Export', () => {
 
     expect(capturedPayload).toBeTruthy();
     const payload = capturedPayload as { schemaVersion: number; structures: Array<{ source: { type: string; id?: string } }> };
-    expect(payload.schemaVersion).toBe(1);
+    expect(payload.schemaVersion).toBe(2);
     expect(payload.structures.length).toBeGreaterThan(0);
     expect(payload.structures[0].source.type).toBeDefined();
   });

@@ -14,13 +14,17 @@ import type {
   Label3D,
   QualifiedAtomRef,
 } from '../types';
-import type { ComponentSettings } from './moleculeTypeClassifier';
-import type { CameraSnapshot, SerializedComponentSettings } from '../types/session';
+import { componentStyle, type ComponentStyle } from './moleculeTypeClassifier';
+import type { CameraSnapshot } from '../types/session';
 import type { Measurement } from './measurements';
 import { loadStructureFromSource } from './structureLoader';
 import type { Atom, Molecule } from '../types';
 
-export const SHARE_SCHEMA_VERSION = 1;
+/**
+ * 2: components store their style only (no atom lists or Cartoon filter),
+ * which builds before it read and crashed without. This build opens 1 and 2.
+ */
+export const SHARE_SCHEMA_VERSION = 2;
 
 /** v1: refuse to share inline payloads larger than this. Lifts the cap on the share link. */
 export const MAX_INLINE_BYTES = 256 * 1024;
@@ -41,7 +45,8 @@ export interface ShareableStructure {
   name: string;
   representation: RepresentationType;
   colorScheme: ColorScheme;
-  componentSettings: SerializedComponentSettings[];
+  /** Each component's style. v1 links also hold atom lists and a Cartoon filter, ignored on load. */
+  componentSettings: ComponentStyle[];
   visible: boolean;
 }
 
@@ -174,7 +179,7 @@ export function resolveSharedAtom(
 }
 
 export interface ShareableSession {
-  schemaVersion: typeof SHARE_SCHEMA_VERSION;
+  schemaVersion: 1 | typeof SHARE_SCHEMA_VERSION;
   structures: ShareableStructure[];
   layoutMode: LayoutMode;
   camera: CameraSnapshot | null;
@@ -199,20 +204,6 @@ export class UnshareableStructureError extends Error {
     super(message);
     this.name = 'UnshareableStructureError';
   }
-}
-
-function serializeComponentSettings(cs: ComponentSettings): SerializedComponentSettings {
-  return {
-    ...cs,
-    residueFilter: cs.residueFilter ? Array.from(cs.residueFilter) : undefined,
-  };
-}
-
-function deserializeComponentSettings(cs: SerializedComponentSettings): ComponentSettings {
-  return {
-    ...cs,
-    residueFilter: cs.residueFilter ? new Set(cs.residueFilter) : undefined,
-  };
 }
 
 /**
@@ -244,7 +235,8 @@ export function serializeShareableSession(
       name: s.name,
       representation: s.representation,
       colorScheme: s.colorScheme,
-      componentSettings: s.componentSettings.map(serializeComponentSettings),
+      // Styles only: the opener classifies the molecule it loads
+      componentSettings: s.componentSettings.map(componentStyle),
       visible: s.visible,
     });
   }
@@ -294,7 +286,7 @@ export async function deserializeShareableSession(
   session: ShareableSession,
   signal?: AbortSignal
 ): Promise<DeserializedShareableSession> {
-  if (session.schemaVersion !== SHARE_SCHEMA_VERSION) {
+  if (session.schemaVersion !== 1 && session.schemaVersion !== SHARE_SCHEMA_VERSION) {
     throw new Error(`Unsupported share schema v${session.schemaVersion}`);
   }
 
@@ -331,11 +323,6 @@ export async function deserializeShareableSession(
     surfaceSettings: session.surfaceSettings,
     autoRotate: session.autoRotate,
   };
-}
-
-/** Helper for components: rebuilds the per-structure component settings from the share payload. */
-export function shareableComponentSettings(s: ShareableStructure): ComponentSettings[] {
-  return s.componentSettings.map(deserializeComponentSettings);
 }
 
 /** POST current state to /api/share, return the short ID. */

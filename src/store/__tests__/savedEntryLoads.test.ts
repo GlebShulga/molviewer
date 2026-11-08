@@ -48,6 +48,19 @@ beforeEach(() => {
 });
 
 describe('loadSavedMolecule', () => {
+  it('loads NaN and null residue numbers (from older parsing, kept by IndexedDB and JSON) as undefined', async () => {
+    const saved = molecule('Old save');
+    saved.atoms[0] = { ...saved.atoms[0], residueNumber: 1 };
+    saved.atoms[1] = { ...saved.atoms[1], residueNumber: NaN };
+    saved.atoms[2] = { ...saved.atoms[2], residueNumber: null as unknown as number };
+    storage.loadMoleculeAsync.mockResolvedValue({ molecule: saved, measurements: [] });
+
+    await useMoleculeStore.getState().loadSavedMolecule('old-entry');
+
+    const { structures, activeStructureId } = useMoleculeStore.getState();
+    expect(structures.get(activeStructureId!)!.molecule.atoms.map((a) => a.residueNumber)).toEqual([1, undefined, undefined]);
+  });
+
   it('loads an entry stored in IndexedDB through the async loader', async () => {
     storage.loadMoleculeAsync.mockResolvedValue({ molecule: molecule('Large legacy molecule'), measurements: [] });
 

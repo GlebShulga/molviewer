@@ -43,6 +43,20 @@ describe('deserializeShareableSession', () => {
     expect(result.skipped).toEqual(['S1']);
   });
 
+  it('opens v1 links (with stored atom lists) and refuses a schema it does not know', async () => {
+    const v1 = { ...session([{ type: 'rcsb', id: '1CRN' }]), schemaVersion: 1 } as ShareableSession;
+    // Built apart: a literal with fields ComponentStyle lacks would not type-check
+    const stored = [
+      { type: 'protein' as const, atomIndices: [0], residueFilter: ['A:1'], representation: 'stick' as const, colorScheme: 'rainbow' as const, visible: true },
+    ];
+    v1.structures[0].componentSettings = stored;
+    const result = await deserializeShareableSession(v1);
+    expect(result.structures[0].shareableStructure.componentSettings[0]).toMatchObject({ representation: 'stick' });
+
+    const v3 = { ...session([{ type: 'rcsb', id: '1CRN' }]), schemaVersion: 3 } as unknown as ShareableSession;
+    await expect(deserializeShareableSession(v3)).rejects.toThrow(/Unsupported share schema v3/);
+  });
+
   it('fails only when nothing can be restored', async () => {
     await expect(deserializeShareableSession(session([{ type: 'url', url: 'https://example.org/x.pdb' }]))).rejects.toThrow(
       /no longer supported/

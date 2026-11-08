@@ -38,6 +38,7 @@ import {
   type LimitFallback,
 } from '../utils/representationAvailability';
 import { hasBackboneData } from '../utils/backboneExtraction';
+import { withFiniteResidueNumbers } from '../utils/residueAnalysis';
 import { calculateColorSchemeContext } from '../utils/atomColor';
 import { AROMATIC_DETECTION_THRESHOLD, GPU_PICKING_THRESHOLD } from '../config';
 import { SMART_DEFAULTS, CARTOON_FALLBACK_REPRESENTATION } from '../config/smartDefaults';
@@ -1067,8 +1068,10 @@ export const useMoleculeStore = create<MoleculeState>()(
     if (!data) throw new SavedEntryReadError('This saved molecule could not be read.');
 
     // Use setMolecule to clear and load single structure. Stored rings are
-    // dropped so they are detected again, as for a session.
-    get().setMolecule({ ...data.molecule, aromaticRings: undefined });
+    // dropped so they are detected again, as for a session. Every saved
+    // molecule predates the parsers that write a missing residue number as
+    // undefined: NaN or null ones are made undefined.
+    get().setMolecule(withFiniteResidueNumbers({ ...data.molecule, aromaticRings: undefined }));
     // Then restore measurements. A saved molecule is one structure with a new
     // ID, so every ref points at it. Old saves carry only atomIndices; a
     // measurement that spanned several structures lost the others and is dropped.

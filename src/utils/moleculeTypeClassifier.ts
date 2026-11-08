@@ -221,6 +221,11 @@ export function generateComponentSettings(
 /** The parts of a component's settings a user chooses (and a session or share link keeps). */
 export type ComponentStyle = Pick<ComponentSettings, 'type' | 'representation' | 'colorScheme' | 'visible'>;
 
+/** A component's style alone, as sessions and share links store it (atom lists come from the molecule on load). */
+export function componentStyle(cs: ComponentStyle): ComponentStyle {
+  return { type: cs.type, representation: cs.representation, colorScheme: cs.colorScheme, visible: cs.visible };
+}
+
 /**
  * Fresh settings (from classifying the molecule as loaded now) with the
  * saved style of each type that still exists. Atom lists and the residue

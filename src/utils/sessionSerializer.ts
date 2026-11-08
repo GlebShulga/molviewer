@@ -1,11 +1,11 @@
 import type { Structure, Label3D, LayoutMode } from '../types';
 import type { Measurement } from './measurements';
-import { restoreComponentSettings, type ComponentSettings } from './moleculeTypeClassifier';
+import { componentStyle, restoreComponentSettings } from './moleculeTypeClassifier';
+import { withFiniteResidueNumbers } from './residueAnalysis';
 import {
   type MolViewerSession,
   type MolViewerSessionState,
   type SerializedStructure,
-  type SerializedComponentSettings,
   type CameraSnapshot,
   type SurfaceSettingsSerialized,
   SCHEMA_VERSION,
@@ -25,13 +25,6 @@ interface SerializableState {
   autoRotate: boolean;
 }
 
-function serializeComponentSettings(cs: ComponentSettings): SerializedComponentSettings {
-  return {
-    ...cs,
-    residueFilter: cs.residueFilter ? Array.from(cs.residueFilter) : undefined,
-  };
-}
-
 function serializeStructure(s: Structure): SerializedStructure {
   return {
     id: s.id,
@@ -42,8 +35,8 @@ function serializeStructure(s: Structure): SerializedStructure {
     visible: s.visible,
     representation: s.representation,
     colorScheme: s.colorScheme,
-    componentSettings: s.componentSettings.map(serializeComponentSettings),
-    classification: s.classification,
+    // Styles only: atom lists and the classification come from the molecule on load
+    componentSettings: s.componentSettings.map(componentStyle),
     aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
@@ -56,7 +49,11 @@ function deserializeStructure(s: SerializedStructure): Structure {
   // Sessions saved by older versions stored rings from whatever detection
   // that version ran (or none, if Ball & Stick and Stick were never shown),
   // so they are dropped and detected again when a style that draws them is shown.
-  const molecule = { ...s.molecule, aromaticRings: undefined };
+  const legacyAtoms = (s.atomNumbering ?? 1) < ATOM_NUMBERING_VERSION;
+  // Atoms from before atomNumbering 2 can hold NaN (or, through JSON, null)
+  // residue numbers; current parsers write a missing number as undefined
+  const stored = { ...s.molecule, aromaticRings: undefined };
+  const molecule = legacyAtoms ? withFiniteResidueNumbers(stored) : stored;
   // The stored classification and atom lists may predate parser or
   // classifier changes; classify again and keep only the saved styles.
   const { classification, componentSettings } = restoreComponentSettings(molecule, s.componentSettings);
@@ -72,7 +69,7 @@ function deserializeStructure(s: SerializedStructure): Structure {
     aromaticRingsDetected: false,
     offset: s.offset,
     source: s.source,
-    ...((s.atomNumbering ?? 1) < ATOM_NUMBERING_VERSION ? { legacyAtoms: true } : {}),
+    ...(legacyAtoms ? { legacyAtoms: true } : {}),
   };
 }
 

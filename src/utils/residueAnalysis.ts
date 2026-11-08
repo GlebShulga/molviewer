@@ -64,6 +64,24 @@ export function residueLabel(number: number | undefined, insertionCode?: string)
   return `${number ?? ''}${insertionCode ?? ''}`;
 }
 
+const hasFiniteOrNoNumber = (atom: Atom) => atom.residueNumber === undefined || Number.isFinite(atom.residueNumber);
+
+/**
+ * The molecule with every residue number that isn't a finite number made
+ * `undefined`, as parsers write a missing number now. Older PDB parsing
+ * stored NaN for a blank column; IndexedDB keeps NaN and JSON (localStorage)
+ * turns it into null, and residue sorting and keys read neither as missing.
+ * For atoms stored by older builds: saved sessions and saved molecules.
+ * Returns the same molecule when nothing changes.
+ */
+export function withFiniteResidueNumbers<M extends { atoms: Atom[] }>(molecule: M): M {
+  if (molecule.atoms.every(hasFiniteOrNoNumber)) return molecule;
+  return {
+    ...molecule,
+    atoms: molecule.atoms.map((atom) => (hasFiniteOrNoNumber(atom) ? atom : { ...atom, residueNumber: undefined })),
+  };
+}
+
 /**
  * Order of residues in a chain: by number, then insertion code (52 < 52A <
  * 52B < 53). Residues without a number come last.

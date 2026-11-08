@@ -3,6 +3,7 @@ import { useMoleculeStore, temporalStore } from '../moleculeStore';
 import { serializeSession, deserializeSession } from '../../utils/sessionSerializer';
 import { SessionVersionError, SCHEMA_VERSION, ATOM_NUMBERING_VERSION } from '../../types/session';
 import { serializeShareableSession } from '../../utils/shareSession';
+import { analyzeResidues } from '../../utils/residueAnalysis';
 import type { Molecule } from '../../types';
 import type { CameraSnapshot } from '../../types/session';
 import type { Measurement } from '../../utils/measurements';
@@ -253,9 +254,9 @@ describe('session save/load round-trip', () => {
       'set-test'
     );
 
-    // After JSON round-trip, residueFilter must be an array (Set is not JSON-serializable)
+    // Only the styles are stored: atom lists, the filter and the classification come from the molecule on load
     const json = JSON.parse(JSON.stringify(session));
-    expect(Array.isArray(json.state.structures[0].componentSettings[0].residueFilter)).toBe(true);
+    expect(json.state.structures[0].componentSettings[0]).toEqual({ type: 'protein', representation: 'cartoon', colorScheme: 'rainbow', visible: true });
 
     const restored = deserializeSession(json).structures.get(id)!;
     // One protein component, styled like the first saved protein entry
@@ -343,6 +344,32 @@ describe('session loads rebuild component settings', () => {
     });
   });
 
+  it('stores each component\'s style only, in schema v2', () => {
+    useMoleculeStore.getState().addStructure(proteinWithWater(), 'pw');
+    const json = save();
+    expect(json.schemaVersion).toBe(2);
+    const [stored] = json.state.structures;
+    expect(stored).not.toHaveProperty('classification');
+    for (const cs of stored.componentSettings) {
+      expect(Object.keys(cs).sort()).toEqual(['colorScheme', 'representation', 'type', 'visible']);
+    }
+  });
+
+  it('loads a v1 session with stored atom lists, filters and classification, keeping its styles', () => {
+    const id = useMoleculeStore.getState().addStructure(proteinWithWater(), 'pw');
+    const json = save();
+    json.schemaVersion = 1;
+    json.state.structures[0].classification = { components: [], primaryType: 'ligand', hasMultipleTypes: false };
+    json.state.structures[0].componentSettings = [
+      { type: 'protein', atomIndices: [0, 1, 2], residueFilter: ['A:1'], representation: 'stick', colorScheme: 'rainbow', visible: true },
+      { type: 'water', atomIndices: [3], residueFilter: ['A:2'], representation: 'spacefill', colorScheme: 'cpk', visible: true },
+    ];
+    const restored = deserializeSession(json).structures.get(id)!;
+    expect(restored.componentSettings.find((c) => c.type === 'protein')).toMatchObject({ representation: 'stick', colorScheme: 'rainbow', atomIndices: [0, 1, 2] });
+    expect(restored.componentSettings.find((c) => c.type === 'water')).toMatchObject({ visible: true, atomIndices: [3] });
+    expect(restored.classification!.primaryType).toBe('protein');
+  });
+
   it('classifies the molecule again instead of keeping the stored classification', () => {
     const id = useMoleculeStore.getState().addStructure(proteinWithWater(), 'pw');
     const json = save();
@@ -352,7 +379,23 @@ describe('session loads rebuild component settings', () => {
     expect(restored.classification!.components.map((c) => c.type).sort()).toEqual(['protein', 'water']);
   });
 
-  it('merges a share link\'s component styles the same way', () => {
+  it('shares each component\'s style only, in share schema v2', () => {
+    useMoleculeStore.getState().addStructure(proteinWithWater(), 'pw', { type: 'rcsb', id: '1ABC' });
+    const s = useMoleculeStore.getState();
+    const payload = JSON.parse(JSON.stringify(serializeShareableSession(
+      { structureOrder: s.structureOrder, structures: s.structures, layoutMode: s.layoutMode, measurements: s.measurements, labels: s.labels, surfaceSettings: s.surfaceSettings, autoRotate: s.autoRotate },
+      null
+    )));
+    expect(payload.schemaVersion).toBe(2);
+    const [stored] = payload.structures;
+    expect(stored).not.toHaveProperty('classification');
+    expect(stored.componentSettings.length).toBeGreaterThan(0);
+    for (const cs of stored.componentSettings) {
+      expect(Object.keys(cs).sort()).toEqual(['colorScheme', 'representation', 'type', 'visible']);
+    }
+  });
+
+  it('merges a share link\'s component styles the same way (a v1 link stored atom lists too)', () => {
     const shared = {
       id: 'orig',
       source: { type: 'rcsb' as const, id: '1ABC' },
@@ -489,5 +532,46 @@ describe('sharing a structure restored from a saved session', () => {
     useMoleculeStore.getState().reset();
     useMoleculeStore.getState().loadSession(session);
     expect(shareLabels()[0].atom).toMatchObject({ chainId: 'A', residueNumber: 1, element: 'C' });
+  });
+});
+
+describe('residue numbers stored by older builds', () => {
+  /** Two alanines and a water whose residue number an older build stored as `stored` (NaN for a blank column). */
+  function legacySession(stored: number | null) {
+    useMoleculeStore.getState().reset();
+    const molecule = createMockMolecule('old', 3);
+    molecule.atoms = [
+      { ...molecule.atoms[0], residueNumber: 1 },
+      { ...molecule.atoms[1], residueNumber: 2 },
+      { id: 2, element: 'O', name: 'O', residueName: 'HOH', residueNumber: stored as number, chainId: 'A', x: 0, y: 5, z: 0 },
+    ];
+    const id = useMoleculeStore.getState().addStructure(molecule, 'old');
+    const session = useMoleculeStore.getState().buildSession('old', null);
+    // Saved before atomNumbering existed
+    delete session.state.structures[0].atomNumbering;
+    session.schemaVersion = 1;
+    return { id, session };
+  }
+
+  it('restores a NaN residue number (as IndexedDB keeps it) and a null one (through JSON) as undefined, sorted last', () => {
+    const { id, session } = legacySession(NaN);
+    const fromObject = deserializeSession(session).structures.get(id)!;
+    expect(fromObject.molecule.atoms[2].residueNumber).toBeUndefined();
+
+    const json = JSON.parse(JSON.stringify(session));
+    expect(json.state.structures[0].molecule.atoms[2].residueNumber).toBeNull();
+    const fromJson = deserializeSession(json).structures.get(id)!;
+    expect(fromJson.molecule.atoms[2].residueNumber).toBeUndefined();
+
+    const [chain] = analyzeResidues(fromJson.molecule.atoms);
+    expect(chain.residues.map((r) => r.number)).toEqual([1, 2, undefined]);
+  });
+
+  it('leaves current sessions\' atoms as they are', () => {
+    useMoleculeStore.getState().reset();
+    const id = useMoleculeStore.getState().addStructure(createMockMolecule('new'), 'new');
+    const session = useMoleculeStore.getState().buildSession('new', null);
+    const molecule = session.state.structures[0].molecule;
+    expect(deserializeSession(session).structures.get(id)!.molecule.atoms).toBe(molecule.atoms);
   });
 });
