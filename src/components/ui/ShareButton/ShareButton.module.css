@@ -39,7 +39,9 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 20px;
-  min-width: 360px;
+  /* min-width beats max-width: capped below the screen width, or a phone
+     under 360px pins the fixed dialog to the left edge and cuts off Close */
+  min-width: min(360px, 100vw - 16px);
   max-width: 90vw;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color) 30%, transparent);
 }
