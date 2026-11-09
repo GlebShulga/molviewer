@@ -9,9 +9,13 @@ const LOG_API_URL = 'https://log-api.eu.newrelic.com/log/v1';
 const LICENSE_KEY = import.meta.env.VITE_NEW_RELIC_LICENSE_KEY ?? '';
 const FLUSH_INTERVAL_MS = 5000;
 const MAX_BUFFER_SIZE = 10;
-/** The same error (message and stack) is sent at most once per window... */
-const REPEAT_WINDOW_MS = 60_000;
-/** ...and a session sends at most this many errors, so a loop can't flood the log. */
+/**
+ * An error is sent the first time it occurs. Its repeats are counted, and
+ * every error with repeats goes out as one summary (`error.repeats`) when
+ * this shared timer runs, or at once when the tab is hidden or closed...
+ */
+const REPEATS_INTERVAL_MS = 60_000;
+/** ...and a session sends at most this many errors (summaries included), so a loop can't flood the log. */
 const MAX_ERRORS_PER_SESSION = 50;
 
 interface LogEntry {
@@ -21,10 +25,13 @@ interface LogEntry {
   attributes: Record<string, string | number | boolean | undefined>;
 }
 
+type Attributes = Record<string, string | number | boolean>;
+
 let buffer: LogEntry[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-/** Per error: when it was last sent, and how often it occurred since without being sent. */
-const recent = new Map<string, { sentAt: number; repeats: number }>();
+/** Every error sent so far, by signature: its repeats not yet sent, and the last one of them. */
+const seen = new Map<string, { repeats: number; last: { error: Error; attributes?: Attributes } }>();
+let repeatsTimer: ReturnType<typeof setTimeout> | null = null;
 let errorsSent = 0;
 
 function isEnabled(): boolean {
@@ -89,28 +96,11 @@ function enqueue(entry: LogEntry): void {
   }
 }
 
-/**
- * Report an error to New Relic Log API.
- * Safe to call even if New Relic is not configured (no-ops gracefully).
- */
-export function logError(
-  error: Error | string,
-  customAttributes?: Record<string, string | number | boolean>
-): void {
-  if (!isEnabled()) return;
-  const err = typeof error === 'string' ? new Error(error) : error;
-  const now = Date.now();
-
-  const signature = `${err.message}\n${err.stack ?? ''}`;
-  const seen = recent.get(signature);
-  if (seen && now - seen.sentAt < REPEAT_WINDOW_MS) {
-    seen.repeats++;
-    return;
-  }
-
+/** Queues one error, or a summary of its repeats, within the session cap. */
+function sendError(err: Error, attributes?: Attributes, repeats = 0): void {
   if (errorsSent >= MAX_ERRORS_PER_SESSION) return;
   errorsSent++;
-  recent.set(signature, { sentAt: now, repeats: 0 });
+  const now = Date.now();
 
   enqueue({
     message: err.message,
@@ -120,8 +110,8 @@ export function logError(
       'error.name': err.name,
       'error.stack': err.stack ?? 'no stack',
       // Occurrences since this error was last sent
-      ...(seen?.repeats ? { 'error.repeats': seen.repeats } : {}),
-      ...customAttributes,
+      ...(repeats ? { 'error.repeats': repeats } : {}),
+      ...attributes,
     },
   });
 
@@ -133,6 +123,48 @@ export function logError(
       attributes: {},
     });
   }
+}
+
+/**
+ * One summary for each error that repeated since it was last sent. Runs on
+ * the shared timer, and when the tab is hidden or closed. A loop that keeps
+ * failing while the tab is often switched away from sends a summary on each
+ * hide, so it reaches the cap sooner; each of those still has its real count.
+ */
+function sendRepeats(): void {
+  if (repeatsTimer) clearTimeout(repeatsTimer);
+  repeatsTimer = null;
+  for (const entry of seen.values()) {
+    if (entry.repeats === 0) continue;
+    sendError(entry.last.error, entry.last.attributes, entry.repeats);
+    entry.repeats = 0;
+  }
+}
+
+/**
+ * Report an error to New Relic Log API.
+ * Safe to call even if New Relic is not configured (no-ops gracefully).
+ */
+export function logError(error: Error | string, customAttributes?: Attributes): void {
+  if (!isEnabled() || errorsSent >= MAX_ERRORS_PER_SESSION) return;
+  const err = typeof error === 'string' ? new Error(error) : error;
+
+  // Message, stack and the caller's attributes (sorted). Each call site passes
+  // the same ones every time (source, op, a window.onerror's file and line),
+  // so an error without stack frames, or made in a listener, is still told
+  // apart by where it came from.
+  const attributesKey = customAttributes ? JSON.stringify(customAttributes, Object.keys(customAttributes).sort()) : '';
+  const signature = [err.message, err.stack ?? '', attributesKey].join('\n');
+
+  const known = seen.get(signature);
+  if (known) {
+    known.repeats++;
+    known.last = { error: err, attributes: customAttributes };
+    repeatsTimer ??= setTimeout(sendRepeats, REPEATS_INTERVAL_MS);
+    return;
+  }
+  seen.set(signature, { repeats: 0, last: { error: err, attributes: customAttributes } });
+  sendError(err, customAttributes);
 }
 
 /**
@@ -164,11 +196,13 @@ export function initErrorReporter(): void {
 
   window.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
+      sendRepeats();
       flush();
     }
   });
 
   window.addEventListener('beforeunload', () => {
+    sendRepeats();
     flush();
   });
 }
