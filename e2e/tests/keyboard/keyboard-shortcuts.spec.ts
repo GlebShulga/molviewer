@@ -92,9 +92,10 @@ test.describe('Keyboard Shortcuts', () => {
       await moleculeViewer.pressKey('?');
       expect(await moleculeViewer.shortcutsHelp.isVisible()).toBe(true);
 
-      // Close with ESC
-      await moleculeViewer.pressKey('Escape');
-      expect(await moleculeViewer.shortcutsHelp.isVisible()).toBe(false);
+      // Close with ESC: a real key press, since Help is a native <dialog> and the
+      // browser closes it only on a trusted Escape (pressKey dispatches a synthetic one)
+      await moleculeViewer.page.keyboard.press('Escape');
+      await expect(moleculeViewer.shortcutsHelp).toBeHidden();
     });
   });
 
