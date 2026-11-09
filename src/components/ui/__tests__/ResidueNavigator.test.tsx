@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useMoleculeStore, temporalStore } from '../../../store/moleculeStore';
 import { ResidueNavigator } from '../ResidueNavigator';
 import type { Atom, Molecule } from '../../../types';
@@ -91,5 +91,46 @@ describe('ResidueNavigator', () => {
     expect(onResidueHover).toHaveBeenLastCalledWith(second, expect.objectContaining({ name: 'ALA', atomIndices: [2, 3] }));
     fireEvent.mouseLeave(ala);
     expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
+  });
+
+  // The browser fires no mouseleave for a button that goes away under the pointer
+  describe('clears the hover when the hovered row goes away', () => {
+    const hoverAla = () => fireEvent.mouseEnter(screen.getByText('ALA').closest('button')!);
+
+    it('when a search hides it', () => {
+      const { second, onResidueHover } = renderWithTwoStructures();
+      hoverAla();
+      fireEvent.change(screen.getByPlaceholderText('Search residues...'), { target: { value: 'gly' } });
+      expect(screen.queryByText('ALA')).toBeNull();
+      expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
+    });
+
+    it('when its chain is collapsed', () => {
+      const { second, onResidueHover } = renderWithTwoStructures();
+      hoverAla();
+      fireEvent.click(screen.getByText('2 residues'));
+      expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
+    });
+
+    it('when the Residues section is collapsed', () => {
+      const { second, onResidueHover } = renderWithTwoStructures();
+      hoverAla();
+      fireEvent.click(screen.getByText('Residues'));
+      expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
+    });
+
+    it('when the active structure changes to one with the same residues', () => {
+      const { second, onResidueHover } = renderWithTwoStructures();
+      hoverAla();
+      const first = useMoleculeStore.getState().structureOrder.find((id) => id !== second)!;
+      act(() => useMoleculeStore.getState().setActiveStructure(first));
+      expect(onResidueHover).toHaveBeenLastCalledWith(second, null);
+    });
+
+    it('but not when no row was hovered', () => {
+      const { onResidueHover } = renderWithTwoStructures();
+      fireEvent.change(screen.getByPlaceholderText('Search residues...'), { target: { value: 'gly' } });
+      expect(onResidueHover).not.toHaveBeenCalled();
+    });
   });
 });

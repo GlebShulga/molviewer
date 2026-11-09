@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { useMoleculeStore } from '../../store/moleculeStore';
@@ -14,6 +14,44 @@ import {
 import { CollapsibleSection } from './CollapsibleSection';
 import { getChainColor } from '../../constants/elements';
 import styles from './ResidueNavigator.module.css';
+
+interface ResidueRowProps {
+  residue: Residue;
+  isHovered: boolean;
+  isAmino: boolean;
+  onSelect: () => void;
+  onHover: (residue: Residue | null) => void;
+}
+
+function ResidueRow({ residue, isHovered, isAmino, onSelect, onHover }: ResidueRowProps) {
+  const hoveredRef = useRef(isHovered);
+  const onHoverRef = useRef(onHover);
+  useEffect(() => {
+    hoveredRef.current = isHovered;
+    onHoverRef.current = onHover;
+  });
+  // The browser fires no mouseleave for a button that goes away under the
+  // pointer (search, chain or section collapsed, structure changed): end the
+  // hover here, or the atom stays highlighted in 3D
+  useEffect(() => () => {
+    if (hoveredRef.current) onHoverRef.current(null);
+  }, []);
+
+  return (
+    <button
+      className={clsx(styles.residueItem, isHovered && styles.hovered)}
+      onClick={onSelect}
+      onMouseEnter={() => onHover(residue)}
+      onMouseLeave={() => onHover(null)}
+    >
+      <span className={styles.residueCode}>
+        {isAmino ? getOneLetterCode(residue.name) : residue.name}
+      </span>
+      <span className={styles.residueNumber}>{residueLabel(residue.number, residue.insertionCode)}</span>
+      <span className={styles.residueName}>{residue.name}</span>
+    </button>
+  );
+}
 
 /** Both callbacks name the structure the residue belongs to: the active one. */
 export interface ResidueNavigatorProps {
@@ -130,19 +168,17 @@ export function ResidueNavigator({
                       const isAmino = isAminoAcid(residue.name);
 
                       return (
-                        <button
-                          key={key}
-                          className={clsx(styles.residueItem, isHovered && styles.hovered)}
-                          onClick={() => onResidueSelect?.(structureId, residue)}
-                          onMouseEnter={() => handleResidueHover(residue)}
-                          onMouseLeave={() => handleResidueHover(null)}
-                        >
-                          <span className={styles.residueCode}>
-                            {isAmino ? getOneLetterCode(residue.name) : residue.name}
-                          </span>
-                          <span className={styles.residueNumber}>{residueLabel(residue.number, residue.insertionCode)}</span>
-                          <span className={styles.residueName}>{residue.name}</span>
-                        </button>
+                        <ResidueRow
+                          // With the structure in the key, a row of the
+                          // previous structure unmounts (and ends its hover)
+                          // even when the new one has the same residue
+                          key={`${structureId}:${key}`}
+                          residue={residue}
+                          isHovered={isHovered}
+                          isAmino={isAmino}
+                          onSelect={() => onResidueSelect?.(structureId, residue)}
+                          onHover={handleResidueHover}
+                        />
                       );
                     })}
                   </div>
