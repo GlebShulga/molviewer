@@ -1,14 +1,10 @@
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background-color: color-mix(in srgb, var(--overlay-color) 60%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
+/* A native modal <dialog>: these also replace the browser's own dialog styles
+   (margin: auto centres it, which the global reset to 0 would undo) */
 .modalContent {
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  outline: none;
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
@@ -17,6 +13,11 @@
   max-height: 80vh;
   overflow: hidden;
   box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 40%, transparent);
+}
+
+/* Variables reach ::backdrop from Chrome 122, Firefox 120, Safari 17.4; older browsers show no dimming */
+.modalContent::backdrop {
+  background-color: color-mix(in srgb, var(--overlay-color) 60%, transparent);
 }
 
 .modalHeader {

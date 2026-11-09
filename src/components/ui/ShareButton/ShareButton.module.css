@@ -26,17 +26,15 @@
   cursor: not-allowed;
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--overlay-color) 50%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
+/* A native modal <dialog>: these also replace the browser's own dialog styles
+   (margin: auto centres it, which the global reset to 0 would undo; no max-height
+   or overflow, so it neither scrolls nor changes height) */
 .modal {
+  margin: auto;
+  color: inherit;
+  outline: none;
+  max-height: none;
+  overflow: visible;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -44,6 +42,11 @@
   min-width: 360px;
   max-width: 90vw;
   box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow-color) 30%, transparent);
+}
+
+/* Variables reach ::backdrop from Chrome 122, Firefox 120, Safari 17.4; older browsers show no dimming */
+.modal::backdrop {
+  background: color-mix(in srgb, var(--overlay-color) 50%, transparent);
 }
 
 .modalHeader {

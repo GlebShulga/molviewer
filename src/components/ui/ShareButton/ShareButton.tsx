@@ -1,5 +1,4 @@
 import { useCallback, useId, useMemo, useRef, useState, type TouchEvent } from 'react';
-import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { Share2, Check, Copy, X } from 'lucide-react';
 import { useMoleculeStore } from '../../../store/moleculeStore';
@@ -119,14 +118,14 @@ export function ShareButton() {
   }, [resetCopied]);
 
   const hasStructures = useMoleculeStore(s => s.structureOrder.length > 0);
-  const dialogRef = useModalDialog({
+  const dialogProps = useModalDialog({
     isOpen: open,
     onClose: close,
     initialFocusRef: closeButtonRef,
     returnFocusRef: shareButtonRef,
   });
-  // Touches in the dialog would otherwise bubble (through the portal) to the
-  // bottom sheet's swipe-to-close handler
+  // Touches in the dialog would otherwise bubble to the bottom sheet's
+  // swipe-to-close handler: the dialog sits inside the sheet
   const stopTouch = (e: TouchEvent) => e.stopPropagation();
 
   return (
@@ -143,115 +142,106 @@ export function ShareButton() {
         {creating ? 'Creating link…' : 'Share Link'}
       </button>
 
-      {open && createPortal(
-        <div
-          className={styles.modalBackdrop}
-          onClick={close}
+      {open && (
+        <dialog
+          {...dialogProps}
+          className={styles.modal}
+          aria-labelledby={titleId}
           onTouchStart={stopTouch}
           onTouchMove={stopTouch}
           onTouchEnd={stopTouch}
         >
-          <div
-            ref={dialogRef}
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-          >
-            <div className={styles.modalHeader}>
-              <h3 id={titleId} className={styles.modalTitle}>Share this session</h3>
-              <button ref={closeButtonRef} className={styles.closeButton} onClick={close} aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
+          <div className={styles.modalHeader}>
+            <h3 id={titleId} className={styles.modalTitle}>Share this session</h3>
+            <button ref={closeButtonRef} className={styles.closeButton} onClick={close} aria-label="Close">
+              <X size={18} />
+            </button>
+          </div>
 
-            <div className={styles.tabs} role="tablist" aria-label="Share options">
-              <button
-                role="tab"
-                aria-selected={tab === 'link'}
-                className={clsx(styles.tab, tab === 'link' && styles.tabActive)}
-                onClick={() => setTab('link')}
-              >
-                Link
-              </button>
-              <button
-                role="tab"
-                aria-selected={tab === 'embed'}
-                className={clsx(styles.tab, tab === 'embed' && styles.tabActive)}
-                onClick={() => setTab('embed')}
-              >
-                Embed
-              </button>
-            </div>
+          <div className={styles.tabs} role="tablist" aria-label="Share options">
+            <button
+              role="tab"
+              aria-selected={tab === 'link'}
+              className={clsx(styles.tab, tab === 'link' && styles.tabActive)}
+              onClick={() => setTab('link')}
+            >
+              Link
+            </button>
+            <button
+              role="tab"
+              aria-selected={tab === 'embed'}
+              className={clsx(styles.tab, tab === 'embed' && styles.tabActive)}
+              onClick={() => setTab('embed')}
+            >
+              Embed
+            </button>
+          </div>
 
-            {tab === 'link' && (
-              <div role="tabpanel">
-                {creating && <p>Creating link…</p>}
-                {error && <p className={styles.errorMessage}>{error}</p>}
-                {url && (
-                  <>
-                    <div className={styles.urlRow}>
-                      <input
-                        type="text"
-                        className={styles.urlInput}
-                        value={url}
-                        readOnly
-                        onFocus={(e) => e.currentTarget.select()}
-                      />
-                      <button className={styles.copyButton} onClick={() => copy('link', url)}>
-                        {copied === 'link' ? <Check size={14} /> : <Copy size={14} />}
-                        {copied === 'link' ? 'Copied' : 'Copy'}
-                      </button>
-                    </div>
-                    <p className={styles.helpText}>
-                      Anyone with this link can view your scene. Links expire 1 year after creation.
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-
-            {tab === 'embed' && (
-              <div role="tabpanel">
-                {snippet ? (
-                  <>
-                    <textarea
-                      className={styles.snippet}
-                      value={snippet}
+          {tab === 'link' && (
+            <div role="tabpanel">
+              {creating && <p>Creating link…</p>}
+              {error && <p className={styles.errorMessage}>{error}</p>}
+              {url && (
+                <>
+                  <div className={styles.urlRow}>
+                    <input
+                      type="text"
+                      className={styles.urlInput}
+                      value={url}
                       readOnly
-                      rows={4}
-                      aria-label="Embed code"
                       onFocus={(e) => e.currentTarget.select()}
                     />
-                    <div className={styles.embedOptions}>
-                      <label>
-                        <input type="checkbox" checked={spin} onChange={(e) => setSpin(e.target.checked)} /> Rotate
-                      </label>
-                      <label>
-                        <input type="checkbox" checked={lightBg} onChange={(e) => setLightBg(e.target.checked)} /> Light background
-                      </label>
-                      <button className={styles.copyButton} onClick={() => copy('embed', snippet)}>
-                        {copied === 'embed' ? <Check size={14} /> : <Copy size={14} />}
-                        {copied === 'embed' ? 'Copied' : 'Copy code'}
-                      </button>
-                    </div>
-                    <p className={styles.helpText}>
-                      Paste this into any web page, blog or course site to show the active structure in an
-                      interactive 3D viewer. Pasting the page link into WordPress, Notion or Medium also embeds it.
-                    </p>
-                  </>
-                ) : (
+                    <button className={styles.copyButton} onClick={() => copy('link', url)}>
+                      {copied === 'link' ? <Check size={14} /> : <Copy size={14} />}
+                      {copied === 'link' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
                   <p className={styles.helpText}>
-                    Embedding works for structures from the PDB, AlphaFold DB and PubChem. Select one of those in
-                    the structure list to get embed code.
+                    Anyone with this link can view your scene. Links expire 1 year after creation.
                   </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
+                </>
+              )}
+            </div>
+          )}
+
+          {tab === 'embed' && (
+            <div role="tabpanel">
+              {snippet ? (
+                <>
+                  <textarea
+                    className={styles.snippet}
+                    value={snippet}
+                    readOnly
+                    rows={4}
+                    aria-label="Embed code"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <div className={styles.embedOptions}>
+                    <label>
+                      <input type="checkbox" checked={spin} onChange={(e) => setSpin(e.target.checked)} /> Rotate
+                    </label>
+                    <label>
+                      <input type="checkbox" checked={lightBg} onChange={(e) => setLightBg(e.target.checked)} /> Light background
+                    </label>
+                    <button className={styles.copyButton} onClick={() => copy('embed', snippet)}>
+                      {copied === 'embed' ? <Check size={14} /> : <Copy size={14} />}
+                      {copied === 'embed' ? 'Copied' : 'Copy code'}
+                    </button>
+                  </div>
+                  <p className={styles.helpText}>
+                    Paste this into any web page, blog or course site to show the active structure in an
+                    interactive 3D viewer. Pasting the page link into WordPress, Notion or Medium also embeds it.
+                  </p>
+                </>
+              ) : (
+                <p className={styles.helpText}>
+                  Embedding works for structures from the PDB, AlphaFold DB and PubChem. Select one of those in
+                  the structure list to get embed code.
+                </p>
+              )}
+            </div>
+          )}
+        </dialog>
       )}
     </>
   );

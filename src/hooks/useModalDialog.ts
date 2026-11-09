@@ -1,6 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
-
-const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type RefObject } from 'react';
 
 export interface ModalDialogOptions {
   isOpen: boolean;
@@ -14,70 +12,71 @@ export interface ModalDialogOptions {
   returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
+/** Props for the `<dialog>` element; spread them onto it. */
+export interface ModalDialogProps {
+  ref: RefObject<HTMLDialogElement | null>;
+  tabIndex: -1;
+  onKeyDown: (e: KeyboardEvent<HTMLDialogElement>) => void;
+  onClick: (e: MouseEvent<HTMLDialogElement>) => void;
+}
+
 /**
- * Keyboard behaviour of a modal dialog: focus moves in on open and back out
- * on close (however it closes), Escape closes it without reaching the app's
- * own shortcuts, and Tab stays inside. Returns the ref for the dialog element.
+ * A native modal `<dialog>`, rendered only while `isOpen`. The browser opens
+ * it with `showModal()` and supplies the rest: the top layer (no z-index),
+ * the page behind made inert, Tab kept inside, Escape to close.
+ *
+ * - Any close by the browser (Escape, Android's back gesture) calls `onClose`,
+ *   so React state follows. Focus goes back out on close, however it closes.
+ * - Keys pressed in the dialog stop at it: the app's own listeners on window
+ *   and document (shortcuts, the sidebar's Escape, the context menu) never
+ *   see them, while handlers inside the dialog still run. The dialog itself
+ *   takes focus (tabIndex -1) when text in it is clicked, so those keys start
+ *   in it too, not on <body>.
+ * - A click on the backdrop closes it.
+ *
+ * Two capture listeners run before React and are not stopped: the Toolbar
+ * menu's on document (only while that menu is open) and SpotlightTour's.
  */
-export function useModalDialog<T extends HTMLElement = HTMLDivElement>({
+export function useModalDialog({
   isOpen,
   onClose,
   initialFocusRef,
   returnFocusRef,
-}: ModalDialogOptions): RefObject<T | null> {
-  const dialogRef = useRef<T>(null);
+}: ModalDialogOptions): ModalDialogProps {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  // Focus in on open, back out on close or unmount
   useEffect(() => {
-    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!isOpen || !dialog) return;
     const returnTarget = returnFocusRef?.current ?? document.activeElement;
-    // The dialog renders in the same commit; wait a frame so it is laid out
-    const frame = requestAnimationFrame(() => initialFocusRef?.current?.focus());
+    const handleClose = () => onCloseRef.current();
+    dialog.addEventListener('close', handleClose);
+    if (!dialog.open) dialog.showModal();
+    initialFocusRef?.current?.focus();
     return () => {
-      cancelAnimationFrame(frame);
+      // Off first: closing it here is React's doing, not news for onClose
+      dialog.removeEventListener('close', handleClose);
+      if (dialog.open) dialog.close();
       if (returnTarget instanceof HTMLElement && returnTarget.isConnected) returnTarget.focus();
     };
   }, [isOpen, initialFocusRef, returnFocusRef]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        // Capture phase on window runs first, so this keeps Escape from also
-        // clearing the selection or closing the sidebar
-        e.stopPropagation();
-        onCloseRef.current();
-        return;
-      }
-
-      if (e.key === 'Tab' && dialogRef.current) {
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        const active = document.activeElement;
-        const inside = dialogRef.current.contains(active);
-        if (e.shiftKey) {
-          if (active === first || !inside) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else if (active === last || !inside) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen]);
-
-  return dialogRef;
+  return {
+    ref: dialogRef,
+    tabIndex: -1,
+    onKeyDown: (e) => e.stopPropagation(),
+    onClick: (e) => {
+      // The backdrop counts as the dialog itself, outside its box. Checking
+      // the box, not just the target, keeps clicks on its padding inside.
+      const dialog = e.currentTarget;
+      if (e.target !== dialog) return;
+      const box = dialog.getBoundingClientRect();
+      const inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+      if (!inside) onCloseRef.current();
+    },
+  };
 }

@@ -29,47 +29,38 @@ export interface ShortcutsHelpProps {
 
 export function ShortcutsHelp({ isOpen, onClose }: ShortcutsHelpProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const modalRef = useModalDialog({ isOpen, onClose, initialFocusRef: closeButtonRef });
+  const dialogProps = useModalDialog({ isOpen, onClose, initialFocusRef: closeButtonRef });
 
   if (!isOpen) return null;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div
-        ref={modalRef}
-        className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Keyboard shortcuts"
-      >
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Keyboard Shortcuts</h2>
-          <button
-            ref={closeButtonRef}
-            className={styles.modalClose}
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <div className={styles.modalBody}>
-          {SECTIONS.map((section) => (
-            <div key={section.title} className={styles.shortcutsSection}>
-              <h3 className={styles.sectionTitle}>{section.title}</h3>
-              <div className={styles.shortcutsList}>
-                {section.shortcuts.map((shortcut) => (
-                  <div key={shortcut.key} className={styles.shortcutRow}>
-                    <kbd className={styles.shortcutKey}>{shortcut.key}</kbd>
-                    <span className={styles.shortcutDesc}>{shortcut.description}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+    <dialog {...dialogProps} className={styles.modalContent} aria-label="Keyboard shortcuts">
+      <div className={styles.modalHeader}>
+        <h2 className={styles.modalTitle}>Keyboard Shortcuts</h2>
+        <button
+          ref={closeButtonRef}
+          className={styles.modalClose}
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
       </div>
-    </div>
+      <div className={styles.modalBody}>
+        {SECTIONS.map((section) => (
+          <div key={section.title} className={styles.shortcutsSection}>
+            <h3 className={styles.sectionTitle}>{section.title}</h3>
+            <div className={styles.shortcutsList}>
+              {section.shortcuts.map((shortcut) => (
+                <div key={shortcut.key} className={styles.shortcutRow}>
+                  <kbd className={styles.shortcutKey}>{shortcut.key}</kbd>
+                  <span className={styles.shortcutDesc}>{shortcut.description}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </dialog>
   );
 }

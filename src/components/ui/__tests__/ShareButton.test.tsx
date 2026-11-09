@@ -97,22 +97,26 @@ describe('ShareButton modal', () => {
     return button;
   }
 
-  it('is a labelled modal dialog rendered outside the sidebar', async () => {
+  /** Escape as the browser handles it: the key goes to the dialog, then the browser closes it. */
+  function pressEscape(dialog: HTMLElement) {
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    act(() => (dialog as HTMLDialogElement).close());
+  }
+
+  it('is a native dialog, opened modally and labelled by its title', async () => {
     openModal(Promise.resolve(new Response(JSON.stringify({ id: 'abc' }), { status: 200 })));
-    const dialog = await screen.findByRole('dialog');
-    expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
+    const dialog = (await screen.findByRole('dialog')) as HTMLDialogElement;
+    expect(dialog.tagName).toBe('DIALOG');
+    expect(dialog.open).toBe(true);
     expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)?.textContent).toBe('Share this session');
-    // Portalled to the body, so it isn't clipped by or inside the sidebar
-    expect(dialog.parentElement?.parentElement).toBe(document.body);
   });
 
   it('closes on Escape without clearing the selection, and focus returns to the Share button', async () => {
     const button = openModal(Promise.resolve(new Response(JSON.stringify({ id: 'abc' }), { status: 200 })));
-    await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog');
     await screen.findByDisplayValue(/\/s\/abc$/);
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    pressEscape(dialog);
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(useMoleculeStore.getState().selectedAtoms).toEqual([{ structureId, atomIndex: 0 }]);
@@ -122,10 +126,10 @@ describe('ShareButton modal', () => {
   it('returns focus to the Share button when closed while the link is still being created', async () => {
     let resolve!: (r: Response) => void;
     const button = openModal(new Promise<Response>(r => { resolve = r; }));
-    await screen.findByRole('dialog');
+    const dialog = await screen.findByRole('dialog');
     expect(screen.getAllByText('Creating link…').length).toBeGreaterThan(0);
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    pressEscape(dialog);
 
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(button);

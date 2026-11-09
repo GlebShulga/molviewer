@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { ShortcutsHelp } from '../ShortcutsHelp';
 import { KEYBOARD_SHORTCUTS } from '../../../hooks/useKeyboardShortcuts';
 
@@ -19,10 +19,17 @@ describe('ShortcutsHelp', () => {
     expect(within(dialog).getByText('Toggle auto-rotate')).toBeTruthy();
   });
 
-  it('closes on Escape', () => {
+  it('is a native dialog, opened modally', () => {
+    render(<ShortcutsHelp isOpen onClose={() => {}} />);
+    const dialog = screen.getByRole('dialog') as HTMLDialogElement;
+    expect(dialog.tagName).toBe('DIALOG');
+    expect(dialog.open).toBe(true);
+  });
+
+  it('closes when the browser closes it (Escape)', () => {
     const onClose = vi.fn();
     render(<ShortcutsHelp isOpen onClose={onClose} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    act(() => (screen.getByRole('dialog') as HTMLDialogElement).close());
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
