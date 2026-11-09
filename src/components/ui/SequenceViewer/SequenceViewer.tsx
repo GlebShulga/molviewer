@@ -24,6 +24,39 @@ function getResidueSecondaryStructure(residue: Residue): 'helix' | 'sheet' | 'co
   return ss || 'coil';
 }
 
+/**
+ * Scrolls the strip, and only the strip, until the residue shows.
+ * scrollIntoView would also scroll the sidebar: a row hovered in the
+ * Residues panel would move away from under the pointer.
+ *
+ * - Never while a pointer rests in the strip: moving it would slide other
+ *   residues under the pointer, which highlight in turn (or, between them,
+ *   the selected residue does). Only where the main pointer can hover: on
+ *   touch screens :hover stays on whatever was tapped last, resting nowhere.
+ * - Otherwise one rule for both layouts (wrapped rows scrolling down on
+ *   wider screens, one row scrolling sideways on phones): a residue fully in
+ *   view stays put; one that isn't is centred, as far as the strip can scroll.
+ * - At once, not smoothly: during a smooth scroll the browser reports the
+ *   strip where it was, so the next highlight would be measured wrong.
+ */
+function scrollStripTo(strip: HTMLElement, residue: HTMLElement): void {
+  if (window.matchMedia('(hover: hover)').matches && strip.matches(':hover')) return;
+  const area = strip.getBoundingClientRect();
+  const top = area.top + strip.clientTop;
+  const left = area.left + strip.clientLeft;
+  const box = residue.getBoundingClientRect();
+
+  const inView =
+    box.top >= top && box.bottom <= top + strip.clientHeight &&
+    box.left >= left && box.right <= left + strip.clientWidth;
+  if (inView) return;
+  strip.scrollTo({
+    top: strip.scrollTop + box.top + box.height / 2 - (top + strip.clientHeight / 2),
+    left: strip.scrollLeft + box.left + box.width / 2 - (left + strip.clientWidth / 2),
+    behavior: 'instant',
+  });
+}
+
 interface SequenceViewerProps {
   /** The panel's own structure (not necessarily the active one) and the residue's atoms. */
   onResidueClick?: (structureId: string, atomIndices: number[]) => void;
@@ -146,10 +179,8 @@ export function SequenceViewer({ onResidueClick, onResidueHover }: SequenceViewe
   // an id can hold any character a selector would need escaped)
   useEffect(() => {
     if (highlightedResidueId && sequenceRef.current) {
-      const element = sequenceRef.current.querySelector('[data-highlighted]');
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
+      const element = sequenceRef.current.querySelector<HTMLElement>('[data-highlighted]');
+      if (element) scrollStripTo(sequenceRef.current, element);
     }
   }, [highlightedResidueId]);
 
