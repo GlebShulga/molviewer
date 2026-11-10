@@ -15,7 +15,8 @@ import { renderFooter } from '../../../site/nav';
 import { FEATURED_COLLECTIONS } from '../../../site/collections';
 import { ogImage } from '../../../site/ogImages';
 
-export const onRequest: PagesFunction = async ({ request, params, next }) => {
+export const onRequest: PagesFunction = async (context) => {
+  const { request, params, next } = context;
   const raw = String(params.cid ?? '');
   if (!isGetOrHead(request) || !/^[1-9]\d{0,9}$/.test(raw)) return next();
   const cid = Number(raw);
@@ -27,7 +28,11 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
     return Response.redirect(url.toString(), 301);
   }
 
-  const [shell, result] = await Promise.all([next(), fetchPubchemSummary(cid)]);
+  // waitUntil lets a slow upstream answer finish and reach the edge cache (see pdb/[id].ts).
+  const [shell, result] = await Promise.all([
+    next(),
+    fetchPubchemSummary(cid, { waitUntil: (p) => context.waitUntil(p) }),
+  ]);
 
   if (result.status === 'not-found') {
     return shellResponse(

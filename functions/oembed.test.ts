@@ -4,8 +4,9 @@ import { onRequestGet } from './oembed';
 
 function get(pageUrl: string) {
   const request = new Request(`https://molviewer.bio/oembed?url=${encodeURIComponent(pageUrl)}`);
+  // waitUntil: Pages always provides it; getJson hands every edge-cached request to it.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (onRequestGet as any)({ request }) as Promise<Response>;
+  return (onRequestGet as any)({ request, waitUntil: () => {} }) as Promise<Response>;
 }
 
 afterEach(() => vi.unstubAllGlobals());

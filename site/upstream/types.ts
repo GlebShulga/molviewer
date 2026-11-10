@@ -20,6 +20,14 @@ export interface UpstreamOptions {
    * successes and 404s only (see http.ts). `null` sends none.
    */
   cf?: Record<string, unknown> | null;
+  /**
+   * The runtime's `waitUntil` (Workers / Pages Functions). When set, every
+   * edge-cached request is handed to it and read to the end in the background
+   * (after a timeout, or a 404's body), so Cloudflare caches the answer for
+   * the next request. Without it a timed-out request is aborted and an
+   * error's body cancelled (tests, browser).
+   */
+  waitUntil?: (p: Promise<unknown>) => void;
 }
 
 /**

@@ -29,7 +29,8 @@ function json(status: number, body: unknown, maxAge = MAX_AGE): Response {
   });
 }
 
-export const onRequestGet: PagesFunction = async ({ request }) => {
+export const onRequestGet: PagesFunction = async (context) => {
+  const { request } = context;
   const reqUrl = new URL(request.url);
   const format = reqUrl.searchParams.get('format') ?? 'json';
   if (format !== 'json') return new Response('Only format=json is supported', { status: 501 });
@@ -44,7 +45,8 @@ export const onRequestGet: PagesFunction = async ({ request }) => {
   }
   if (!target) return json(404, { error: 'Not an embeddable MolViewer URL' });
   // Don't hand out an embed for an ID that doesn't exist (unreachable upstream: allow it).
-  if ((await embedTargetExists(target)) === 'no') {
+  // waitUntil lets a slow upstream answer, or a 404, reach the edge cache (see pdb/[id].ts).
+  if ((await embedTargetExists(target, { waitUntil: (p) => context.waitUntil(p) })) === 'no') {
     return json(404, { error: `${target.label} not found` }, NOT_FOUND_MAX_AGE);
   }
 

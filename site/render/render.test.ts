@@ -420,7 +420,7 @@ describe('links in pages rendered at request time', () => {
     const share = renderShareLanding('abcdefgh1234', { structures: [{ name: '4HHB', source: { type: 'rcsb', id: '4HHB' } }] }, ORIGIN);
     pages.push({ path: '/s/abcdefgh1234', html: applyShellMeta(SHELL, share.meta) });
 
-    // The CID page is built inline in its handler (fetchPubchemSummary takes no options)
+    // The CID page is built inline in its handler, which passes no fetchImpl
     vi.stubGlobal('fetch', fixtureFetch().fetchImpl);
     try {
       const { onRequest } = await import('../../functions/compound/cid/[cid]');
@@ -429,6 +429,8 @@ describe('links in pages rendered at request time', () => {
         request: new Request(`${ORIGIN}/compound/cid/9890`),
         params: { cid: '9890' },
         next: async () => new Response(SHELL, { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+        // Pages always provides it; getJson hands every edge-cached request to it.
+        waitUntil: () => {},
       });
       expect(res.status).toBe(200);
       const html = await res.text();

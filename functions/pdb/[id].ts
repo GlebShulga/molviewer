@@ -11,7 +11,8 @@ import { isGetOrHead, shellResponse } from '../../site/render/respond';
 import { SITE_ORIGIN } from '../../site/nav';
 import { PDB_ID_RE } from '../../site/identifiers';
 
-export const onRequest: PagesFunction = async ({ request, params, next }) => {
+export const onRequest: PagesFunction = async (context) => {
+  const { request, params, next } = context;
   const id = String(params.id ?? '');
   if (!isGetOrHead(request) || !PDB_ID_RE.test(id)) return next();
 
@@ -24,7 +25,11 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
     return Response.redirect(url.toString(), 301);
   }
 
-  const [shell, result] = await Promise.all([next(), fetchPdbDetails(upper)]);
+  // waitUntil lets a slow upstream answer finish and reach the edge cache (site/upstream/http.ts).
+  const [shell, result] = await Promise.all([
+    next(),
+    fetchPdbDetails(upper, { waitUntil: (p) => context.waitUntil(p) }),
+  ]);
   // Canonical and social URLs always use the production origin, so preview
   // hosts (*.pages.dev) never compete with molviewer.bio.
   const { status, meta } = renderPdbLanding(upper, result, SITE_ORIGIN);

@@ -1,10 +1,20 @@
 /**
  * Small fetch helper shared by the upstream fetchers: timeout, Cloudflare edge
  * caching and JSON parsing, returning a discriminated result instead of throwing.
+ * An edge-cached request that times out can finish in the background (see
+ * `getJson`), so a slow upstream answer is cached for the next request.
  */
 import type { UpstreamOptions } from './types';
 
 export const DEFAULT_TIMEOUT_MS = 4000;
+
+/**
+ * The hard limit on a request, background included: it is aborted
+ * `max(timeoutMs, BACKGROUND_LIMIT_MS)` after it started. Kept under the 30 s
+ * Workers allow for `waitUntil`, as long as `timeoutMs` stays under it too
+ * (no caller passes more than the default 4 s).
+ */
+export const BACKGROUND_LIMIT_MS = 25_000;
 
 /**
  * Cloudflare edge cache policy for upstream responses (ignored outside
@@ -35,6 +45,14 @@ export type JsonResponse<T> =
  * - HTTP errors return `{ ok: false, status }` (callers decide whether 404 means "not found").
  * - A 204 or empty body returns `{ ok: true, data: null }`.
  * - Timeouts, network errors and invalid JSON return `{ ok: false }` without `status`.
+ *
+ * On a timeout the caller gets the failure at once, and an HTTP error is
+ * answered as soon as its status arrives. With `opts.waitUntil` and edge
+ * caching on, the request is read to the end in the background (an unfinished
+ * one after a timeout, a 404's body) so Cloudflare caches the answer, which it
+ * only does for a body that is read. Otherwise a timed-out request is aborted
+ * and an error's body cancelled. Either way the request is
+ * aborted at the hard limit (see `BACKGROUND_LIMIT_MS`).
  */
 export async function getJson<T>(
   url: string,
@@ -43,30 +61,68 @@ export async function getJson<T>(
   const fetchImpl = opts.fetchImpl ?? fetch;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const cf = opts.cf === undefined ? DEFAULT_CF : opts.cf;
+  const host = hostOf(url);
   const init = {
     headers: { accept: 'application/json', 'user-agent': USER_AGENT },
     signal: controller.signal,
     ...(cf ? { cf } : {}),
   } as RequestInit & { cf?: unknown };
 
-  try {
-    const resp = await fetchImpl(url, init);
-    if (!resp.ok) {
-      return { ok: false, status: resp.status, message: `HTTP ${resp.status} from ${hostOf(url)}` };
+  // The one rule for the background: only an edge-cached request has a reason to
+  // finish (without `cf` there is nothing to cache), and only `waitUntil` keeps it alive.
+  const waitUntil = cf ? opts.waitUntil : undefined;
+  // The hard limit covers the whole request, background included. `Math.max`
+  // keeps it from ever cutting a request off before its own timeout.
+  const hard = setTimeout(() => controller.abort(), Math.max(timeoutMs, BACKGROUND_LIMIT_MS));
+
+  // What the caller gets: for an HTTP error the status alone, without waiting
+  // for the body. Never rejects: every failure becomes `{ ok: false }`.
+  let resp: Response | undefined;
+  const answer = (async (): Promise<JsonResponse<T | null>> => {
+    try {
+      resp = await fetchImpl(url, init);
+      if (!resp.ok) return { ok: false, status: resp.status, message: `HTTP ${resp.status} from ${host}` };
+      const text = await resp.text();
+      if (!text.trim()) return { ok: true, status: resp.status, data: null };
+      return { ok: true, status: resp.status, data: JSON.parse(text) as T };
+    } catch (err) {
+      const message = controller.signal.aborted
+        ? `Timeout after ${timeoutMs} ms from ${host}`
+        : `${errorName(err)} from ${host}`;
+      return { ok: false, message };
     }
-    const text = await resp.text();
-    if (!text.trim()) return { ok: true, status: resp.status, data: null };
-    return { ok: true, status: resp.status, data: JSON.parse(text) as T };
-  } catch (err) {
-    const message = controller.signal.aborted
-      ? `Timeout after ${timeoutMs} ms from ${hostOf(url)}`
-      : `${errorName(err)} from ${hostOf(url)}`;
-    return { ok: false, message };
-  } finally {
+  })();
+
+  // The answer, then whatever of the body is left (only an error's). The edge
+  // cache only stores a body that is read, and of the error statuses it only
+  // keeps 404 (DEFAULT_CF), so a 404's body is read in the background; any
+  // other is cancelled to free the connection. Resolves to the same result as
+  // `answer` and never rejects.
+  const done = answer
+    .then(async (result) => {
+      if (resp && !resp.bodyUsed) {
+        if (waitUntil && resp.status === 404) await resp.arrayBuffer();
+        else await resp.body?.cancel();
+      }
+      return result;
+    })
+    .catch(() => answer)
+    .finally(() => clearTimeout(hard));
+  // Handed over once, whoever wins the race below; a settled promise costs nothing.
+  waitUntil?.(done);
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  const result = await Promise.race([answer, timeout]);
+  if (result) {
     clearTimeout(timer);
+    return result;
   }
+  if (!waitUntil) controller.abort();
+  return { ok: false, message: `Timeout after ${timeoutMs} ms from ${host}` };
 }
 
 /** Build a GET URL for an RCSB GraphQL query (GET so the edge cache can store it). */

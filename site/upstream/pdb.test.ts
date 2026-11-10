@@ -155,6 +155,21 @@ describe('fetchPdbDetails (3DNI fixtures)', () => {
     expect(d.secondaryStructure?.source).toBe('rcsb');
   });
 
+  it('falls back on a slow PDBe answer and lets it finish in the background', async () => {
+    const { fetchImpl } = fixtureFetch({ 'pdbe-ss-3DNI.json': { delayMs: 200 } });
+    const background: Promise<unknown>[] = [];
+    const d = await okData(
+      await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: 50, waitUntil: (p) => void background.push(p) })
+    );
+    expect(d.partial).toContain('pdbeSecondaryStructure');
+    expect(d.secondaryStructure?.source).toBe('rcsb');
+
+    const finished = await Promise.all(background);
+    expect(finished).toContainEqual(
+      expect.objectContaining({ ok: true, data: expect.objectContaining({ '3dni': expect.anything() }) })
+    );
+  });
+
   it('does not mark PDBe 404 (no data) as a failure', async () => {
     const { fetchImpl } = fixtureFetch({ 'pdbe-ss-3DNI.json': { status: 404 } });
     const d = await okData(await fetchPdbDetails('3DNI', { fetchImpl }));

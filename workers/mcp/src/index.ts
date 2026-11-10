@@ -34,8 +34,10 @@ export default {
 
     if (pathname === '/mcp') {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
-      // One stateless handler per request: the factory needs this request's waitUntil.
-      const handler = createMcpHandler(() => createServer(env, (p) => ctx.waitUntil(p)), {
+      // One stateless handler per request: the factory needs this request's waitUntil,
+      // for the tool cache and so a slow upstream answer can finish into the edge cache.
+      const waitUntil = (p: Promise<unknown>) => ctx.waitUntil(p);
+      const handler = createMcpHandler(() => createServer(env, waitUntil, { waitUntil }), {
         onerror: (err) => console.error('mcp', err),
       });
       return withCors(await handler.fetch(request));

@@ -9,7 +9,8 @@ import { isGetOrHead, shellResponse } from '../../site/render/respond';
 import { SITE_ORIGIN } from '../../site/nav';
 import { UNIPROT_RE } from '../../site/identifiers';
 
-export const onRequest: PagesFunction = async ({ request, params, next }) => {
+export const onRequest: PagesFunction = async (context) => {
+  const { request, params, next } = context;
   const id = String(params.id ?? '');
   const upper = id.toUpperCase();
   if (!isGetOrHead(request) || !UNIPROT_RE.test(upper)) return next();
@@ -20,7 +21,11 @@ export const onRequest: PagesFunction = async ({ request, params, next }) => {
     return Response.redirect(url.toString(), 301);
   }
 
-  const [shell, result] = await Promise.all([next(), fetchAfDetails(upper)]);
+  // waitUntil lets a slow upstream answer finish and reach the edge cache (see pdb/[id].ts).
+  const [shell, result] = await Promise.all([
+    next(),
+    fetchAfDetails(upper, { waitUntil: (p) => context.waitUntil(p) }),
+  ]);
   // Canonical and social URLs always use the production origin (see pdb/[id].ts).
   const { status, meta } = renderAfLanding(upper, result, SITE_ORIGIN);
   return shellResponse(request, shell, meta, status);

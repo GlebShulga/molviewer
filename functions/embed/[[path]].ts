@@ -11,13 +11,18 @@ import { isGetOrHead, shellResponse } from '../../site/render/respond';
 import { embedTarget } from '../../site/embed';
 import { embedTargetExists } from '../../site/embedExists';
 
-export const onRequest: PagesFunction = async ({ request, next }) => {
+export const onRequest: PagesFunction = async (context) => {
+  const { request, next } = context;
   const url = new URL(request.url);
   const target = embedTarget(url.pathname);
   // Unknown shapes fall through to the SPA shell, which the middleware 404s.
   if (!isGetOrHead(request) || !target) return next();
 
-  const [shell, exists] = await Promise.all([next(), embedTargetExists(target)]);
+  // waitUntil lets a slow upstream answer, or a 404, reach the edge cache (see pdb/[id].ts).
+  const [shell, exists] = await Promise.all([
+    next(),
+    embedTargetExists(target, { waitUntil: (p) => context.waitUntil(p) }),
+  ]);
   const missing = exists === 'no';
   return shellResponse(
     request,
