@@ -12,7 +12,7 @@ const TTL_SECONDS = 86400;
  * bump: the key also carries DENY_LIST_HASH, so answers cached before an
  * agent was added (a compound hit, a curated slug) become unreachable.
  */
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 
 /** Cache key for one tool call. `denyHash` is a parameter for tests. */
 export function cacheKey(tool: string, args: unknown, denyHash: string = DENY_LIST_HASH): string {

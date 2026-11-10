@@ -48,6 +48,7 @@ import {
   pdbPageUrl,
   pdbSections,
   pdbSummary,
+  withSections,
   type DetailSection,
 } from './summaries';
 
@@ -555,7 +556,7 @@ export async function getStructureDetails(args: DetailsArgs, upstream: UpstreamO
   if (args.kind === 'pdb') extra = pdbSections(r.details as Parameters<typeof pdbSections>[0], sections);
   if (args.kind === 'alphafold') extra = afSections(r.details as Parameters<typeof afSections>[0], sections);
 
-  const structuredContent = { ...r.summary, ...extra };
+  const structuredContent = withSections(r.summary, extra);
   return {
     text: `Details for ${r.title}: ${JSON.stringify(structuredContent)}`,
     structuredContent,

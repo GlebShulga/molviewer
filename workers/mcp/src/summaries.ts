@@ -3,7 +3,7 @@
  * (site/upstream). Kept to a few KB: no coordinates, sequences only on
  * request and capped.
  */
-import type { AfDetails, Citation, PdbDetails } from '../../../site/upstream/types';
+import type { AfDetails, ChainSecondaryStructure, Citation, PdbDetails } from '../../../site/upstream/types';
 import type { PubchemCompound } from '../../../site/upstream/pubchem';
 import { COMPOUND_CATEGORY_LABELS, type Compound, type CompoundCategory } from '../../../site/dataTypes';
 import { shortName } from '../../../site/render/pdbPage';
@@ -12,9 +12,119 @@ import { formatMethod, formatRange } from '../../../site/render/format';
 import { SITE_ORIGIN } from '../../../site/nav';
 import { structurePath } from '../../../site/routes';
 
+// Caps that keep answers small for entries with hundreds of chains (ribosomes,
+// virus capsids). Whatever they cut is noted in a `truncated` field.
 const MAX_SEQUENCE = 2000;
 const MAX_LIGANDS = 20;
 const MAX_ENTITIES = 12;
+const MAX_ORGANISMS = 10;
+/** Chain IDs in one list (an entity's or a ligand's chains). */
+const MAX_CHAIN_IDS = 20;
+/** The secondaryStructure section: each chain and each helix or strand counts 1. */
+const MAX_SS_ITEMS = 600;
+const MAX_SECTION_LIGANDS = 50;
+
+/**
+ * What the caps cut, keyed by the top-level field each note describes, so a
+ * section that replaces a summary field also replaces its note. A Set, because
+ * a per-item cap fires once for every item over it.
+ */
+type Notes = Record<string, Set<string>>;
+
+function addNote(notes: Notes, field: string, text: string): void {
+  (notes[field] ??= new Set()).add(text);
+}
+
+/** The first `max` items; when there are more, "first 10 of 34" goes under `field`. */
+function capped<T>(items: T[], max: number, notes: Notes, field: string): T[] {
+  if (items.length <= max) return items;
+  addNote(notes, field, `first ${max} of ${items.length}`);
+  return items.slice(0, max);
+}
+
+/** One item's chain IDs, at most MAX_CHAIN_IDS: "chains: at most 20 per ligand" goes under `field`. */
+function cappedChains(ids: string[], notes: Notes, field: string, per: string): string[] {
+  if (ids.length <= MAX_CHAIN_IDS) return ids;
+  addNote(notes, field, `chains: at most ${MAX_CHAIN_IDS} per ${per}`);
+  return ids.slice(0, MAX_CHAIN_IDS);
+}
+
+/** One entity's sequence, at most MAX_SEQUENCE residues and then "...". */
+function cappedSequence(sequence: string | undefined, notes: Notes): string | undefined {
+  if (!sequence || sequence.length <= MAX_SEQUENCE) return sequence;
+  addNote(notes, 'sequences', `residues: at most ${MAX_SEQUENCE} per sequence`);
+  return `${sequence.slice(0, MAX_SEQUENCE)}...`;
+}
+
+/** `truncated`: one sentence per field, e.g. { ligands: "first 50 of 80; chains: at most 20 per ligand" }. */
+function truncatedOf(notes: Notes): Record<string, string> | undefined {
+  const entries = Object.entries(notes).filter(([, s]) => s.size > 0);
+  return entries.length ? Object.fromEntries(entries.map(([field, s]) => [field, [...s].join('; ')])) : undefined;
+}
+
+function withTruncated<T extends object>(value: T, notes: Notes): T & { truncated?: Record<string, string> } {
+  const truncated = truncatedOf(notes);
+  return truncated ? { ...value, truncated } : value;
+}
+
+/**
+ * get_structure_details: the summary plus its extra sections. A section that
+ * replaces a summary field (the full `ligands` list) also replaces that
+ * field's note, so a list the section gives in full is not noted as cut.
+ */
+export function withSections(summary: object, extra: Record<string, unknown>): Record<string, unknown> {
+  const { truncated: summaryNotes, ...rest } = summary as { truncated?: Record<string, string> };
+  const { truncated: sectionNotes, ...sections } = extra as { truncated?: Record<string, string> };
+  const truncated: Record<string, string> = { ...summaryNotes };
+  for (const field of Object.keys(sections)) delete truncated[field];
+  Object.assign(truncated, sectionNotes);
+  return { ...rest, ...sections, ...(Object.keys(truncated).length ? { truncated } : {}) };
+}
+
+/** Helices and strands in the whole entry. */
+function ssTotals(ss: { chains: ChainSecondaryStructure[] }): { helices: number; strands: number } {
+  return {
+    helices: ss.chains.reduce((n, c) => n + c.helices.length, 0),
+    strands: ss.chains.reduce((n, c) => n + c.strands.length, 0),
+  };
+}
+
+/**
+ * Secondary-structure ranges within MAX_SS_ITEMS, chains in the parser's order
+ * (sorted by chain ID): helices, then strands, until the budget runs out. A
+ * chain goes in only when at least one of its ranges fits too, since a chain
+ * with empty lists would read as "no secondary structure" (the parsers drop
+ * chains without ranges, so every chain needs 2 or more). The chain cut
+ * partway is noted with counts ("chain X: 39 of 40 helices, 0 of 15 strands"),
+ * so a list it cut to empty doesn't read that way either.
+ */
+function ssChains(chains: ChainSecondaryStructure[], notes: Notes) {
+  let left = MAX_SS_ITEMS;
+  let partly: string | undefined;
+  const out: { chain: string; helices: string[]; strands: string[] }[] = [];
+  for (const c of chains) {
+    if (left < 2) break;
+    left -= 1;
+    const helices = c.helices.slice(0, left);
+    left -= helices.length;
+    const strands = c.strands.slice(0, left);
+    left -= strands.length;
+    const cut = [
+      helices.length < c.helices.length && `${helices.length} of ${c.helices.length} helices`,
+      strands.length < c.strands.length && `${strands.length} of ${c.strands.length} strands`,
+    ].filter(Boolean);
+    if (cut.length) partly = `chain ${c.chainId}: ${cut.join(', ')}`;
+    out.push({
+      chain: c.chainId,
+      helices: helices.map(formatRange),
+      strands: strands.map((s) => (s.sheetId ? `${formatRange(s)} (sheet ${s.sheetId})` : formatRange(s))),
+    });
+  }
+  const parts = [out.length < chains.length && `ranges for ${out.length} of ${chains.length} chains`, partly];
+  const note = parts.filter(Boolean).join('; ');
+  if (note) addNote(notes, 'secondaryStructure', note);
+  return out;
+}
 
 export function pdbPageUrl(id: string): string {
   return `${SITE_ORIGIN}${structurePath({ kind: 'pdb', id })}`;
@@ -205,7 +315,8 @@ export function compoundCaption(c: { name?: string; title?: string; formula?: st
 
 export function pdbSummary(d: PdbDetails) {
   const ss = d.secondaryStructure;
-  return {
+  const notes: Notes = {};
+  return withTruncated({
     kind: 'pdb' as const,
     id: d.id,
     name: shortName(d),
@@ -213,7 +324,7 @@ export function pdbSummary(d: PdbDetails) {
     method: d.method ? formatMethod(d.method) : undefined,
     resolutionAngstrom: d.resolution,
     releaseYear: d.releaseDate ? Number(d.releaseDate.slice(0, 4)) : undefined,
-    organisms: [...new Set(d.entities.flatMap((e) => e.organisms))],
+    organisms: capped([...new Set(d.entities.flatMap((e) => e.organisms))], MAX_ORGANISMS, notes, 'organisms'),
     /** Chains in the file, which is what the viewer shows. */
     polymerChainCount: d.polymerChainCount,
     biologicalAssembly: d.assembly
@@ -226,28 +337,25 @@ export function pdbSummary(d: PdbDetails) {
       : undefined,
     chainsNote: assemblyNote(d),
     molecularWeightKda: d.molecularWeight,
-    entities: d.entities.slice(0, MAX_ENTITIES).map((e) => ({
+    entities: capped(d.entities, MAX_ENTITIES, notes, 'entities').map((e) => ({
       description: e.description ? toSentenceCase(e.description) : undefined,
       type: e.type,
-      chains: e.chainIds,
+      // The count stays when `chains` is cut: a capsid's 60 coat-protein copies
+      chainCount: e.chainIds.length,
+      chains: cappedChains(e.chainIds, notes, 'entities', 'entity'),
       length: e.length,
       uniprot: e.uniprotIds,
     })),
-    ligands: d.ligands.slice(0, MAX_LIGANDS).map((l) => ({
+    ligands: capped(d.ligands, MAX_LIGANDS, notes, 'ligands').map((l) => ({
       id: l.id,
       name: l.name ? toSentenceCase(l.name) : undefined,
       copies: l.instanceCount,
     })),
-    secondaryStructure: ss
-      ? {
-          helices: ss.chains.reduce((n, c) => n + c.helices.length, 0),
-          strands: ss.chains.reduce((n, c) => n + c.strands.length, 0),
-        }
-      : undefined,
+    secondaryStructure: ss ? ssTotals(ss) : undefined,
     alphafoldModels: d.alphafoldIds,
     citation: formatCitation(d.citation),
     pageUrl: pdbPageUrl(d.id),
-  };
+  }, notes);
 }
 
 function percent(fraction: number): number {
@@ -299,6 +407,7 @@ export type DetailSection = 'secondaryStructure' | 'sequence' | 'ligands' | 'cit
 /** Extra sections for get_structure_details on a PDB entry. */
 export function pdbSections(d: PdbDetails, sections: DetailSection[]) {
   const out: Record<string, unknown> = {};
+  const notes: Notes = {};
   if (sections.includes('secondaryStructure')) {
     const ss = d.secondaryStructure;
     out.secondaryStructure = ss
@@ -308,29 +417,28 @@ export function pdbSections(d: PdbDetails, sections: DetailSection[]) {
             ss.numbering === 'author'
               ? 'Author residue numbers, as shown in the PDB file and viewers'
               : 'Sequence positions (label_seq_id), because only the RCSB fallback was available',
-          chains: ss.chains.map((c) => ({
-            chain: c.chainId,
-            helices: c.helices.map(formatRange),
-            strands: c.strands.map((s) => (s.sheetId ? `${formatRange(s)} (sheet ${s.sheetId})` : formatRange(s))),
-          })),
+          // This replaces the summary's totals, and `chains` may be cut, so the totals stay here
+          ...ssTotals(ss),
+          chains: ssChains(ss.chains, notes),
         }
       : 'Not available: both PDBe and RCSB failed to answer.';
   }
   if (sections.includes('sequence')) {
-    out.sequences = d.entities.slice(0, MAX_ENTITIES).map((e) => ({
+    out.sequences = capped(d.entities, MAX_ENTITIES, notes, 'sequences').map((e) => ({
       description: e.description,
-      chains: e.chainIds,
+      chainCount: e.chainIds.length,
+      chains: cappedChains(e.chainIds, notes, 'sequences', 'sequence'),
       length: e.length,
-      sequence: e.sequence && e.sequence.length > MAX_SEQUENCE ? `${e.sequence.slice(0, MAX_SEQUENCE)}...` : e.sequence,
+      sequence: cappedSequence(e.sequence, notes),
     }));
   }
   if (sections.includes('ligands')) {
-    out.ligands = d.ligands.map((l) => ({
+    out.ligands = capped(d.ligands, MAX_SECTION_LIGANDS, notes, 'ligands').map((l) => ({
       id: l.id,
       name: l.name ? toSentenceCase(l.name) : undefined,
       formula: l.formula,
       copies: l.instanceCount,
-      chains: l.chainIds,
+      chains: cappedChains(l.chainIds, notes, 'ligands', 'ligand'),
     }));
     out.excludedAdditives = d.excludedLigandIds;
   }
@@ -348,7 +456,7 @@ export function pdbSections(d: PdbDetails, sections: DetailSection[]) {
     }));
   }
   if (d.partial.length) out.unavailableParts = d.partial;
-  return out;
+  return withTruncated(out, notes);
 }
 
 /** Extra sections for get_structure_details on an AlphaFold model. */

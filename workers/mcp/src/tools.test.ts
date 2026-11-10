@@ -639,3 +639,143 @@ describe('assemblyNote', () => {
     expect(assemblyNote({ polymerChainCount: 3 })).toBeUndefined();
   });
 });
+
+describe('large entries', () => {
+  // 4HHB's recorded answers, enlarged to the size of a ribosome or virus capsid:
+  // hundreds of chains, many organisms and ligands, long secondary-structure lists.
+  const fixture = (name: string) =>
+    JSON.parse(readFileSync(new URL(`../../../site/upstream/__fixtures__/${name}`, import.meta.url), 'utf8'));
+  const chainIds = (n: number, prefix = '') => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+  type SsChain = { chain: string; helices: string[]; strands: string[] };
+  /** What the secondary-structure budget counts: each chain and each range. */
+  const ssItems = (chains: SsChain[]) => chains.reduce((n, c) => n + 1 + c.helices.length + c.strands.length, 0);
+
+  interface HugeOptions {
+    ligands?: number;
+    chainsPerLigand?: number;
+    /** Helices in each secondary-structure chain, in chain order. */
+    helicesPerChain?: number[];
+    /** Strands in each secondary-structure chain (default none, like 4HHB). */
+    strandsPerChain?: number[];
+    /** Residues in each entity's sequence (default 4HHB's own). */
+    sequenceLength?: number;
+  }
+
+  function hugeUpstream({ ligands = 80, chainsPerLigand = 300, helicesPerChain = Array(200).fill(100), strandsPerChain = [], sequenceLength }: HugeOptions = {}) {
+    const gql = fixture('rcsb-gql-entities-4HHB.json');
+    const entry = gql.data.entry;
+    const template = entry.polymer_entities[0];
+    if (sequenceLength) template.entity_poly = { ...template.entity_poly, pdbx_seq_one_letter_code_can: 'A'.repeat(sequenceLength) };
+    entry.polymer_entities = Array.from({ length: 30 }, (_, i) => ({
+      ...template,
+      rcsb_polymer_entity_container_identifiers: { ...template.rcsb_polymer_entity_container_identifiers, entity_id: String(i + 1), auth_asym_ids: chainIds(300, `E${i}-`) },
+      rcsb_entity_source_organism: [{ scientific_name: `Organism number ${i}` }],
+    }));
+    const ligand = entry.nonpolymer_entities[0];
+    entry.nonpolymer_entities = Array.from({ length: ligands }, (_, i) => ({
+      ...ligand,
+      rcsb_nonpolymer_entity_container_identifiers: { auth_asym_ids: chainIds(chainsPerLigand, `L${i}-`), nonpolymer_comp_id: `L${i}` },
+      nonpolymer_comp: { chem_comp: { ...ligand.nonpolymer_comp.chem_comp, id: `L${i}` } },
+    }));
+
+    const ss = fixture('pdbe-ss-4HHB.json');
+    const molecule = ss['4hhb'].molecules[0];
+    const chain = molecule.chains[0];
+    const helix = chain.secondary_structure.helices[0];
+    // Zero-padded (S000, S001, ...): the parser sorts chain IDs as text, so this keeps numeric order
+    molecule.chains = helicesPerChain.map((count, i) => ({
+      ...chain,
+      chain_id: `S${String(i).padStart(3, '0')}`,
+      secondary_structure: {
+        ...chain.secondary_structure,
+        helices: Array.from({ length: count }, () => helix),
+        strands: Array.from({ length: strandsPerChain[i] ?? 0 }, () => ({ ...helix, sheet_id: 1 })),
+      },
+    }));
+    ss['4hhb'].molecules = [molecule];
+
+    return upstream({
+      'rcsb-gql-entities-4HHB.json': { status: 200, body: JSON.stringify(gql) },
+      'pdbe-ss-4HHB.json': { status: 200, body: JSON.stringify(ss) },
+    });
+  }
+
+  it('get_structure_details stays bounded and says what it cut', async () => {
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB', sections: ['secondaryStructure', 'ligands', 'sequence'] }, hugeUpstream());
+    expect(r.status).toBe('ok');
+    expect(r.text.length).toBeLessThan(60_000);
+    const s = r.structuredContent as Record<string, unknown>;
+    expect((s.organisms as string[]).length).toBeLessThanOrEqual(10);
+    const ss = s.secondaryStructure as { helices: number; strands: number; chains: SsChain[] };
+    expect(ssItems(ss.chains)).toBeLessThanOrEqual(600);
+    // The section replaces the summary's totals, so it keeps them though its list is cut
+    expect(ss).toMatchObject({ helices: 200 * 100, strands: 0 });
+    expect(ss.chains.map((c) => c.chain)).toEqual(['S000', 'S001', 'S002', 'S003', 'S004', 'S005']);
+    const ligands = s.ligands as { chains: string[] }[];
+    expect(ligands.length).toBeLessThanOrEqual(50);
+    expect(ligands[0].chains.length).toBeLessThanOrEqual(20);
+    // The chain list is cut, the count is not
+    expect((s.entities as { chains: string[]; chainCount: number }[])[0]).toMatchObject({ chainCount: 300, chains: chainIds(20, 'E0-') });
+    const truncated = s.truncated as Record<string, string>;
+    expect(truncated.organisms).toBe('first 10 of 30');
+    expect(truncated.secondaryStructure).toBe('ranges for 6 of 200 chains; chain S005: 94 of 100 helices');
+    // The section's full list replaces the summary's 20, and its note replaces the summary's
+    expect(truncated.ligands).toBe('first 50 of 80; chains: at most 20 per ligand');
+    expect(r.text).toContain('truncated');
+  });
+
+  it('notes no cut for ligands the section lists in full', async () => {
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, hugeUpstream({ ligands: 30, chainsPerLigand: 20 }));
+    const s = r.structuredContent as { ligands: unknown[]; truncated: Record<string, string> };
+    expect(s.ligands).toHaveLength(30);
+    expect(s.truncated).not.toHaveProperty('ligands');
+  });
+
+  it.each([
+    ['one long helical chain', [45]],
+    ['a 24-chain oligomer', Array(24).fill(5)],
+  ])('lists every secondary-structure range of %s', async (_, helicesPerChain) => {
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, hugeUpstream({ helicesPerChain }));
+    const s = r.structuredContent as { secondaryStructure: { chains: SsChain[] }; truncated: Record<string, string> };
+    expect(s.secondaryStructure.chains.map((c) => c.helices.length)).toEqual(helicesPerChain);
+    expect(s.truncated).not.toHaveProperty('secondaryStructure');
+  });
+
+  it('leaves out a chain when none of its ranges would fit', async () => {
+    // The first chain costs 599 (itself and 598 helices), leaving 1: room for the chain but not a range
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, hugeUpstream({ helicesPerChain: [598, 5] }));
+    const s = r.structuredContent as { secondaryStructure: { chains: SsChain[] }; truncated: Record<string, string> };
+    expect(s.secondaryStructure.chains.map((c) => [c.chain, c.helices.length])).toEqual([['S000', 598]]);
+    expect(s.truncated.secondaryStructure).toBe('ranges for 1 of 2 chains');
+  });
+
+  it('counts what it cut from a chain, so an emptied strands list is not read as none', async () => {
+    // The first chain costs 560, leaving 40: the second chain, 39 of its 40 helices, none of its 15 strands
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, hugeUpstream({ helicesPerChain: [559, 40], strandsPerChain: [0, 15] }));
+    const s = r.structuredContent as { secondaryStructure: { chains: SsChain[] }; truncated: Record<string, string> };
+    expect(s.secondaryStructure.chains[1]).toMatchObject({ chain: 'S001', strands: [] });
+    expect(s.truncated.secondaryStructure).toBe('chain S001: 39 of 40 helices, 0 of 15 strands');
+  });
+
+  it('notes a sequence cut at 2000 residues', async () => {
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB', sections: ['sequence'] }, hugeUpstream({ sequenceLength: 2500 }));
+    const s = r.structuredContent as { sequences: { sequence: string; chainCount: number; chains: string[] }[]; truncated: Record<string, string> };
+    expect(s.sequences[0].sequence).toBe(`${'A'.repeat(2000)}...`);
+    expect(s.sequences[0]).toMatchObject({ chainCount: 300, chains: chainIds(20, 'E0-') });
+    expect(s.truncated.sequences).toBe('first 12 of 30; chains: at most 20 per sequence; residues: at most 2000 per sequence');
+  });
+
+  it('show_structure bounds its structured content the same way', async () => {
+    const r = await showStructure({ kind: 'pdb', id: '4HHB' }, hugeUpstream());
+    expect(r.status).toBe('ok');
+    const s = r.structuredContent as Record<string, unknown>;
+    expect(JSON.stringify(s).length).toBeLessThan(10_000);
+    expect((s.organisms as string[]).length).toBeLessThanOrEqual(10);
+    expect(s.truncated).toMatchObject({ organisms: 'first 10 of 30', ligands: 'first 20 of 80' });
+  });
+
+  it('adds no note for an entry within the limits', async () => {
+    const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, upstream());
+    expect(r.structuredContent).not.toHaveProperty('truncated');
+  });
+});
