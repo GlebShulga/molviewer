@@ -5,7 +5,7 @@
 import { McpServer, type CallToolResult, type ServerContext } from '@modelcontextprotocol/server';
 import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import * as z from 'zod/v4';
-import { APP_COLORS, APP_STYLES, WIDGET_RESOURCE_URI, type AppKind } from '../../../site/appContract';
+import { APP_COLORS, APP_STYLES, WIDGET_META_KEY, WIDGET_RESOURCE_URI, type AppKind, type WidgetError } from '../../../site/appContract';
 import { SITE_ORIGIN } from '../../../site/nav';
 import type { UpstreamOptions } from '../../../site/upstream/types';
 import { findStructures, getStructureDetails, showStructure, type ToolOutcome } from './tools';
@@ -73,11 +73,14 @@ const summarySchema = z.looseObject({
   note: z.string().optional(),
 });
 
-function toResult(o: ToolOutcome): CallToolResult {
+/** `hasWidget`: the tool renders the viewer (show_structure), so its errors are marked for the widget. */
+function toResult(o: ToolOutcome, hasWidget: boolean): CallToolResult {
+  // An error also goes in _meta, where ChatGPT's window.openai fallback can see it
+  const meta = o.isError && hasWidget ? { ...o.meta, [WIDGET_META_KEY]: { error: o.text } satisfies WidgetError } : o.meta;
   return {
     content: [{ type: 'text', text: o.text }],
     ...(o.structuredContent ? { structuredContent: o.structuredContent } : {}),
-    ...(o.meta ? { _meta: o.meta } : {}),
+    ...(meta ? { _meta: meta } : {}),
     ...(o.isError ? { isError: true } : {}),
   };
 }
@@ -95,11 +98,12 @@ export function createServer(
   async function run(tool: string, kind: AppKind | 'any', args: unknown, ctx: ServerContext, fn: () => Promise<ToolOutcome>) {
     const started = Date.now();
     const client = clientOf(ctx);
+    const hasWidget = tool === 'show_structure';
     let outcome: ToolOutcome;
     if (!(await limitCaller(env, ctx))) {
       outcome = { text: RATE_LIMITED_MESSAGE, isError: true, status: 'invalid' };
       recordToolCall(env, { tool, kind, client, status: 'rate_limited', ms: Date.now() - started });
-      return toResult(outcome);
+      return toResult(outcome, hasWidget);
     }
     let cached = false;
     try {
@@ -119,7 +123,7 @@ export function createServer(
       format: cached ? 'cache' : d?.sources,
       scale: d?.words,
     });
-    return toResult(outcome);
+    return toResult(outcome, hasWidget);
   }
 
   server.registerTool(

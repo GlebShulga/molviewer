@@ -5,7 +5,7 @@
  * fallback when a standard call isn't available.
  */
 import { App, PostMessageTransport, type McpUiDisplayMode, type McpUiHostContext } from '@modelcontextprotocol/ext-apps';
-import { readWidgetPayload, type WidgetPayload } from '../../site/appContract';
+import { readWidgetError, readWidgetPayload, type WidgetPayload } from '../../site/appContract';
 
 /** The parts of ChatGPT's `window.openai` the widget uses (all optional: other hosts don't have it). */
 interface OpenAiGlobals {
@@ -84,7 +84,23 @@ export function connectHost(): HostBridge {
     // The same result can arrive twice (MCP Apps notification and window.openai): load it once.
     if (!p || (payload && JSON.stringify(payload) === JSON.stringify(p))) return;
     payload = p;
+    // A structure replaces the last error: a late listener doesn't get it, and the same error later is new again.
+    toolError = null;
     payloadListeners.forEach((cb) => cb(p));
+  };
+  const emitError = (message: string) => {
+    // The same error can arrive twice too, and globals updates repeat it
+    if (toolError === message) return;
+    toolError = message;
+    errorListeners.forEach((cb) => cb(message));
+  };
+  /** ChatGPT's window.openai: it exposes the result's _meta only, so errors carry their text there. */
+  const readOpenAiResult = () => {
+    const meta = window.openai?.toolResponseMetadata;
+    const p = readWidgetPayload(meta);
+    if (p) return emitPayload(p);
+    const error = readWidgetError(meta);
+    if (error) emitError(error);
   };
   const snapshot = (): HostSnapshot => {
     const modes = context.availableDisplayModes;
@@ -102,8 +118,7 @@ export function connectHost(): HostBridge {
     const p = readWidgetPayload(result._meta);
     if (p) return emitPayload(p);
     const text = result.content?.find((c) => c.type === 'text');
-    toolError = text && 'text' in text ? text.text : 'MolViewer could not show this structure.';
-    errorListeners.forEach((cb) => cb(toolError!));
+    emitError(text && 'text' in text ? text.text : 'MolViewer could not show this structure.');
   };
   app.onhostcontextchanged = (changes) => {
     context = { ...context, ...changes };
@@ -123,9 +138,9 @@ export function connectHost(): HostBridge {
     });
 
   // ChatGPT fallback: the result may already be in window.openai, or arrive with a globals update.
-  emitPayload(readWidgetPayload(window.openai?.toolResponseMetadata));
+  readOpenAiResult();
   window.addEventListener('openai:set_globals', () => {
-    if (!payload) emitPayload(readWidgetPayload(window.openai?.toolResponseMetadata));
+    if (!payload) readOpenAiResult();
     emitChange();
   });
 

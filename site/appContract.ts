@@ -119,3 +119,20 @@ export function readWidgetPayload(meta: unknown): WidgetPayload | null {
     (load.kind === 'compound' && typeof load.cid === 'number');
   return okLoad ? (p as WidgetPayload) : null;
 }
+
+/**
+ * Error results carry `_meta[WIDGET_META_KEY] = { error: <message> }`, the same
+ * text as their content: ChatGPT's window.openai gives the widget a result's
+ * _meta but not its text. Additive: a widget that doesn't read it sees no
+ * payload, as before.
+ */
+export interface WidgetError {
+  error: string;
+}
+
+/** The error message an error result carries for the widget, or null. */
+export function readWidgetError(meta: unknown): string | null {
+  if (!meta || typeof meta !== 'object') return null;
+  const e = (meta as Record<string, unknown>)[WIDGET_META_KEY] as Partial<WidgetError> | undefined;
+  return e && typeof e === 'object' && typeof e.error === 'string' && e.error ? e.error : null;
+}

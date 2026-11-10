@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { fixtureFetch } from '../../../site/upstream/__fixtures__/fixtureFetch';
-import { WIDGET_RESOURCE_URI, readWidgetPayload } from '../../../site/appContract';
+import { WIDGET_META_KEY, WIDGET_RESOURCE_URI, readWidgetPayload } from '../../../site/appContract';
 import { createServer, type Env } from './server';
 import worker from './index';
 import { cacheKey, cachedOutcome } from './cache';
@@ -20,6 +20,8 @@ afterEach(async () => {
   await client?.close();
   client = null;
   vi.unstubAllGlobals();
+  // Even when an assertion fails first: a silenced console.error would hide later failures
+  vi.restoreAllMocks();
 });
 
 async function connect(env: Env = {}): Promise<Client> {
@@ -135,6 +137,53 @@ describe('MCP server', () => {
     const result = await c.callTool({ name: 'find_structures', arguments: { query: 'caffeine' } });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result.content)).toContain('busy');
+  });
+});
+
+describe('error results carry their message for the widget', () => {
+  // ChatGPT's window.openai fallback sees only _meta, not the text content
+  const textOf = (result: { content?: unknown }) =>
+    (result.content as { type: string; text: string }[]).find((c) => c.type === 'text')!.text;
+  const markerOf = (result: { _meta?: Record<string, unknown> }) => result._meta?.[WIDGET_META_KEY];
+
+  it('on a tool error', async () => {
+    const c = await connect();
+    const result = await c.callTool({ name: 'show_structure', arguments: { kind: 'pdb', id: 'ZZZ9' } });
+    expect(result.isError).toBe(true);
+    expect(markerOf(result)).toEqual({ error: textOf(result) });
+    expect(textOf(result)).toContain('No PDB entry');
+  });
+
+  it('on a rate-limited call', async () => {
+    const env: Env = { IP_LIMIT: { limit: async () => ({ success: false }) } as unknown as RateLimit };
+    const c = await connect(env);
+    const result = await c.callTool({ name: 'show_structure', arguments: { kind: 'pdb', id: '4HHB' } });
+    expect(markerOf(result)).toEqual({ error: textOf(result) });
+    expect(textOf(result)).toContain('busy');
+  });
+
+  it('on an unexpected failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubGlobal('caches', { default: { match: async () => { throw new Error('cache down'); } } });
+    const c = await connect();
+    const result = await c.callTool({ name: 'show_structure', arguments: { kind: 'pdb', id: '4HHB' } });
+    expect(markerOf(result)).toEqual({ error: textOf(result) });
+    expect(textOf(result)).toContain('unexpected error');
+  });
+
+  it('not on an error from a tool without a widget', async () => {
+    const c = await connect();
+    const result = await c.callTool({ name: 'get_structure_details', arguments: { kind: 'pdb', id: 'ZZZ9' } });
+    expect(result.isError).toBe(true);
+    expect(textOf(result)).toContain('No PDB entry');
+    expect(markerOf(result)).toBeUndefined();
+  });
+
+  it('not on a result that shows a structure', async () => {
+    const c = await connect();
+    const result = await c.callTool({ name: 'show_structure', arguments: { kind: 'pdb', id: '4HHB' } });
+    expect(readWidgetPayload(result._meta)).not.toBeNull();
+    expect(markerOf(result)).not.toHaveProperty('error');
   });
 });
 
