@@ -3,7 +3,7 @@ import type { ContentPage } from '../types';
 export const page: ContentPage = {
   path: '/about',
   kind: 'about',
-  updated: '2026-10-02',
+  updated: '2026-11-10',
   title: 'About MolViewer: License, Citation, Privacy | MolViewer',
   description:
     'MolViewer is a free, open-source 3D molecule viewer that runs in your browser with no install. Who builds it, the MIT license, how to cite it, and privacy.',
@@ -36,7 +36,7 @@ export const page: ContentPage = {
         `<li>Files you open from your computer are processed on your device and never leave it, except when you choose to create a share link for a scene that includes a small local file. That file is then stored with the link so others can open it.</li>` +
         `<li>Saved sessions and preferences stay in your browser storage.</li>` +
         `<li>We use Cloudflare Web Analytics for anonymous product analytics. It does not use cookies or build personal profiles.</li>` +
-        `<li>If the app hits an error, a short error report (the message, the page address and your browser version) is sent to New Relic so the bug can be fixed.</li>` +
+        `<li>If the app hits an error, a short error report (the message, the page address and your browser version) is passed through our server to New Relic, which never sees your IP address, so the bug can be fixed.</li>` +
         `</ul>` +
         `<p>The full <a href="/privacy">privacy policy</a> also covers anonymous usage counts and the MolViewer app for ChatGPT and Claude. See also the <a href="/terms">terms of use</a>, and <a href="/support">support</a> for questions.</p>`,
     },

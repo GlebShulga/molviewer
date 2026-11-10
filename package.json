@@ -21,7 +21,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && vite build --config vite.widget.config.ts",
+    "build": "tsc -b && vite build && vite build --config vite.widget.config.ts && tsx scripts/check-bundle-secrets.ts",
     "build:widget": "vite build --config vite.widget.config.ts",
     "preview": "vite preview",
     "lint": "eslint .",

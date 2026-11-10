@@ -19,7 +19,6 @@ const BASE_DIRECTIVES: Record<string, string> = {
     'https://data.rcsb.org',
     'https://alphafold.ebi.ac.uk',
     'https://pubchem.ncbi.nlm.nih.gov',
-    'https://log-api.eu.newrelic.com',
     'https://cloudflareinsights.com',
   ].join(' '),
   'img-src': "'self' data: blob:",

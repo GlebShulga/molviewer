@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_NEW_RELIC_LICENSE_KEY: string;
+  /** 'off' turns error reporting off in a production build (the widget build sets it). */
+  readonly VITE_ERROR_REPORTING?: string;
 }
 
 interface ImportMeta {

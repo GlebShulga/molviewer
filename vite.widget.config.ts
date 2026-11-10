@@ -15,8 +15,9 @@ export default defineConfig({
   plugins: [react()],
   base: './',
   define: {
-    // No error reporting from the widget (keeps New Relic out of its CSP and privacy scope).
-    'import.meta.env.VITE_NEW_RELIC_LICENSE_KEY': '""',
+    // No error reporting from the widget: it runs on the chat host's origin,
+    // where /api/log doesn't exist, and it keeps New Relic out of its privacy scope.
+    'import.meta.env.VITE_ERROR_REPORTING': '"off"',
   },
   build: {
     outDir: 'dist/widget/v1',

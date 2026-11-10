@@ -3,6 +3,7 @@
  * must never break or slow down the app. Disabled in development and tests.
  */
 import { CROSS_ORIGIN_EVENTS, pageKind, type EventName, type EventProps, type EventPayload } from '../../site/events';
+import { beacon } from './beacon';
 
 export type { EventName, EventProps };
 
@@ -47,14 +48,7 @@ export function track(event: EventName, props?: EventProps): void {
     const payload: EventPayload = { e: event, p: props, page: config.page ?? pageKind(window.location.pathname) };
     const body = JSON.stringify(payload);
     // Same origin: JSON. Cross-origin: text/plain, a "simple" request that needs no CORS preflight.
-    const type = sameOrigin ? 'application/json' : 'text/plain';
-    if (navigator.sendBeacon?.(config.endpoint, new Blob([body], { type }))) return;
-    void fetch(config.endpoint, {
-      method: 'POST',
-      headers: { 'content-type': type },
-      body,
-      keepalive: true,
-    }).catch(() => {});
+    beacon(config.endpoint, body, sameOrigin ? 'application/json' : 'text/plain');
   } catch {
     // Tracking is best effort.
   }

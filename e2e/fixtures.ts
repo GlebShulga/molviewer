@@ -3,7 +3,8 @@ import { test as base } from '@playwright/test';
 // Custom test fixture with one-time storage clearing
 export const test = base.extend({
   // CI runs these tests against production (BASE_URL): keep them out of its
-  // analytics, both Cloudflare Web Analytics and the product events. Answered
+  // analytics, both Cloudflare Web Analytics and the product events, and out
+  // of the error log (production builds report errors to /api/log). Answered
   // rather than aborted: an aborted request logs a console error, and some
   // tests fail on those.
   context: async ({ context }, use) => {
@@ -11,6 +12,7 @@ export const test = base.extend({
       route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
     );
     await context.route('**/api/event', (route) => route.fulfill({ status: 204 }));
+    await context.route('**/api/log', (route) => route.fulfill({ status: 204 }));
     await use(context);
   },
 

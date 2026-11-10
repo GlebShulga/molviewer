@@ -10,17 +10,18 @@ let fetchMock: ReturnType<typeof vi.fn>;
 /** Listeners each fresh reporter adds to window, removed after the test. */
 let added: [string, EventListenerOrEventListenerObject][] = [];
 
-/** The module reads its license key at import, so each test imports it fresh. */
+/** The module reads whether it's enabled at import, so each test imports it fresh. */
 async function loadReporter() {
   vi.resetModules();
   return import('../errorReporter');
 }
 
-/** Everything sent so far, without moving the clock. */
+/**
+ * Everything sent so far, without moving the clock. jsdom has no
+ * navigator.sendBeacon, so every batch goes through the fetch fallback.
+ */
 function logsSoFar(): SentLog[] {
-  return fetchMock.mock.calls.flatMap(([, init]) =>
-    (JSON.parse((init as RequestInit).body as string) as { logs: SentLog[] }[]).flatMap((p) => p.logs)
-  );
+  return fetchMock.mock.calls.flatMap(([, init]) => JSON.parse((init as RequestInit).body as string) as SentLog[]);
 }
 
 /** Everything sent so far, after the pending flush timer has run (moves the clock 10 s). */
@@ -43,7 +44,7 @@ function hideTab() {
 describe('errorReporter', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.stubEnv('VITE_NEW_RELIC_LICENSE_KEY', 'test-key');
+    vi.stubEnv('PROD', true);
     fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 202 })));
     vi.stubGlobal('fetch', fetchMock);
     const add = window.addEventListener.bind(window);
@@ -151,10 +152,89 @@ describe('errorReporter', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('sends nothing without a license key', async () => {
-    vi.stubEnv('VITE_NEW_RELIC_LICENSE_KEY', '');
+  it('sends nothing when reporting is off', async () => {
+    vi.stubEnv('VITE_ERROR_REPORTING', 'off');
     const { logError } = await loadReporter();
     logError(errorAt('x', 1));
     expect(sentLogs()).toHaveLength(0);
+  });
+
+  it('sends nothing outside production builds', async () => {
+    vi.stubEnv('PROD', false);
+    const { logError } = await loadReporter();
+    logError(errorAt('x', 1));
+    expect(sentLogs()).toHaveLength(0);
+  });
+
+  it('posts the plain entries to /api/log, with no key, each with the page address', async () => {
+    const { logError } = await loadReporter();
+    logError(errorAt('a', 1), { source: 'test' });
+    logError(errorAt('b', 2));
+    const logs = sentLogs();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/log');
+    expect(Object.keys(init.headers as Record<string, string>).map((h) => h.toLowerCase())).not.toContain('api-key');
+    expect(logs).toHaveLength(2);
+    for (const l of logs) expect(l.attributes.url).toBe(window.location.href);
+    expect(logs[0].attributes.source).toBe('test');
+  });
+
+  it('sends by plain fetch while the page stays open, never touching the beacon budget', async () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { sendBeacon: beacon }));
+    const { logError } = await loadReporter();
+    // A burst that fills two full batches in one tick: in a browser the
+    // second beacon would be refused (one 64 KB budget per page).
+    for (let i = 0; i < 12; i++) {
+      const err = new Error(`burst ${i}`);
+      err.stack = `${i}`.repeat(4_000);
+      logError(err, { componentStack: `c${i}`.repeat(2_000) });
+    }
+    expect(sentLogs()).toHaveLength(12);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+    for (const [, init] of fetchMock.mock.calls) expect((init as RequestInit).keepalive).toBeUndefined();
+    expect(beacon).not.toHaveBeenCalled();
+  });
+
+  it('sends the last batch as a beacon when the tab is hidden, and by keepalive fetch if it refuses', async () => {
+    const beacon = vi.fn(() => true);
+    vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { sendBeacon: beacon }));
+    const { logError, initErrorReporter } = await loadReporter();
+    initErrorReporter();
+    logError(errorAt('a', 1));
+    hideTab();
+    expect(beacon).toHaveBeenCalledWith('/api/log', expect.any(Blob));
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    beacon.mockReturnValue(false);
+    logError(errorAt('b', 2));
+    hideTab();
+    expect(logsSoFar().map((l) => l.message)).toEqual(['b']);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).keepalive).toBe(true);
+  });
+
+  it('cuts a long stack to 4000 characters', async () => {
+    const { logError } = await loadReporter();
+    const err = new Error('deep');
+    err.stack = 's'.repeat(10_000);
+    logError(err);
+    expect(sentLogs()[0].attributes['error.stack']).toHaveLength(4_000);
+  });
+
+  it('splits big batches by size, each request under 64 KB', async () => {
+    const { logError } = await loadReporter();
+    // Ten different errors (repeats of one would be merged into one entry)
+    for (let i = 0; i < 10; i++) {
+      const err = new Error(`big ${i}`);
+      err.stack = `${i}`.repeat(5_000);
+      logError(err, { componentStack: `c${i}`.repeat(3_000) });
+    }
+    const logs = sentLogs();
+    expect(logs).toHaveLength(10);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(1);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new TextEncoder().encode((init as RequestInit).body as string).byteLength).toBeLessThan(65_536);
+    }
   });
 });

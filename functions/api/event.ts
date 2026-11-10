@@ -12,6 +12,7 @@
  *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms)
  */
 import { CROSS_ORIGIN_EVENTS, isEventName, isPageKind, NUMBER_FIELDS, STRING_FIELDS, type EventPayload } from '../../site/events';
+import { isCrossOrigin } from '../../site/http/isCrossOrigin';
 import { readLimited } from '../../site/http/readLimited';
 
 interface Env {
@@ -26,12 +27,6 @@ const MAX_BODY = 2048;
  * request with no preflight; OPTIONS is answered anyway for fetch() callers.
  */
 const CORS = { 'access-control-allow-origin': '*' };
-
-/** A missing Origin header counts as same-origin: older browsers omit it on same-origin beacons. */
-function isCrossOrigin(request: Request): boolean {
-  const origin = request.headers.get('origin');
-  return !!origin && origin !== new URL(request.url).origin;
-}
 
 function str(value: unknown): string {
   return typeof value === 'string' ? value.slice(0, 96) : '';
