@@ -774,6 +774,13 @@ describe('large entries', () => {
     expect(s.truncated).toMatchObject({ organisms: 'first 10 of 30', ligands: 'first 20 of 80' });
   });
 
+  it('show_structure names a few chains per entity in its facts, not all of them', async () => {
+    const r = await showStructure({ kind: 'pdb', id: '4HHB' }, hugeUpstream());
+    expect(r.text.length).toBeLessThan(4_000);
+    expect(r.text).toContain('E0-19, and 280 more');
+    expect(r.text).not.toContain('E0-20');
+  });
+
   it('adds no note for an entry within the limits', async () => {
     const r = await getStructureDetails({ kind: 'pdb', id: '4HHB' }, upstream());
     expect(r.structuredContent).not.toHaveProperty('truncated');

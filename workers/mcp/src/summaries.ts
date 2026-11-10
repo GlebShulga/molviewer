@@ -177,6 +177,12 @@ export function assemblyNote(d: Pick<PdbDetails, 'assembly' | 'polymerChainCount
   );
 }
 
+/** "A, B, C" for a few chains; a capsid's hundreds end in "..., and 280 more". */
+function chainList(ids: string[]): string {
+  if (ids.length <= MAX_CHAIN_IDS) return ids.join(', ');
+  return `${ids.slice(0, MAX_CHAIN_IDS).join(', ')}, and ${ids.length - MAX_CHAIN_IDS} more`;
+}
+
 /**
  * One-paragraph facts for the tool's text content. Models tend to stay silent
  * after a widget renders unless the text gives them something to say, so the
@@ -192,7 +198,7 @@ export function pdbFacts(d: PdbDetails): string {
   ].filter(Boolean);
   const chains = d.entities
     .slice(0, MAX_ENTITIES)
-    .map((e) => `${e.description ? toSentenceCase(e.description) : `entity ${e.entityId}`} (chain${e.chainIds.length > 1 ? 's' : ''} ${e.chainIds.join(', ')})`)
+    .map((e) => `${e.description ? toSentenceCase(e.description) : `entity ${e.entityId}`} (chain${e.chainIds.length > 1 ? 's' : ''} ${chainList(e.chainIds)})`)
     .join('; ');
   const ligands = d.ligands
     .slice(0, 6)
