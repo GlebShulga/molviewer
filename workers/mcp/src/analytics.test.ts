@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { recordToolCall } from './analytics';
+import { SCHEMA_VERSION } from '../../../site/events';
 import type { Env } from './server';
 
 describe('recordToolCall', () => {
@@ -18,8 +19,8 @@ describe('recordToolCall', () => {
     expect(a.blobs?.[7]).toBe('mcp'); // blob8
     expect(a.blobs?.[8]).toBe(''); // blob9
     expect(a.blobs?.[9]).toBe('prod'); // blob10
-    expect(a.blobs?.[14]).toBe('2'); // blob15
+    expect(a.blobs?.[14]).toBe(SCHEMA_VERSION); // blob15
     expect(a.blobs).toHaveLength(16);
-    expect(a.doubles).toEqual([2, 0.25, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(a.doubles).toEqual([2, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 });

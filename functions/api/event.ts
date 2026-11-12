@@ -5,14 +5,20 @@
  * Layout of each data point, used when querying with the SQL API
  * (see scripts/query-events.ts):
  *   index1  = session id (a UUID from the client; a new random one otherwise).
- *             Analytics Engine samples by index, so a session is kept or dropped whole.
+ *             Analytics Engine samples by index, and within a busy session it
+ *             drops some rows at write time, giving the kept ones a larger
+ *             _sample_interval (28 of 448 rows on 12 Nov 2026); whole sessions
+ *             are not known to be dropped. Per-session questions read the
+ *             running totals (double11..double14), not a session's own rows.
  *   blob1   = event name
  *   blob2.. = STRING_FIELDS in order (source, entry, format, kind, ref, value)
  *   blob8   = page kind (PAGE_KINDS: home, pdb, af, compound, share, embed, widget, other; '' otherwise)
  *   blob9   = country (from Cloudflare)
  *   blob10..blob16 = CONTEXT_FIELDS (env, device, entry_page, ref_type, version, schema, detail)
  *   double1.. = NUMBER_FIELDS in order (scale, seconds, atoms, seq, elapsed,
- *             duration, kb, asn, webdriver, user); asn comes from Cloudflare, never the client
+ *             duration, kb, asn, webdriver, user, then the session's running
+ *             samples, real_loads, pickers, failures from schema 3); asn comes
+ *             from Cloudflare, never the client
  * Events from before schema 2 have index1 = event name and blobs 10+ empty.
  */
 import {

@@ -9,6 +9,7 @@
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --app [days=7]
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --search [days=7]
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --styles [days=7]
+ *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --funnel [days=7]
  * The token can also come from .env (CF_API_TOKEN_ANALYTICS_READ), which tsx
  * doesn't read by itself: `pnpm exec tsx --env-file=.env scripts/query-events.ts ...`.
  *
@@ -28,6 +29,13 @@
  * Stick. Touch screens and desktops are counted together. Size "?" is events
  * from before sizes were recorded.
  *
+ * --funnel sorts the site's sessions (schema 3, real browsers off cloud
+ * networks) into the activation buckets: own structure only, example then own
+ * structure, opened the file picker without loading their own, examples only,
+ * nothing loaded by hand. It reads the running totals, not the load events:
+ * Analytics Engine drops some rows within busy sessions at write time, so
+ * counting a session's own events can miss its one real load.
+ *
  * Every query here counts production traffic only (PROD): events from preview
  * deployments and from the owner's browsers (?internal=1) are left out. Events
  * from before schema 2 have no environment and are kept. A --sql query gets no
@@ -41,8 +49,11 @@
  * blob8 = page kind, blob9 = country,
  * blob10..blob16 = env, device, entry_page, ref_type, version, schema, detail (schema 2),
  * double1 = scale, double2 = seconds, double3 = atoms,
- * double4..double10 = seq, elapsed, duration, kb, asn, webdriver, user (schema 2).
+ * double4..double10 = seq, elapsed, duration, kb, asn, webdriver, user (schema 2),
+ * double11..double14 = the session's running samples, real_loads, pickers, failures (schema 3).
  */
+
+import { funnelBuckets } from './funnel';
 
 const accountId = process.env.CF_ACCOUNT_ID;
 const token = process.env.CF_API_TOKEN ?? process.env.CF_API_TOKEN_ANALYTICS_READ;
@@ -160,8 +171,43 @@ async function printStyles(): Promise<void> {
   console.table(events.data ?? events);
 }
 
+/**
+ * Cloud and hosting networks: browsers there are almost always automation.
+ * AWS, Google Cloud, Contabo, Alibaba, Tencent, DigitalOcean, Hetzner, OVH.
+ * Microsoft (8075) is left out on purpose: it would also drop corporate users.
+ * Written as floats in the SQL: the SQL API refuses to compare a double column with integers in IN.
+ */
+const CLOUD_ASNS = [16509, 14618, 396982, 51167, 40021, 45102, 132203, 14061, 24940, 16276];
+
+/**
+ * One row per session on the site itself, from schema 3 on, its funnel read
+ * from the running totals every event carries (double11..double14). The max
+ * over a session's rows is its final state even when Analytics Engine dropped
+ * some of them at write time, which it does within busy sessions. Each
+ * session counts once: whole sessions are not known to be dropped.
+ *
+ * - samples_at_first_real: the samples count on the first row with a real
+ *   load, for the order of the two (the SQL API has no minIf). If that very
+ *   row was dropped, the next one stands in.
+ * - Embeds run the app on other sites (page kind 'embed'): not site sessions.
+ * - Schema 3 and later as "not '' (before schema 2) and not '2'": the SQL API's
+ *   toUInt32(blob15) doesn't compare as a number.
+ */
+const FUNNEL_SQL = `SELECT index1 AS session, MAX(double11) AS samples, MAX(double12) AS real_loads,
+       MAX(double13) AS pickers, MAX(double14) AS failures,
+       MIN(if(double12 > 0, double11, 1000000.0)) AS samples_at_first_real
+       FROM molviewer_events
+       WHERE ${SINCE} AND blob10 = 'prod' AND blob15 NOT IN ('', '2')
+         AND blob8 NOT IN ('mcp', 'widget', 'embed')
+         AND double9 = 0 AND double8 NOT IN (${CLOUD_ASNS.map((asn) => `${asn}.0`).join(', ')})
+       GROUP BY session
+       FORMAT JSON`;
+
 if (args.includes('--styles')) {
   await printStyles();
+} else if (args.includes('--funnel')) {
+  const result = await query(FUNNEL_SQL);
+  console.table(funnelBuckets(result.data ?? []));
 } else {
   const sql =
     sqlIndex >= 0

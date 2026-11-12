@@ -39,7 +39,7 @@ describe('tracking sessions', () => {
     expect(start.sid).toMatch(UUID);
     expect(png.sid).toBe(start.sid);
     expect([start.p?.seq, png.p?.seq]).toEqual([1, 2]);
-    expect(png.p).toMatchObject({ schema: '2', device: 'desktop', entry_page: 'home', ref_type: 'direct', webdriver: 0 });
+    expect(png.p).toMatchObject({ schema: '3', device: 'desktop', entry_page: 'home', ref_type: 'direct', webdriver: 0 });
   });
 
   it('keeps counting across a full page load in the same tab, with no second session_start', () => {
@@ -123,7 +123,7 @@ describe('tracking sessions', () => {
     const [view, open] = sent();
     expect(view.sid).toMatch(UUID);
     expect(open.sid).not.toBe(view.sid);
-    expect(view.p).toMatchObject({ env: 'prod', schema: '2' });
+    expect(view.p).toMatchObject({ env: 'prod', schema: '3' });
     expect(view.p).not.toHaveProperty('device');
     expect(view.p).not.toHaveProperty('entry_page');
     expect(view.p).not.toHaveProperty('seq');
@@ -137,6 +137,59 @@ describe('tracking sessions', () => {
     document.dispatchEvent(new Event('visibilitychange'));
     hidden.mockRestore();
     expect(sent().filter((e) => e.e === 'session_hidden')).toHaveLength(2);
+  });
+});
+
+describe('session totals', () => {
+  beforeEach(() => {
+    vi.stubEnv('DEV', false);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    sessionStorage.clear();
+    localStorage.clear();
+    beacon.mockClear();
+    resetTrackingForTests();
+    configureTracking({ endpoint: '/api/event' });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('carry the running funnel on every event, this event included', () => {
+    startTrackingSession();
+    track('structure_loaded', { source: 'rcsb', user: 0 }); // landing auto-load: not counted
+    track('structure_loaded', { source: 'rcsb', user: 1, value: 'welcome_example' }); // an example
+    track('file_picker_opened', { value: 'dialog' });
+    track('structure_load_failed', { source: 'file', user: 1, detail: 'parse' });
+    track('structure_loaded', { source: 'file', user: 1 });
+    track('export_png');
+    const totals = sent().map((e) => [e.e, e.p?.samples, e.p?.real_loads, e.p?.pickers, e.p?.failures]);
+    expect(totals).toEqual([
+      ['session_start', 0, 0, 0, 0],
+      ['structure_loaded', 0, 0, 0, 0],
+      ['structure_loaded', 1, 0, 0, 0],
+      ['file_picker_opened', 1, 0, 1, 0],
+      ['structure_load_failed', 1, 0, 1, 1],
+      ['structure_loaded', 1, 1, 1, 1],
+      ['export_png', 1, 1, 1, 1],
+    ]);
+    expect(sent()[0].p?.schema).toBe('3');
+  });
+
+  it('keep counting across a full page load in the same tab', () => {
+    startTrackingSession();
+    track('structure_loaded', { source: 'sample', user: 1 });
+    resetTrackingForTests();
+    beacon.mockClear();
+    startTrackingSession();
+    track('structure_loaded', { source: 'saved', user: 1 });
+    expect(sent()[0].p).toMatchObject({ samples: 1, real_loads: 1 });
+  });
+
+  it('are not sent by the widget, which has no session', () => {
+    configureTracking({ endpoint: 'https://molviewer.bio/api/event', page: 'widget' });
+    track('widget_view');
+    expect(sent()[0].p).not.toHaveProperty('samples');
   });
 });
 

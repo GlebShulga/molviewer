@@ -20,7 +20,7 @@ describe('/api/event', () => {
   it('stores the numeric fields in order, atoms third', async () => {
     const { res, points } = post(JSON.stringify({ e: 'representation_changed', p: { value: 'spacefill', atoms: 4800 } }));
     await res;
-    expect((points[0] as { doubles: number[] }).doubles).toEqual([0, 0, 4800, 0, 0, 0, 0, 0, 0, 0]);
+    expect((points[0] as { doubles: number[] }).doubles).toEqual([0, 0, 4800, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
   it('appends the schema 2 fields after page kind and country, and the numbers after atoms', async () => {
@@ -47,6 +47,10 @@ describe('/api/event', () => {
           asn: 99999,
           webdriver: 0,
           user: 1,
+          samples: 2,
+          real_loads: 1,
+          pickers: 1,
+          failures: 0,
         },
       })
     );
@@ -58,7 +62,8 @@ describe('/api/event', () => {
     expect(p.blobs[7]).toBe('pdb'); // blob8: page kind, unmoved
     expect(p.blobs.slice(9)).toEqual(['prod', 'mobile', 'learn', 'search', 'abc1234', '2', 'x']);
     // asn (double8) comes from Cloudflare, never from the client: none in this test
-    expect(p.doubles).toEqual([0, 0, 4800, 3, 1200, 450, 12, 0, 0, 1]);
+    // Then the session totals (double11..double14)
+    expect(p.doubles).toEqual([0, 0, 4800, 3, 1200, 450, 12, 0, 0, 1, 2, 1, 1, 0]);
   });
 
   it('uses a new random id when the session id is not a UUID', async () => {

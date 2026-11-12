@@ -85,6 +85,18 @@ export const NUMBER_FIELDS = [
   'webdriver',
   /** 1 when a person started the load in this tab, 0 for an automatic load from the URL. */
   'user',
+  // Schema 3, double11..double14: the session's running totals, this event
+  // included (src/utils/track.ts). They only grow, so a session's funnel is
+  // the max over its rows: Analytics Engine drops some rows of a busy session
+  // at write time, and any later row still carries what they counted.
+  /** Built-in examples a person loaded: sidebar samples, welcome and empty-state examples, the tour. */
+  'samples',
+  /** Structures a person loaded that are not examples: files, RCSB/AlphaFold/PubChem lookups, Saved entries. */
+  'real_loads',
+  /** file_picker_opened events. */
+  'pickers',
+  /** Loads a person started that failed. */
+  'failures',
 ] as const;
 
 /**
@@ -108,7 +120,13 @@ export const CONTEXT_FIELDS = [
   'detail',
 ] as const;
 
-export const SCHEMA_VERSION = '2';
+/** '2': sessions and load outcomes. '3': also the session totals (double11..double14). */
+export const SCHEMA_VERSION = '3';
+
+/** `value` of the example loads that count as samples, not as a person's own structure. */
+export const EXAMPLE_LOADS: ReadonlySet<string> = new Set(['welcome_example', 'empty_example']);
+/** Load sources that are a person's own structure (unless an example). */
+export const REAL_LOAD_SOURCES: ReadonlySet<string> = new Set(['file', 'rcsb', 'pubchem', 'af', 'saved']);
 
 export type EventProps = Partial<
   Record<(typeof STRING_FIELDS)[number] | (typeof CONTEXT_FIELDS)[number], string> &

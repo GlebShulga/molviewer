@@ -44,5 +44,7 @@ describe('the data point layout', () => {
     expect(1 + STRING_FIELDS.length + 2 + CONTEXT_FIELDS.indexOf('detail') + 1).toBe(16); // blob16
     expect(NUMBER_FIELDS.indexOf('asn') + 1).toBe(8); // double8
     expect(NUMBER_FIELDS.indexOf('user') + 1).toBe(10); // double10
+    expect(NUMBER_FIELDS.indexOf('samples') + 1).toBe(11); // double11
+    expect(NUMBER_FIELDS.indexOf('failures') + 1).toBe(14); // double14
   });
 });

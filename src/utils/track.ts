@@ -4,7 +4,7 @@
  *
  * Sessions (schema 2): the site's events of one browser tab share a random id
  * kept in sessionStorage under SESSION_KEY, with the entry page, the referring
- * host, the start time and an event counter. The static pages write the first
+ * host, the start time, an event counter and the funnel totals (schema 3). The static pages write the first
  * three (public/entry.js); the app adds the rest in startTrackingSession(),
  * called once from src/main.tsx. The chat widget never calls it: its events get
  * a new id each and carry no device or entry. A visitor can turn all of this
@@ -13,7 +13,9 @@
 import {
   CROSS_ORIGIN_EVENTS,
   entryPageKind,
+  EXAMPLE_LOADS,
   pageKind,
+  REAL_LOAD_SOURCES,
   SCHEMA_VERSION,
   type EventName,
   type EventProps,
@@ -71,6 +73,35 @@ interface SessionRecord {
   id?: string;
   /** Events sent so far. */
   seq?: number;
+  /** Running totals for the funnel, sent with every event (sessionTotals). */
+  totals?: SessionTotals;
+}
+
+type SessionTotals = Record<'samples' | 'real_loads' | 'pickers' | 'failures', number>;
+
+const NO_TOTALS: SessionTotals = { samples: 0, real_loads: 0, pickers: 0, failures: 0 };
+
+/**
+ * The session's totals after `event`: a person's loads split into examples
+ * and their own structures, file picker openings and failed loads. Sent with
+ * every event, so the funnel survives rows Analytics Engine drops.
+ */
+export function sessionTotals(before: SessionTotals, event: EventName, props: EventProps): SessionTotals {
+  const t = { ...before };
+  if (event === 'file_picker_opened') t.pickers += 1;
+  if (props.user !== 1) return t;
+  if (event === 'structure_load_failed') t.failures += 1;
+  if (event === 'structure_loaded') {
+    if (props.source === 'sample' || EXAMPLE_LOADS.has(props.value ?? '')) t.samples += 1;
+    else if (REAL_LOAD_SOURCES.has(props.source ?? '')) t.real_loads += 1;
+  }
+  return t;
+}
+
+function readTotals(value: unknown): SessionTotals {
+  const v = (value ?? {}) as Partial<Record<keyof SessionTotals, unknown>>;
+  const n = (x: unknown) => (typeof x === 'number' && x >= 0 ? x : 0);
+  return { samples: n(v.samples), real_loads: n(v.real_loads), pickers: n(v.pickers), failures: n(v.failures) };
 }
 
 /** Whether startTrackingSession() ran: only the site's own pages have a session. */
@@ -85,7 +116,14 @@ function readSession(): SessionRecord | null {
     if (!raw) return memorySession;
     const r = JSON.parse(raw) as Partial<SessionRecord> | null;
     if (!r || typeof r.entry !== 'string' || typeof r.start !== 'number') return memorySession;
-    return { entry: r.entry, ref: typeof r.ref === 'string' ? r.ref : '', start: r.start, id: r.id, seq: r.seq };
+    return {
+      entry: r.entry,
+      ref: typeof r.ref === 'string' ? r.ref : '',
+      start: r.start,
+      id: r.id,
+      seq: r.seq,
+      totals: readTotals(r.totals),
+    };
   } catch {
     return memorySession;
   }
@@ -245,7 +283,7 @@ export function startTrackingSession(): void {
 }
 
 /** The fields every event carries, and the session id. */
-function context(): { sid: string; props: EventProps } {
+function context(event: EventName, eventProps: EventProps): { sid: string; props: EventProps } {
   const props: EventProps = {
     env: environment(),
     version: String(import.meta.env.VITE_APP_VERSION ?? ''),
@@ -258,6 +296,7 @@ function context(): { sid: string; props: EventProps } {
   const r = readSession() ?? { entry: ENTRY_PATH, ref: referrerHost(document.referrer), start: Date.now() };
   if (!r.id) r.id = newSessionId();
   r.seq = (typeof r.seq === 'number' && r.seq >= 0 ? r.seq : 0) + 1;
+  r.totals = sessionTotals(r.totals ?? NO_TOTALS, event, eventProps);
   writeSession(r);
   return {
     sid: r.id,
@@ -268,6 +307,7 @@ function context(): { sid: string; props: EventProps } {
       ref_type: referrerType(r.ref, window.location.hostname),
       seq: r.seq,
       elapsed: Math.max(0, Date.now() - r.start),
+      ...r.totals,
     },
   };
 }
@@ -285,7 +325,7 @@ export function track(event: EventName, props?: EventProps): void {
       forgetSession();
       return;
     }
-    const { sid, props: ctx } = context();
+    const { sid, props: ctx } = context(event, props ?? {});
     const payload: EventPayload = { e: event, p: { ...props, ...ctx }, page: config.page ?? pageKind(window.location.pathname), sid };
     const body = JSON.stringify(payload);
     // Same origin: JSON. Cross-origin: text/plain, a "simple" request that needs no CORS preflight.
