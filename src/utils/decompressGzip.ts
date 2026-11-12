@@ -25,7 +25,8 @@ export async function decompressGzip(data: ArrayBuffer, maxBytes = MAX_DECOMPRES
     if (total > maxBytes) {
       await reader.cancel();
       throw new FileValidationError(
-        `This file is too large once decompressed (over ${Math.round(maxBytes / (1024 * 1024))} MB).`
+        `This file is too large once decompressed (over ${Math.round(maxBytes / (1024 * 1024))} MB).`,
+        'too_large'
       );
     }
     chunks.push(value);

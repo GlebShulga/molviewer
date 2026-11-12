@@ -9,13 +9,22 @@
  * would let the sync fire while the real load is still in flight.
  */
 import { useEffect } from 'react';
-import { applySceneLoad, beginSceneLoad, finishSceneLoad, isCurrentSceneLoad, useMoleculeStore, type SceneLoadToken } from '../store/moleculeStore';
+import {
+  applySceneLoad,
+  beginSceneLoad,
+  finishSceneLoad,
+  isCurrentSceneLoad,
+  notAppliedReason,
+  useMoleculeStore,
+  type SceneLoadToken,
+} from '../store/moleculeStore';
 import { useUrlSyncStore } from '../store/urlSyncStore';
 import { getInitialUrlLoad, parseViewParams, type UrlMoleculeParams } from '../utils/urlParams';
 import { loadSharedSession, deserializeShareableSession } from '../utils/shareSession';
 import { loadStructureFromSource, resolvePubchemCid } from '../utils/structureLoader';
 import { cidForSlug, slugForCid } from '../../site/compoundSlugs';
-import { entryKind, roundAtoms, track } from '../utils/track';
+import { track } from '../utils/track';
+import { startLoad, type LoadSource } from '../utils/loadTracking';
 import { colorToShow, styleFallbackMessage, styleToShow } from '../utils/representationAvailability';
 import { showToast } from '../utils/toast';
 import type { StructureSource } from '../types';
@@ -63,41 +72,63 @@ function trackSource(source: StructureSource): string {
   return source.type === 'alphafold' ? 'af' : source.type === 'inline' ? 'file' : source.type;
 }
 
+const LOAD_SOURCE: Record<Exclude<UrlMoleculeParams['source'], 'share'>, LoadSource> = {
+  rcsb: 'rcsb',
+  alphafold: 'af',
+  pubchem: 'pubchem',
+};
+
 /**
  * Loads one structure from parsed URL params and adds it to the store. Shared
  * by the startup load below and the example links on the welcome screen
- * (src/App.tsx), so both report the same event. Everything that belongs to the
+ * (src/App.tsx), so both report the same events. Everything that belongs to the
  * startup load only (view params, embed tracking, the initial-load gate) stays
  * at the call site.
  *
  * The structure is added through the token (applySceneLoad): nothing is
- * added once a later Replace load has applied, and the caller then shows
- * nothing either.
+ * added once a later Replace load has applied, or when the store refuses it
+ * (the structure limit), and the caller then shows nothing either.
  */
 export async function loadStructureFromParams(
   params: UrlMoleculeParams,
   signal: AbortSignal,
-  /** Goes into the event's `value`, to tell example clicks from URL loads. */
-  via: string | undefined,
-  token: SceneLoadToken
+  token: SceneLoadToken,
+  start: {
+    /** True for an example click, false for the automatic load from the URL. */
+    userInitiated: boolean;
+    /** Goes into the events' `value`, to tell example clicks from URL loads. */
+    via?: string;
+  }
 ): Promise<{ structId: string | null; source: StructureSource; warning?: string }> {
-  const store = useMoleculeStore.getState();
-  const source = await toSource(params, signal);
-  const { molecule, name, warning } = await loadStructureFromSource(source, signal);
-  if (signal.aborted) return { structId: null, source };
-
-  // '' when the store refused it (the structure limit), which marks nothing
-  let structId = null as string | null;
-  applySceneLoad(token, () => (structId = store.addStructure(molecule, name, source)) !== '');
-  // Still null: a later Replace load applied meanwhile, nothing was added
-  if (structId === null) return { structId: null, source };
-  track('structure_loaded', {
-    source: trackSource(source),
-    entry: entryKind(),
-    atoms: roundAtoms(molecule.atoms.length),
-    ...(via ? { value: via } : {}),
+  const attempt = startLoad({
+    source: params.source === 'share' ? 'share' : LOAD_SOURCE[params.source],
+    userInitiated: start.userInitiated,
+    via: start.via,
   });
-  return { structId, source, warning };
+  // One try around the whole load, adding to the store included (applySceneLoad
+  // passes on what addStructure throws): every started load reports an outcome
+  try {
+    const source = await toSource(params, signal);
+    const { molecule, name, warning } = await loadStructureFromSource(source, signal);
+    if (signal.aborted) {
+      attempt.cancelled('aborted');
+      return { structId: null, source };
+    }
+
+    let structId = '';
+    if (!applySceneLoad(token, () => (structId = useMoleculeStore.getState().addStructure(molecule, name, source)) !== '')) {
+      // A later Replace load applied meanwhile, or the store refused it ('')
+      attempt.cancelled(notAppliedReason(token));
+      return { structId: null, source };
+    }
+    attempt.loaded(useMoleculeStore.getState().getStructure(structId));
+    return { structId, source, warning };
+  } catch (err) {
+    if (signal.aborted) attempt.cancelled('aborted');
+    else if (!isCurrentSceneLoad(token)) attempt.cancelled('superseded');
+    else attempt.failed(err);
+    throw err;
+  }
 }
 
 export function useInitialUrlLoad(): void {
@@ -125,26 +156,29 @@ export function useInitialUrlLoad(): void {
 
     if (params.source === 'share') {
       (async () => {
+        // Opening a share link is a load from the URL, not something done in this tab
+        const attempt = startLoad({ source: 'share', userInitiated: false });
         const token = beginSceneLoad('replace');
         try {
           const session = await loadSharedSession(params.id!, signal);
           const deserialized = await deserializeShareableSession(session, signal);
           // Aborted (StrictMode's first run), or overtaken by a later Replace load that applied
-          if (signal.aborted) return;
+          if (signal.aborted) return attempt.cancelled('aborted');
           let droppedReferences = 0;
           if (!applySceneLoad(token, () => {
             ({ droppedReferences } = store().applyShareableSession({ ...deserialized, sourceStructures: session.structures }));
-          })) return;
+          })) return attempt.cancelled('superseded');
           document.title = 'Shared session - MolViewer';
           const notice = shareRestoreNotice(deserialized.skipped, droppedReferences);
           if (notice) store().setError(notice);
           // One event per share, sized by the structure now active, which
           // style switches made next are counted against
           const { structures, activeStructureId } = store();
-          const atoms = structures.get(activeStructureId ?? '')?.molecule.atoms.length ?? 0;
-          track('structure_loaded', { source: 'share', entry: entryKind(), atoms: roundAtoms(atoms) });
+          attempt.loaded(structures.get(activeStructureId ?? ''));
         } catch (err) {
-          if (signal.aborted || !isCurrentSceneLoad(token)) return;
+          if (signal.aborted) return attempt.cancelled('aborted');
+          if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+          attempt.failed(err);
           store().setError(err instanceof Error ? err.message : 'Failed to load shared session');
         } finally {
           // Always: a load left open would keep isLoading on, which stops the address-bar sync
@@ -158,7 +192,8 @@ export function useInitialUrlLoad(): void {
     (async () => {
       const token = beginSceneLoad('add');
       try {
-        const { structId, source, warning } = await loadStructureFromParams(params, signal, undefined, token);
+        // The landing auto-load: nobody clicked anything yet
+        const { structId, source, warning } = await loadStructureFromParams(params, signal, token, { userInitiated: false });
         if (signal.aborted || !isCurrentSceneLoad(token)) return;
 
         if (structId) {

@@ -18,6 +18,7 @@ import { componentStyle, type ComponentStyle } from './moleculeTypeClassifier';
 import type { CameraSnapshot } from '../types/session';
 import type { Measurement } from './measurements';
 import { loadStructureFromSource } from './structureLoader';
+import { LoadError } from './loadErrors';
 import type { Atom, Molecule } from '../types';
 
 /**
@@ -363,8 +364,8 @@ export async function createShareLink(payload: ShareableSession): Promise<string
 export async function loadSharedSession(id: string, signal?: AbortSignal): Promise<ShareableSession> {
   const resp = await fetch(`/api/share/${id}`, { signal });
   if (!resp.ok) {
-    if (resp.status === 404) throw new Error('Share link not found or expired');
-    throw new Error(`Failed to load share (${resp.status})`);
+    if (resp.status === 404) throw new LoadError('Share link not found or expired', 'not_found');
+    throw new LoadError(`Failed to load share (${resp.status})`, 'network');
   }
   return (await resp.json()) as ShareableSession;
 }

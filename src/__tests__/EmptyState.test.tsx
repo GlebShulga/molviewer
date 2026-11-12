@@ -48,7 +48,8 @@ describe('empty state', () => {
 
     expect(event.defaultPrevented).toBe(true);
     await waitFor(() => expect(loadStructureFromParams).toHaveBeenCalledTimes(1));
-    expect(loadStructureFromParams.mock.calls[0][2]).toBe('empty_example');
+    // An example click is a load a person started
+    expect(loadStructureFromParams.mock.calls[0][3]).toEqual({ userInitiated: true, via: 'empty_example' });
     expect(track).not.toHaveBeenCalledWith('onboarding_completed', expect.anything());
   });
 });

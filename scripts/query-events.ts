@@ -28,9 +28,20 @@
  * Stick. Touch screens and desktops are counted together. Size "?" is events
  * from before sizes were recorded.
  *
+ * Every query here counts production traffic only (PROD): events from preview
+ * deployments and from the owner's browsers (?internal=1) are left out. Events
+ * from before schema 2 have no environment and are kept. A --sql query gets no
+ * such filter. Since schema 2, structure_loaded also counts Saved-panel loads
+ * (source 'saved') and the onboarding tour's demo (source 'sample', value
+ * 'onboarding'), which earlier events didn't.
+ *
  * The token needs the "Account Analytics: Read" permission.
- * Column layout: blob1 = event, blob2..blob7 = source, entry, format, kind, ref, value,
- * blob8 = page kind, blob9 = country, double1 = scale, double2 = seconds, double3 = atoms.
+ * Column layout (site/events.ts): index1 = session id since schema 2 (the event name before),
+ * blob1 = event, blob2..blob7 = source, entry, format, kind, ref, value,
+ * blob8 = page kind, blob9 = country,
+ * blob10..blob16 = env, device, entry_page, ref_type, version, schema, detail (schema 2),
+ * double1 = scale, double2 = seconds, double3 = atoms,
+ * double4..double10 = seq, elapsed, duration, kb, asn, webdriver, user (schema 2).
  */
 
 const accountId = process.env.CF_ACCOUNT_ID;
@@ -44,11 +55,13 @@ const args = process.argv.slice(2);
 const sqlIndex = args.indexOf('--sql');
 const days = Number(args.find((a) => /^\d+$/.test(a)) ?? 7);
 const SINCE = `timestamp > NOW() - INTERVAL '${days}' DAY`;
+/** Production only: blob10 is the environment ('' on events from before schema 2, which had none). */
+const PROD = "blob10 IN ('prod', '')";
 
 const APP_SQL = `SELECT blob1 AS event, blob2 AS tool, blob6 AS client, blob7 AS outcome,
        SUM(_sample_interval) AS count, AVG(double2) AS avg_seconds
        FROM molviewer_events
-       WHERE ${SINCE}
+       WHERE ${SINCE} AND ${PROD}
          AND (blob1 = 'mcp_tool_call' OR blob1 = 'widget_view' OR blob1 = 'widget_open_full')
        GROUP BY event, tool, client, outcome
        ORDER BY count DESC
@@ -57,7 +70,7 @@ const APP_SQL = `SELECT blob1 AS event, blob2 AS tool, blob6 AS client, blob7 AS
 const SEARCH_SQL = `SELECT blob5 AS kind, blob7 AS outcome, blob3 AS shape, blob4 AS sources,
        SUM(_sample_interval) AS count, AVG(double2) AS avg_seconds
        FROM molviewer_events
-       WHERE ${SINCE}
+       WHERE ${SINCE} AND ${PROD}
          AND blob1 = 'mcp_tool_call' AND blob2 = 'find_structures'
        GROUP BY kind, outcome, shape, sources
        ORDER BY count DESC
@@ -65,7 +78,7 @@ const SEARCH_SQL = `SELECT blob5 AS kind, blob7 AS outcome, blob3 AS shape, blob
 
 const COUNTS_SQL = `SELECT blob1 AS event, blob2 AS source, blob8 AS page, SUM(_sample_interval) AS count
        FROM molviewer_events
-       WHERE ${SINCE}
+       WHERE ${SINCE} AND ${PROD}
        GROUP BY event, source, page
        ORDER BY count DESC
        FORMAT JSON`;
@@ -86,14 +99,14 @@ const STYLES = ['ball-and-stick', 'stick', 'spacefill', 'cartoon', 'surface-vdw'
 
 const LOADS_SQL = `SELECT ${SIZE_SQL} AS size, SUM(_sample_interval) AS loads
        FROM molviewer_events
-       WHERE ${SINCE} AND blob1 = 'structure_loaded'
+       WHERE ${SINCE} AND ${PROD} AND blob1 = 'structure_loaded'
        GROUP BY size
        FORMAT JSON`;
 
 const STYLE_EVENTS_SQL = `SELECT blob1 AS event, ${SIZE_SQL} AS size, blob7 AS style, blob5 AS kind,
        blob4 AS picking, SUM(_sample_interval) AS count
        FROM molviewer_events
-       WHERE ${SINCE}
+       WHERE ${SINCE} AND ${PROD}
          AND blob1 IN ('representation_changed', 'measurement_added', 'label_added', 'atom_menu_opened')
        GROUP BY event, size, style, kind, picking
        ORDER BY count DESC

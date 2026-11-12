@@ -28,6 +28,7 @@ import { legacyIndexCutoff, resolveSharedAtom, type SharedAtomRef } from '../uti
 import { clearSelectorCaches } from './selectors';
 import { useUrlSyncStore } from './urlSyncStore';
 import { roundAtoms, track, type EventProps } from '../utils/track';
+import { forgetRemovedStructures, startLoad } from '../utils/loadTracking';
 import { showToast } from '../utils/toast';
 import {
   availableColor,
@@ -394,12 +395,25 @@ export function isCurrentSceneLoad(token: SceneLoadToken): boolean {
  * loads started before it. `apply` returns false when the store refused the
  * result (the structure limit): nothing is recorded. If it throws, nothing is
  * recorded and the error goes to the caller. Returns whether it applied.
+ *
+ * Every load that applies through here also reports itself through startLoad()
+ * (src/utils/loadTracking.ts), so it shows up in the load events; the chat
+ * widget's loads are the one exception (it sends only its own two events).
  */
 export function applySceneLoad(token: SceneLoadToken, apply: () => unknown): boolean {
   if (!openSceneLoads.has(token) || !isCurrentSceneLoad(token)) return false;
   if (apply() === false) return false;
   if (token.mode === 'replace') latestAppliedReplaceSeq = Math.max(latestAppliedReplaceSeq, token.seq);
   return true;
+}
+
+/**
+ * Why applySceneLoad returned false for an open load: still current means the
+ * store refused the result (the structure limit), otherwise a later load
+ * replaced it. For the load's cancel event.
+ */
+export function notAppliedReason(token: SceneLoadToken): 'limit' | 'superseded' {
+  return isCurrentSceneLoad(token) ? 'limit' : 'superseded';
 }
 
 /** Ends a load; always call it (in `finally`). A second call for the same token does nothing. */
@@ -1138,6 +1152,8 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedMolecule: async (id) => {
+    // Only the Saved panel calls this: a person picked the entry
+    const attempt = startLoad({ source: 'saved', userInitiated: true });
     // Async: entries of 50,000+ atoms live in IndexedDB
     const token = beginSavedLoad(id);
     try {
@@ -1155,7 +1171,12 @@ export const useMoleculeStore = create<MoleculeState>()(
       });
       // Recorded before the measurement restore: the scene is replaced even if
       // that throws. (`read` is set whenever it applied.)
-      if (!applied || !read) return;
+      if (!applied || !read) {
+        // A later load replaced it, or its entry was deleted meanwhile
+        attempt.cancelled('superseded');
+        return;
+      }
+      attempt.loaded(get().structures.get(get().activeStructureId ?? ''));
       const data = read;
       // Then restore measurements. A saved molecule is one structure with a new
       // ID, so every ref points at it. Old saves carry only atomIndices; a
@@ -1179,6 +1200,11 @@ export const useMoleculeStore = create<MoleculeState>()(
           .filter(m => matchesStoredValue(m, structures));
         set({ measurements: refreshDihedrals(migratedMeasurements, structures) });
       }
+    } catch (err) {
+      // After loaded() (a failed measurement restore) this sends nothing
+      if (isCurrentSceneLoad(token)) attempt.failed(err);
+      else attempt.cancelled('superseded');
+      throw err;
     } finally {
       finishSceneLoad(token);
     }
@@ -1294,6 +1320,8 @@ export const useMoleculeStore = create<MoleculeState>()(
   },
 
   loadSavedSession: async (id) => {
+    // Only the Saved panel calls this: a person picked the entry
+    const attempt = startLoad({ source: 'saved', userInitiated: true });
     const token = beginSavedLoad(id);
     try {
       const session = await loadSessionAsync(id);
@@ -1306,9 +1334,18 @@ export const useMoleculeStore = create<MoleculeState>()(
         if (!session) throw new SavedEntryReadError('This saved session could not be read.');
         camera = get().loadSession(session);
       });
-      if (!applied) return null;
+      if (!applied) {
+        attempt.cancelled('superseded');
+        return null;
+      }
       set({ loadedMoleculeId: id });
+      const { structures, activeStructureId } = get();
+      attempt.loaded(structures.get(activeStructureId ?? ''));
       return camera;
+    } catch (err) {
+      if (isCurrentSceneLoad(token)) attempt.failed(err);
+      else attempt.cancelled('superseded');
+      throw err;
     } finally {
       finishSceneLoad(token);
     }
@@ -1556,6 +1593,11 @@ export const useMoleculeStore = create<MoleculeState>()(
 
 // Export the temporal store for undo/redo access
 export const temporalStore = useMoleculeStore.temporal;
+
+// A structure removed before its first frame will never be drawn: its load stops waiting
+useMoleculeStore.subscribe((state, prev) => {
+  if (state.structures !== prev.structures) forgetRemovedStructures((id) => state.structures.has(id));
+});
 
 /**
  * activeStructureId isn't undoable (selection stays out of history), so an

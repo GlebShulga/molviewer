@@ -80,6 +80,7 @@ export function renderStaticDocument(doc: StaticDocument): string {
 <meta charset="UTF-8">
 <script src="/theme-init.js"></script>
 <script src="/footer.js" defer></script>
+<script src="/entry.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${t}</title>
 <meta name="description" content="${d}">

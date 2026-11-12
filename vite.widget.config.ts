@@ -10,6 +10,7 @@
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { appVersion } from './site/build/appVersion';
 
 export default defineConfig({
   plugins: [react()],
@@ -18,6 +19,8 @@ export default defineConfig({
     // No error reporting from the widget: it runs on the chat host's origin,
     // where /api/log doesn't exist, and it keeps New Relic out of its privacy scope.
     'import.meta.env.VITE_ERROR_REPORTING': '"off"',
+    // Tags the widget's two product events with the build (src/utils/track.ts)
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion()),
   },
   build: {
     outDir: 'dist/widget/v1',

@@ -4,7 +4,16 @@ import { useMoleculeStore, temporalStore, beginSceneLoad, finishSceneLoad, apply
 import { useOnboarding } from '../useOnboarding';
 
 const track = vi.hoisted(() => vi.fn());
-vi.mock('../../../utils/track', () => ({ track, entryKind: () => 'home' }));
+vi.mock('../../../utils/track', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/track')>()),
+  track,
+  entryKind: () => 'home',
+}));
+
+const loadEvents = () =>
+  track.mock.calls
+    .filter(([n]) => String(n).startsWith('structure_load') || n === 'structure_loaded')
+    .map(([n, p]) => [n, (p as { detail?: string }).detail]);
 
 const STORAGE_KEY = 'mol3d-onboarding-completed';
 
@@ -70,6 +79,10 @@ describe('startTour', () => {
     expect(result.current.phase).toBe('completed');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('true');
     expect(useMoleculeStore.getState().error).toBeNull();
+    expect(loadEvents()).toEqual([
+      ['structure_load_started', undefined],
+      ['structure_load_cancelled', 'superseded'],
+    ]);
     vi.unstubAllGlobals();
   });
 
@@ -81,6 +94,23 @@ describe('startTour', () => {
     await act(async () => { release(); await tour; });
     expect(result.current.phase).toBe('completed');
     expect(useMoleculeStore.getState().error).toBe('Failed to fetch 1CRN');
+    expect(loadEvents()).toEqual([
+      ['structure_load_started', undefined],
+      ['structure_load_failed', 'network'],
+    ]);
+    vi.unstubAllGlobals();
+  });
+
+  it('reports the tour\'s demo as a sample a person started', async () => {
+    const release = slowFetch();
+    const { result } = renderHook(() => useOnboarding());
+    let tour!: Promise<void>;
+    act(() => { tour = result.current.startTour() as unknown as Promise<void>; });
+    await act(async () => { release(); await tour; });
+    expect(track).toHaveBeenCalledWith(
+      'structure_loaded',
+      expect.objectContaining({ source: 'sample', value: 'onboarding', user: 1, atoms: 1 })
+    );
     vi.unstubAllGlobals();
   });
 

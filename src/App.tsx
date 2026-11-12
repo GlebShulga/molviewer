@@ -116,7 +116,7 @@ export function EmptyOrWelcome({ onOpenSidebar }: { onOpenSidebar: () => void })
     const store = useMoleculeStore.getState();
     const token = beginSceneLoad('add');
     try {
-      const { warning } = await loadStructureFromParams(params, new AbortController().signal, via, token);
+      const { warning } = await loadStructureFromParams(params, new AbortController().signal, token, { userInitiated: true, via });
       // Overtaken by a later load: no warning, and onboarding goes on
       if (!isCurrentSceneLoad(token)) return;
       if (warning) store.setError(warning);

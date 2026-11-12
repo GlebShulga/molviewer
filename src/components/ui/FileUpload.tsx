@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -8,7 +8,9 @@ import {
   finishSceneLoad,
   isCurrentSceneLoad,
   applySceneLoad,
+  notAppliedReason,
   type SceneLoadMode,
+  type SceneLoadToken,
 } from '../../store/moleculeStore';
 import { parseByFilename } from '../../parsers';
 import { SAMPLE_MOLECULES, type SampleMolecule } from '../../config';
@@ -17,7 +19,9 @@ import { decompressGzip } from '../../utils/decompressGzip';
 import type { Molecule, StructureSource } from '../../types';
 import { Download, Plus, RefreshCw } from 'lucide-react';
 import { logError } from '../../utils/errorReporter';
-import { track, entryKind, roundAtoms } from '../../utils/track';
+import { track } from '../../utils/track';
+import { startLoad, type LoadAttempt } from '../../utils/loadTracking';
+import { asParseError, LoadError } from '../../utils/loadErrors';
 import { loadStructureFromSource, resolvePubchemCid } from '../../utils/structureLoader';
 import { slugForCid } from '../../../site/compoundSlugs';
 import { UNIPROT_RE } from '../../../site/identifiers';
@@ -100,19 +104,56 @@ export function FileUpload() {
     return true;
   }, [atLimit, setError]);
 
-  /** Adds or replaces; false when the store refused it (the limit was reached meanwhile). */
-  const loadMolecule = useCallback((molecule: Molecule, name?: string, source?: StructureSource): boolean => {
+  /** Offline: nothing is fetched, and the started load ends as a network failure. */
+  const refuseOffline = useCallback((attempt: LoadAttempt): boolean => {
+    if (navigator.onLine) return false;
+    setError('You appear to be offline. Please check your internet connection.');
+    attempt.failed(new LoadError('Offline', 'network'));
+    return true;
+  }, [setError]);
+
+  /**
+   * Adds or replaces. Returns the new structure's id, or '' when the store
+   * refused it (the limit was reached meanwhile).
+   */
+  const loadMolecule = useCallback((molecule: Molecule, name?: string, source?: StructureSource): string => {
     if (hasStructures && addMode) {
       // Add as new structure; the store refuses an 11th with its own message
-      return addStructure(molecule, name, source) !== '';
+      return addStructure(molecule, name, source);
     }
     // Replace all structures
     setMolecule(molecule, source);
-    return true;
+    return useMoleculeStore.getState().activeStructureId ?? '';
   }, [hasStructures, addMode, addStructure, setMolecule]);
 
+  /**
+   * Applies a loaded molecule through the token and reports the outcome: the
+   * structure, or why it wasn't added (the limit, or a later Replace load).
+   */
+  const applyLoaded = useCallback((
+    token: SceneLoadToken,
+    attempt: LoadAttempt,
+    molecule: Molecule,
+    name?: string,
+    source?: StructureSource
+  ): boolean => {
+    let structureId = '';
+    if (!applySceneLoad(token, () => (structureId = loadMolecule(molecule, name, source)) !== '')) {
+      attempt.cancelled(notAppliedReason(token));
+      return false;
+    }
+    attempt.loaded(useMoleculeStore.getState().getStructure(structureId));
+    return true;
+  }, [loadMolecule]);
+
   const handleFile = useCallback(async (file: File) => {
-    if (refuseAtLimit()) return;
+    const attempt = startLoad({
+      source: 'file',
+      userInitiated: true,
+      format: detectInlineFormat(file.name) ?? 'other',
+      bytes: file.size,
+    });
+    if (refuseAtLimit()) return attempt.cancelled('limit');
     const token = beginSceneLoad(loadMode);
     setError(null);
 
@@ -120,40 +161,58 @@ export function FileUpload() {
       validateFile(file);
 
       let content: string;
-      // Handle gzip-compressed files
-      if (file.name.toLowerCase().endsWith('.gz')) {
-        const arrayBuffer = await file.arrayBuffer();
-        content = await decompressGzip(arrayBuffer);
-      } else {
-        content = await file.text();
+      let molecule: Molecule;
+      try {
+        // Handle gzip-compressed files
+        if (file.name.toLowerCase().endsWith('.gz')) {
+          const arrayBuffer = await file.arrayBuffer();
+          content = await decompressGzip(arrayBuffer);
+        } else {
+          content = await file.text();
+        }
+        molecule = parseFile(content, file.name);
+      } catch (err) {
+        throw asParseError(err);
       }
-
-      const molecule = parseFile(content, file.name);
       // Extract name from filename without extension(s)
       const name = file.name.replace(/\.(cif\.gz|[^/.]+)$/i, '');
       const inlineFormat = detectInlineFormat(file.name);
       const inlineSource: StructureSource | undefined =
         inlineFormat ? { type: 'inline', format: inlineFormat, data: content } : undefined;
-      if (!applySceneLoad(token, () => loadMolecule(molecule, name, inlineSource))) return;
-      track('structure_loaded', { source: 'file', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
+      applyLoaded(token, attempt, molecule, name, inlineSource);
     } catch (err) {
-      if (!isCurrentSceneLoad(token)) return;
+      if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+      attempt.failed(err);
       setError(getErrorMessage(err, 'Failed to parse file'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.handleFile' });
     } finally {
       finishSceneLoad(token);
     }
-  }, [parseFile, loadMolecule, refuseAtLimit, loadMode, setError]);
+  }, [parseFile, applyLoaded, refuseAtLimit, loadMode, setError]);
+
+  // dragenter/dragleave fire for every child the pointer crosses: count the
+  // depth so a drag over the drop zone is one file_picker_opened
+  const dragDepth = useRef(0);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    dragDepth.current = 0;
 
     const file = e.dataTransfer.files[0];
     if (file) {
       handleFile(file);
     }
   }, [handleFile]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current += 1;
+    // Only files: dragged text or a link is not an attempt to open one
+    if (dragDepth.current === 1 && Array.from(e.dataTransfer?.types ?? []).includes('Files')) {
+      track('file_picker_opened', { value: 'drop' });
+    }
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -162,6 +221,7 @@ export function FileUpload() {
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
     setIsDragging(false);
   }, []);
 
@@ -175,51 +235,57 @@ export function FileUpload() {
   }, [handleFile]);
 
   const loadSample = useCallback(async (sample: SampleMolecule) => {
-    if (refuseAtLimit()) return;
-    if (!navigator.onLine) {
-      setError('You appear to be offline. Please check your internet connection.');
-      return;
-    }
+    const isRcsb = sample.file.startsWith('rcsb:');
+    const attempt = startLoad({
+      source: 'sample',
+      userInitiated: true,
+      ...(isRcsb ? {} : { format: detectInlineFormat(sample.file) ?? 'other' }),
+    });
+    if (refuseAtLimit()) return attempt.cancelled('limit');
+    if (refuseOffline(attempt)) return;
 
     const token = beginSceneLoad(loadMode);
     setError(null);
 
-    const isRcsb = sample.file.startsWith('rcsb:');
     const timeoutMs = isRcsb ? PDB_FETCH_TIMEOUT_MS : SAMPLE_FETCH_TIMEOUT_MS;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      let molecule: Molecule;
       if (isRcsb) {
         const pdbId = sample.file.slice(5); // strip 'rcsb:'
-        ({ molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal));
-        if (!applySceneLoad(token, () => loadMolecule(molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId }))) return;
+        const { molecule } = await loadStructureFromSource({ type: 'rcsb', id: pdbId }, controller.signal);
+        applyLoaded(token, attempt, molecule, sample.name, { type: 'rcsb', id: sample.pdbId ?? pdbId });
       } else {
         const response = await fetch(sample.file, { signal: controller.signal });
         if (!response.ok) {
-          throw new Error('Failed to load sample molecule');
+          throw new LoadError('Failed to load sample molecule', response.status === 404 ? 'not_found' : 'network');
         }
         const content = await response.text();
-        molecule = parseFile(content, sample.file);
+        let molecule: Molecule;
+        try {
+          molecule = parseFile(content, sample.file);
+        } catch (err) {
+          throw asParseError(err);
+        }
         const inlineFormat = detectInlineFormat(sample.file);
         const sampleSource: StructureSource | undefined = sample.pdbId
           ? { type: 'rcsb', id: sample.pdbId }
           : inlineFormat
             ? { type: 'inline', format: inlineFormat, data: content }
             : undefined;
-        if (!applySceneLoad(token, () => loadMolecule(molecule, sample.name, sampleSource))) return;
+        applyLoaded(token, attempt, molecule, sample.name, sampleSource);
       }
-      track('structure_loaded', { source: 'sample', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
     } catch (err) {
-      if (!isCurrentSceneLoad(token)) return;
+      if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+      attempt.failed(err);
       setError(getErrorMessage(err, 'Failed to load sample', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.loadSample' });
     } finally {
       clearTimeout(timeout);
       finishSceneLoad(token);
     }
-  }, [parseFile, loadMolecule, refuseAtLimit, loadMode, setError]);
+  }, [parseFile, applyLoaded, refuseAtLimit, refuseOffline, loadMode, setError]);
 
   const fetchPDB = useCallback(async (id: string) => {
     const trimmedId = id.trim().toUpperCase();
@@ -234,11 +300,10 @@ export function FileUpload() {
       return;
     }
 
-    if (refuseAtLimit()) return;
-    if (!navigator.onLine) {
-      setError('You appear to be offline. Please check your internet connection.');
-      return;
-    }
+    // Format checks above come first: a mistyped ID is not an attempt
+    const attempt = startLoad({ source: 'rcsb', userInitiated: true });
+    if (refuseAtLimit()) return attempt.cancelled('limit');
+    if (refuseOffline(attempt)) return;
 
     const token = beginSceneLoad(loadMode);
     setError(null);
@@ -249,11 +314,11 @@ export function FileUpload() {
     try {
       const source = { type: 'rcsb', id: trimmedId } as const;
       const { molecule } = await loadStructureFromSource(source, controller.signal);
-      if (!applySceneLoad(token, () => loadMolecule(molecule, trimmedId, source))) return;
-      track('structure_loaded', { source: 'rcsb', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
+      if (!applyLoaded(token, attempt, molecule, trimmedId, source)) return;
       setPdbId(''); // Clear input on success
     } catch (err) {
-      if (!isCurrentSceneLoad(token)) return;
+      if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+      attempt.failed(err);
       setError(getErrorMessage(
         err,
         'Failed to fetch PDB',
@@ -264,7 +329,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
+  }, [applyLoaded, refuseAtLimit, refuseOffline, loadMode, setError]);
 
   const handlePdbSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -283,11 +348,9 @@ export function FileUpload() {
       return;
     }
 
-    if (refuseAtLimit()) return;
-    if (!navigator.onLine) {
-      setError('You appear to be offline. Please check your internet connection.');
-      return;
-    }
+    const attempt = startLoad({ source: 'af', userInitiated: true });
+    if (refuseAtLimit()) return attempt.cancelled('limit');
+    if (refuseOffline(attempt)) return;
 
     const token = beginSceneLoad(loadMode);
     setError(null);
@@ -298,11 +361,11 @@ export function FileUpload() {
     try {
       const source = { type: 'alphafold', id: trimmedId } as const;
       const { molecule, name } = await loadStructureFromSource(source, controller.signal);
-      if (!applySceneLoad(token, () => loadMolecule(molecule, name, source))) return;
-      track('structure_loaded', { source: 'af', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
+      if (!applyLoaded(token, attempt, molecule, name, source)) return;
       setUniprotId(''); // Clear input on success
     } catch (err) {
-      if (!isCurrentSceneLoad(token)) return;
+      if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+      attempt.failed(err);
       setError(getErrorMessage(
         err,
         'Failed to fetch AlphaFold structure',
@@ -313,7 +376,7 @@ export function FileUpload() {
       clearTimeout(timeout);
       finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
+  }, [applyLoaded, refuseAtLimit, refuseOffline, loadMode, setError]);
 
   const handleAlphaFoldSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -327,11 +390,9 @@ export function FileUpload() {
       return;
     }
 
-    if (refuseAtLimit()) return;
-    if (!navigator.onLine) {
-      setError('You appear to be offline. Please check your internet connection.');
-      return;
-    }
+    const attempt = startLoad({ source: 'pubchem', userInitiated: true });
+    if (refuseAtLimit()) return attempt.cancelled('limit');
+    if (refuseOffline(attempt)) return;
 
     const token = beginSceneLoad(loadMode);
     setError(null);
@@ -344,20 +405,20 @@ export function FileUpload() {
       // Curated compounds keep their canonical address (/compound/caffeine).
       const source = { type: 'pubchem', cid, slug: slugForCid(cid) } as const;
       const { molecule, name, warning } = await loadStructureFromSource(source, controller.signal);
-      if (!applySceneLoad(token, () => loadMolecule(molecule, name, source))) return;
-      track('structure_loaded', { source: 'pubchem', entry: entryKind(), atoms: roundAtoms(molecule.atoms.length) });
+      if (!applyLoaded(token, attempt, molecule, name, source)) return;
       setCompoundQuery('');
       // Loading clears errors; show the 2D notice after the structure is in.
       if (warning) setError(warning);
     } catch (err) {
-      if (!isCurrentSceneLoad(token)) return;
+      if (!isCurrentSceneLoad(token)) return attempt.cancelled('superseded');
+      attempt.failed(err);
       setError(getErrorMessage(err, 'Failed to fetch compound from PubChem', 'Request timed out. Please try again.'));
       logError(err instanceof Error ? err : new Error(String(err)), { source: 'FileUpload.fetchPubchem' });
     } finally {
       clearTimeout(timeout);
       finishSceneLoad(token);
     }
-  }, [loadMolecule, refuseAtLimit, loadMode, setError]);
+  }, [applyLoaded, refuseAtLimit, refuseOffline, loadMode, setError]);
 
   const handlePubchemSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +455,7 @@ export function FileUpload() {
       <div
         className={clsx(styles.dropZone, isDragging && styles.dragging)}
         onDrop={handleDrop}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onKeyDown={(e) => {
@@ -410,6 +472,8 @@ export function FileUpload() {
           type="file"
           accept=".pdb,.cif,.cif.gz,.mmcif,.sdf,.mol,.xyz"
           onChange={handleFileInput}
+          // The label, the drop zone's Enter key and a direct click all open the dialog through here
+          onClick={() => track('file_picker_opened', { value: 'dialog' })}
           id="file-input"
           className={styles.fileInput}
         />

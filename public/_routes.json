@@ -15,6 +15,7 @@
     "/manifest.json",
     "/theme-init.js",
     "/footer.js",
+    "/entry.js",
     "/robots.txt",
     "/llms.txt",
     "/sitemap.xml",

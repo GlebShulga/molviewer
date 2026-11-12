@@ -1,9 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sitePlugin } from './site/build/vitePlugin';
+import { appVersion } from './site/build/appVersion';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react(), sitePlugin()],
+  define: {
+    // Tags product events with the build (src/utils/track.ts)
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion()),
+  },
   server: {
     port: 3000,
     open: true,

@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { addAfterEffect, useThree } from '@react-three/fiber';
 import { useMoleculeStore } from '../store/moleculeStore';
+import { noteFrameDrawn, noteStructureCommitted, noteStructureUnmounted } from '../utils/loadTracking';
 import { selectVisibleStructureIds, selectStructureRenderData } from '../store/selectors';
 import { StructureRepresentation } from './StructureRepresentation';
 
@@ -27,6 +29,19 @@ const StructureRenderer = React.memo(function StructureRenderer({
   const selector = useMemo(() => selectStructureRenderData(structureId), [structureId]);
   const structureData = useMoleculeStore(selector);
 
+  // The geometry is built once this commits: the next frame drawn shows a
+  // new load (src/utils/loadTracking.ts). Keyed by the molecule: a reopened
+  // saved session keeps this renderer (same id). The scene draws on demand,
+  // so ask for that frame.
+  const invalidate = useThree((state) => state.invalidate);
+  const molecule = structureData?.molecule;
+  useEffect(() => {
+    if (!molecule) return;
+    noteStructureCommitted(structureId, molecule);
+    invalidate();
+  }, [structureId, molecule, invalidate]);
+  useEffect(() => () => noteStructureUnmounted(structureId), [structureId]);
+
   // Don't render if structure is hidden or removed
   if (!structureData) return null;
 
@@ -49,6 +64,9 @@ const StructureRenderer = React.memo(function StructureRenderer({
 export const MultiStructureRenderer = React.memo(function MultiStructureRenderer() {
   // Subscribe only to the list of visible structure IDs (stable array reference)
   const visibleStructureIds = useMoleculeStore(selectVisibleStructureIds);
+
+  // After each frame React Three Fiber draws: a committed load is now on screen
+  useEffect(() => addAfterEffect(noteFrameDrawn), []);
   // surfaceSettings is a shallow object that changes rarely
   const surfaceSettings = useMoleculeStore(state => state.surfaceSettings);
 

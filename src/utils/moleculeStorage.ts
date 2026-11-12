@@ -2,6 +2,7 @@ import type { Molecule, Atom, Bond, AromaticRing, BiologicalAssembly } from '../
 import type { Measurement } from './measurements';
 import type { MolViewerSession } from '../types/session';
 import { logError } from './errorReporter';
+import { LoadError } from './loadErrors';
 import { countAromaticRings } from './aromaticDetection';
 
 /**
@@ -31,8 +32,12 @@ const LARGE_SESSION_BYTES = 1 * 1024 * 1024; // 1MB threshold for IndexedDB
  * A failed read has already been logged here, so callers show the message
  * without reporting it again.
  */
-export class SavedEntryReadError extends Error {
-  name = 'SavedEntryReadError';
+export class SavedEntryReadError extends LoadError {
+  constructor(message: string) {
+    // The entry's data is missing or can't be read back: for the load events, not found
+    super(message, 'not_found');
+    this.name = 'SavedEntryReadError';
+  }
 }
 
 export interface SavedMoleculeEntry {

@@ -9,6 +9,7 @@ import { useMoleculeStore } from "../../store/moleculeStore";
 import { viewerRefs } from "../../utils/viewerRefs";
 import { dataUrlToBlob, drawWatermark } from "../../utils/exportImage";
 import { logError } from "../../utils/errorReporter";
+import { roundAtoms, track } from "../../utils/track";
 import { recordTurntable as recordTurntableFrames, type RecordTurntableOptions } from "../../utils/exportVideo";
 import type { ModelFormat, ExportModelOptions, ExportModelResult } from "../../utils/exportModel";
 
@@ -76,6 +77,9 @@ function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneCont
     const handleContextLost = (event: Event) => {
       event.preventDefault();
       setError('WebGL context lost. Attempting to restore...');
+      let atoms = 0;
+      for (const s of useMoleculeStore.getState().structures.values()) atoms += s.molecule.atoms.length;
+      track('webgl_context_lost', { atoms: roundAtoms(atoms) });
     };
     const handleContextRestored = () => {
       setError(null);

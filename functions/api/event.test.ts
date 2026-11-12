@@ -20,7 +20,82 @@ describe('/api/event', () => {
   it('stores the numeric fields in order, atoms third', async () => {
     const { res, points } = post(JSON.stringify({ e: 'representation_changed', p: { value: 'spacefill', atoms: 4800 } }));
     await res;
-    expect((points[0] as { doubles: number[] }).doubles).toEqual([0, 0, 4800]);
+    expect((points[0] as { doubles: number[] }).doubles).toEqual([0, 0, 4800, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('appends the schema 2 fields after page kind and country, and the numbers after atoms', async () => {
+    const sid = '0b1c2d3e-4f50-4617-8a9b-0c1d2e3f4a5b';
+    const { res, points } = post(
+      JSON.stringify({
+        e: 'structure_loaded',
+        sid,
+        page: 'pdb',
+        p: {
+          source: 'rcsb',
+          atoms: 4800,
+          env: 'prod',
+          device: 'mobile',
+          entry_page: 'learn',
+          ref_type: 'search',
+          version: 'abc1234',
+          schema: '2',
+          detail: 'x',
+          seq: 3,
+          elapsed: 1200,
+          duration: 450,
+          kb: 12,
+          asn: 99999,
+          webdriver: 0,
+          user: 1,
+        },
+      })
+    );
+    await res;
+    const p = points[0] as { indexes: string[]; blobs: string[]; doubles: number[] };
+    expect(p.indexes).toEqual([sid]);
+    expect(p.blobs[0]).toBe('structure_loaded');
+    expect(p.blobs[1]).toBe('rcsb');
+    expect(p.blobs[7]).toBe('pdb'); // blob8: page kind, unmoved
+    expect(p.blobs.slice(9)).toEqual(['prod', 'mobile', 'learn', 'search', 'abc1234', '2', 'x']);
+    // asn (double8) comes from Cloudflare, never from the client: none in this test
+    expect(p.doubles).toEqual([0, 0, 4800, 3, 1200, 450, 12, 0, 0, 1]);
+  });
+
+  it('uses a new random id when the session id is not a UUID', async () => {
+    const write = async (sid: unknown) => {
+      const { res, points } = post(JSON.stringify({ e: 'structure_loaded', sid }));
+      await res;
+      return (points[0] as { indexes: string[] }).indexes[0];
+    };
+    const bad = await write('structure_loaded');
+    expect(bad).not.toBe('structure_loaded');
+    expect(bad).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await write('x'.repeat(200))).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await write(undefined)).not.toBe(await write(undefined));
+  });
+
+  it('stores only known entry page kinds', async () => {
+    const entryOf = async (entry_page: string) => {
+      const { res, points } = post(JSON.stringify({ e: 'session_start', p: { entry_page } }));
+      await res;
+      return (points[0] as { blobs: string[] }).blobs[11];
+    };
+    expect(await entryOf('learn')).toBe('learn');
+    expect(await entryOf('pdb')).toBe('pdb');
+    expect(await entryOf('/learn/plddt-explained')).toBe('');
+  });
+
+  it('records the network from Cloudflare, except for the widget events', async () => {
+    const withAsn = (body: object, headers: Record<string, string> = {}) => {
+      const points: { doubles: number[] }[] = [];
+      const env = { EVENTS: { writeDataPoint: (p: { doubles: number[] }) => points.push(p) } };
+      const request = new Request('https://molviewer.bio/api/event', { method: 'POST', body: JSON.stringify(body), headers });
+      Object.defineProperty(request, 'cf', { value: { country: 'DE', asn: 3320 } });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return Promise.resolve((onRequestPost as any)({ request, env })).then(() => points[0].doubles[7]);
+    };
+    expect(await withAsn({ e: 'structure_loaded', p: { asn: 1 } })).toBe(3320);
+    expect(await withAsn({ e: 'widget_view', page: 'widget' })).toBe(0);
   });
 
   it('rejects unknown events', async () => {

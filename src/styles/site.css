@@ -115,6 +115,11 @@
   margin: 16px 0 24px;
 }
 
+/* A row a script reveals (the analytics toggle on /privacy) stays hidden without it */
+.cta-row[hidden] {
+  display: none;
+}
+
 .cta {
   display: inline-block;
   padding: 10px 18px;
@@ -136,6 +141,11 @@
   border: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+button.cta-secondary {
+  font: inherit;
+  cursor: pointer;
 }
 
 /* Key facts */

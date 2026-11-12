@@ -3,9 +3,12 @@
  * client helper (src/utils/track.ts) and the Function that stores them in
  * Workers Analytics Engine (functions/api/event.ts).
  *
- * No cookies, no user ids: each data point is one anonymous event.
+ * No cookies, no user ids. Since schema 2 the events of one browser tab share
+ * a random session id (kept in sessionStorage, gone with the tab), so a visit
+ * can be followed as a funnel; the chat widget and the MCP server use a new id
+ * per event, so nothing links one person's chat calls.
  */
-import { parseRoute } from './routes';
+import { normalizePath, parseRoute } from './routes';
 
 export const EVENT_NAMES = [
   'structure_loaded',
@@ -28,6 +31,19 @@ export const EVENT_NAMES = [
   // `mcp_tool_call` points straight to the dataset (workers/mcp/src/analytics.ts).
   'widget_view',
   'widget_open_full',
+  // Schema 2 (src/utils/track.ts, src/utils/loadTracking.ts). session_start:
+  // detail = WebGL support. file_picker_opened: value = 'dialog' or 'drop'.
+  'session_start',
+  'session_hidden',
+  'file_picker_opened',
+  // Every load: started, then exactly one of structure_loaded,
+  // structure_load_failed (detail = LoadErrorClass) or structure_load_cancelled
+  // (detail = aborted, superseded, limit); structure_rendered after the first frame.
+  'structure_load_started',
+  'structure_load_failed',
+  'structure_load_cancelled',
+  'structure_rendered',
+  'webgl_context_lost',
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];
@@ -50,10 +66,53 @@ export const STRING_FIELDS = ['source', 'entry', 'format', 'kind', 'ref', 'value
  * the columns of older ones don't move. `atoms`: the structure's atom count to
  * two significant figures (roundAtoms in src/utils/track.ts).
  */
-export const NUMBER_FIELDS = ['scale', 'seconds', 'atoms'] as const;
+export const NUMBER_FIELDS = [
+  'scale',
+  'seconds',
+  'atoms',
+  // Schema 2, double4..double10:
+  /** Event number within the session (1, 2, 3...). */
+  'seq',
+  /** ms since the session started (the start time stored on the entry page). */
+  'elapsed',
+  /** ms: fetch + parse for structure_loaded, start to first frame for structure_rendered. */
+  'duration',
+  /** File size in KB, two significant figures. */
+  'kb',
+  /** The client's network (request.cf.asn), set by /api/event only: a client value is ignored. */
+  'asn',
+  /** navigator.webdriver as 0/1. */
+  'webdriver',
+  /** 1 when a person started the load in this tab, 0 for an automatic load from the URL. */
+  'user',
+] as const;
+
+/**
+ * Schema 2 context strings, stored after page kind and country (blob10..blob16)
+ * so the older columns don't move.
+ */
+export const CONTEXT_FIELDS = [
+  /** prod, preview or internal. */
+  'env',
+  /** mobile, tablet or desktop; empty on widget and MCP events. */
+  'device',
+  /** ENTRY_PAGE_KINDS: where the tab's visit started; /api/event stores nothing else. */
+  'entry_page',
+  /** search, ai, social, direct, internal or other, from the entry page's referrer. */
+  'ref_type',
+  /** Short commit hash of the build. */
+  'version',
+  /** SCHEMA_VERSION. */
+  'schema',
+  /** Event-specific: error class, cancel reason, 'hidden', WebGL support. */
+  'detail',
+] as const;
+
+export const SCHEMA_VERSION = '2';
 
 export type EventProps = Partial<
-  Record<(typeof STRING_FIELDS)[number], string> & Record<(typeof NUMBER_FIELDS)[number], number>
+  Record<(typeof STRING_FIELDS)[number] | (typeof CONTEXT_FIELDS)[number], string> &
+    Record<(typeof NUMBER_FIELDS)[number], number>
 >;
 
 export interface EventPayload {
@@ -61,6 +120,8 @@ export interface EventPayload {
   p?: EventProps;
   /** Page type the event happened on: home, pdb, af, compound, share, embed, widget, other. */
   page?: string;
+  /** Session id (a UUID): one per tab on the site, one per event in the widget. */
+  sid?: string;
 }
 
 export function isEventName(value: unknown): value is EventName {
@@ -89,4 +150,42 @@ export function pageKind(pathname: string): PageKind {
       if (route.embed) return 'embed';
       return route.structure.kind === 'cid' ? 'compound' : route.structure.kind;
   }
+}
+
+/**
+ * Where a visit can start besides the app: the static pages built by
+ * site/build (src/utils/track.ts reads the entry path public/entry.js stored).
+ */
+export const STATIC_ENTRY_KINDS = ['learn', 'tool', 'collection', 'compounds', 'info'] as const;
+export const ENTRY_PAGE_KINDS = [...PAGE_KINDS, ...STATIC_ENTRY_KINDS] as const;
+export type EntryPageKind = (typeof ENTRY_PAGE_KINDS)[number];
+
+export function isEntryPageKind(value: unknown): value is EntryPageKind {
+  return typeof value === 'string' && (ENTRY_PAGE_KINDS as readonly string[]).includes(value);
+}
+
+/** Tool pages (site/content/pages, kind 'tool'); a test keeps this list in step. */
+export const TOOL_PATHS: ReadonlySet<string> = new Set([
+  '/pdb-viewer',
+  '/alphafold-viewer',
+  '/mmcif-viewer',
+  '/sdf-viewer',
+  '/xyz-viewer',
+  '/pymol-online-alternative',
+  '/compare',
+]);
+
+const INFO_PATHS: ReadonlySet<string> = new Set(['/about', '/privacy', '/terms', '/support']);
+
+/** Classify the page a visit started on: an app page kind, or a static page kind. */
+export function entryPageKind(pathname: string): EntryPageKind {
+  const app = pageKind(pathname);
+  if (app !== 'other') return app;
+  const path = normalizePath(pathname);
+  if (path === '/learn' || path.startsWith('/learn/')) return 'learn';
+  if (path === '/collections' || path.startsWith('/collections/')) return 'collection';
+  if (path === '/compounds') return 'compounds';
+  if (INFO_PATHS.has(path)) return 'info';
+  if (TOOL_PATHS.has(path)) return 'tool';
+  return 'other';
 }

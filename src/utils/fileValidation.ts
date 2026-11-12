@@ -1,7 +1,11 @@
 import { PARSER_CONFIG, ALLOWED_EXTENSIONS } from '../config';
 
 export class FileValidationError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** Why the file was refused; the load events report it (src/utils/loadErrors.ts). */
+    readonly reason: 'unsupported_format' | 'too_large' | 'empty'
+  ) {
     super(message);
     this.name = 'FileValidationError';
   }
@@ -15,7 +19,8 @@ export function validateFile(file: File): void {
   if (!ALLOWED_EXTENSIONS.test(file.name)) {
     const ext = file.name.split('.').pop() || 'unknown';
     throw new FileValidationError(
-      `Unsupported file format: .${ext}. Supported formats: PDB, CIF, CIF.GZ, SDF, MOL, XYZ`
+      `Unsupported file format: .${ext}. Supported formats: PDB, CIF, CIF.GZ, SDF, MOL, XYZ`,
+      'unsupported_format'
     );
   }
 
@@ -23,12 +28,13 @@ export function validateFile(file: File): void {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
     const maxMB = (PARSER_CONFIG.maxFileSize / (1024 * 1024)).toFixed(0);
     throw new FileValidationError(
-      `File too large: ${sizeMB}MB. Maximum allowed: ${maxMB}MB`
+      `File too large: ${sizeMB}MB. Maximum allowed: ${maxMB}MB`,
+      'too_large'
     );
   }
 
   if (file.size === 0) {
-    throw new FileValidationError('File is empty');
+    throw new FileValidationError('File is empty', 'empty');
   }
 }
 

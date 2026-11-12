@@ -3,7 +3,7 @@ import type { ContentPage } from '../types';
 export const page: ContentPage = {
   path: '/privacy',
   kind: 'legal',
-  updated: '2026-11-10',
+  updated: '2026-11-11',
   title: 'Privacy policy | MolViewer',
   description:
     'What MolViewer collects on molviewer.bio and in its ChatGPT and Claude app: anonymous usage counts, no accounts, no tracking cookies, and no sale of data.',
@@ -19,7 +19,7 @@ export const page: ContentPage = {
         `<li><strong>Files you open</strong> from your computer are processed on your device and never uploaded, unless you create a share link for a scene that includes a small local file. That file is then stored with the link.</li>` +
         `<li><strong>Share links</strong> (/s/...) store the scene you chose to share (structure references, view settings, measurements and labels) for one year.</li>` +
         `<li><strong>Saved sessions and preferences</strong> stay in your browser's local storage and never leave your device.</li>` +
-        `<li><strong>Analytics:</strong> Cloudflare Web Analytics counts page views without cookies or personal profiles. MolViewer also records anonymous product events, such as "a structure was loaded from PubChem" or "a PNG was exported", with the page type, the country Cloudflare derives from the request and, for some events, the structure's approximate atom count (rounded, for example 4,800). No IP address, cookie, account or device identifier is stored with them.</li>` +
+        `<li><strong>Analytics:</strong> Cloudflare Web Analytics counts page views without cookies or personal profiles. MolViewer also records anonymous product events, such as "a structure was loaded from PubChem", "a file could not be opened" or "a PNG was exported". Each event carries the page type, the country and network (ASN) Cloudflare derives from the request, the device class (phone, tablet or desktop), whether the browser reports itself as automated (to leave out bots), the app version, how long a load took and, for some events, the structure's approximate atom count or file size (rounded, for example 4,800). To count the events of one visit together, your browser keeps a random session ID, the page the visit started on and the name of the site that linked to it in session storage, which the browser deletes when you close the tab; only the kind of linking site (for example a search engine) is sent. When the viewer is embedded in another website, it reports the name of that website (for example university.example), so we know where MolViewer is used. No IP address, cookie, account, name or file content is stored, and the events are not combined with other data or used to follow you across sites. They are used only to measure how the site is used, under the conditions of the Spanish data protection authority (AEPD) for audience-measurement tools. You can <a href="#analytics-optout">turn them off</a> for your browser.</li>` +
         `<li><strong>Error reports:</strong> if the app hits an error, a short report (the message, the page address and your browser version) is passed through our server to New Relic so the bug can be fixed. Your browser doesn't connect to New Relic, so New Relic doesn't receive your IP address.</li>` +
         `</ul>`,
     },
@@ -46,7 +46,9 @@ export const page: ContentPage = {
     {
       heading: 'Your choices',
       html:
-        `<p>Apart from the structure downloads and the anonymous counts above, nothing leaves your device. Blocking scripts from cloudflareinsights.com turns off page-view analytics. Because MolViewer stores nothing that identifies you, there is no personal profile to access or delete. To remove a share link you created, email <a href="mailto:support@molviewer.bio">support@molviewer.bio</a> with the link.</p>`,
+        `<p>Apart from the structure downloads and the anonymous counts above, nothing leaves your device. Blocking scripts from cloudflareinsights.com turns off page-view analytics. Because MolViewer stores nothing that identifies you, there is no personal profile to access or delete. To remove a share link you created, email <a href="mailto:support@molviewer.bio">support@molviewer.bio</a> with the link.</p>` +
+        `<p>You can turn off MolViewer's product analytics in this browser. The choice is kept in your browser's local storage; while it is off, nothing is stored in session storage and no event is sent.</p>` +
+        `<p id="analytics-optout" class="cta-row" hidden><button type="button" id="analytics-toggle" class="cta-secondary">Turn off product analytics</button> <span id="analytics-status" role="status"></span></p>`,
     },
     {
       heading: 'Children',

@@ -5,6 +5,7 @@
  */
 import type { Molecule, StructureSource } from '../types';
 import { parseByFormat, parseSDF } from '../parsers';
+import { asParseError, LoadError } from './loadErrors';
 
 export interface LoadedStructure {
   molecule: Molecule;
@@ -21,11 +22,11 @@ export async function resolvePubchemCid(query: string, signal?: AbortSignal): Pr
   const trimmed = query.trim();
   if (/^\d+$/.test(trimmed)) return Number(trimmed);
   const resp = await fetch(`${PUBCHEM}/compound/name/${encodeURIComponent(trimmed)}/cids/JSON`, { signal });
-  if (resp.status === 404) throw new Error(`No PubChem compound found for "${trimmed}"`);
-  if (!resp.ok) throw new Error(`PubChem lookup failed (${resp.status})`);
+  if (resp.status === 404) throw new LoadError(`No PubChem compound found for "${trimmed}"`, 'not_found');
+  if (!resp.ok) throw new LoadError(`PubChem lookup failed (${resp.status})`, 'network');
   const data = (await resp.json()) as { IdentifierList?: { CID?: number[] } };
   const cid = data.IdentifierList?.CID?.[0];
-  if (!cid) throw new Error(`No PubChem compound found for "${trimmed}"`);
+  if (!cid) throw new LoadError(`No PubChem compound found for "${trimmed}"`, 'not_found');
   return cid;
 }
 
@@ -52,15 +53,24 @@ async function loadPubchem(cid: number, signal?: AbortSignal): Promise<LoadedStr
   let warning: string | undefined;
   if (resp.status === 404) {
     resp = await fetch(`${PUBCHEM}/compound/cid/${cid}/SDF?record_type=2d`, { signal });
-    if (resp.status === 404) throw new Error(`PubChem compound CID ${cid} not found`);
+    if (resp.status === 404) throw new LoadError(`PubChem compound CID ${cid} not found`, 'not_found');
     warning = 'PubChem has no 3D conformer for this compound, so it is shown as a flat 2D structure.';
   }
-  if (!resp.ok) throw new Error(`Failed to fetch compound from PubChem (${resp.status})`);
-  const molecule = parseSDF(await resp.text());
+  if (!resp.ok) throw new LoadError(`Failed to fetch compound from PubChem (${resp.status})`, 'network');
+  const molecule = parse(await resp.text(), (text) => parseSDF(text));
   const title = await titlePromise;
   const name = title ?? `CID ${cid}`;
   molecule.name = name;
   return { molecule, name, warning };
+}
+
+/** Runs a parser; what it throws is marked as a parse failure for the load events. */
+function parse(text: string, parser: (text: string) => Molecule): Molecule {
+  try {
+    return parser(text);
+  } catch (err) {
+    throw asParseError(err);
+  }
 }
 
 export async function loadStructureFromSource(
@@ -72,38 +82,38 @@ export async function loadStructureFromSource(
       // mmCIF: RCSB's preferred format, with better coverage than legacy PDB.
       const resp = await fetch(`https://files.rcsb.org/download/${source.id}.cif`, { signal });
       if (!resp.ok) {
-        throw new Error(resp.status === 404 ? `PDB ID "${source.id}" not found` : `Failed to fetch structure: ${resp.statusText || resp.status}`);
+        throw resp.status === 404
+          ? new LoadError(`PDB ID "${source.id}" not found`, 'not_found')
+          : new LoadError(`Failed to fetch structure: ${resp.statusText || resp.status}`, 'network');
       }
-      const molecule = parseByFormat(await resp.text(), 'cif');
+      const molecule = parse(await resp.text(), (text) => parseByFormat(text, 'cif'));
       molecule.name = source.id;
       return { molecule, name: source.id };
     }
     case 'alphafold': {
       const metaResp = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${source.id}`, { signal });
       if (!metaResp.ok) {
-        throw new Error(
-          metaResp.status === 404
-            ? `UniProt ID "${source.id}" not found in AlphaFold DB`
-            : `Failed to fetch AlphaFold metadata: ${metaResp.statusText || metaResp.status}`
-        );
+        throw metaResp.status === 404
+          ? new LoadError(`UniProt ID "${source.id}" not found in AlphaFold DB`, 'not_found')
+          : new LoadError(`Failed to fetch AlphaFold metadata: ${metaResp.statusText || metaResp.status}`, 'network');
       }
       const metadata = (await metaResp.json()) as AlphaFoldEntry[] | AlphaFoldEntry;
       const entries = Array.isArray(metadata) ? metadata : [metadata];
       // Some accessions return several models (isoforms): take the canonical one.
       const entry = entries.find((e) => e?.uniprotAccession === source.id) ?? entries[0];
       const cifUrl = entry?.cifUrl;
-      if (!cifUrl) throw new Error('No structure file available for this UniProt ID');
+      if (!cifUrl) throw new LoadError('No structure file available for this UniProt ID', 'not_found');
       const cifResp = await fetch(cifUrl, { signal });
-      if (!cifResp.ok) throw new Error(`Failed to fetch AlphaFold structure: ${cifResp.statusText || cifResp.status}`);
+      if (!cifResp.ok) throw new LoadError(`Failed to fetch AlphaFold structure: ${cifResp.statusText || cifResp.status}`, 'network');
       const name = `AF-${source.id}`;
-      const molecule = parseByFormat(await cifResp.text(), 'cif');
+      const molecule = parse(await cifResp.text(), (text) => parseByFormat(text, 'cif'));
       molecule.name = name;
       return { molecule, name };
     }
     case 'pubchem':
       return loadPubchem(source.cid, signal);
     case 'inline': {
-      const molecule = parseByFormat(source.data, source.format);
+      const molecule = parse(source.data, (text) => parseByFormat(text, source.format));
       return { molecule, name: molecule.name || 'Structure' };
     }
     default: {
