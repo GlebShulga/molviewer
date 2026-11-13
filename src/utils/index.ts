@@ -6,7 +6,7 @@ export { detectAromaticRings } from './aromaticDetection';
 export { detectSecondaryStructure } from './secondaryStructureDetection';
 export { extractBackbone, hasBackboneData, type BackboneResidue, type BackboneChain } from './backboneExtraction';
 export { generateBackboneSpline, segmentSplineByStructure, type SplinePoint, type SplineSegment } from './splineGeneration';
-export { generateHelixGeometry, generateSheetGeometry, generateCoilGeometry, mergeGeometries } from './cartoonGeometry';
+export { generateHelixGeometry, generateSheetGeometry, generateCoilGeometry } from './cartoonGeometry';
 export {
   loadMoleculeAsync,
   getSavedMolecules,

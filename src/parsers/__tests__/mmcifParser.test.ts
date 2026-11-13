@@ -563,3 +563,193 @@ ${atomHeaders}`;
     expect(parseMMCIF(cif).atoms.map((a) => a.secondaryStructure)).toEqual(['coil', 'helix', 'helix']);
   });
 });
+
+describe('parseMMCIF loop rows and column fallbacks', () => {
+  /** An atom loop with label_ and auth_ chain/number columns, one CA per row. */
+  const atoms = (rows: string) => `loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_seq_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+${rows}
+#
+`;
+  const ss = (m: ReturnType<typeof parseMMCIF>) =>
+    m.atoms.map((a) => `${a.chainId}${a.residueNumber}${a.insertionCode ?? ''}:${a.secondaryStructure}`);
+
+  it('falls through an auth_ value of . or ? to the label_ column', () => {
+    const m = parseMMCIF(`data_T
+${atoms(`ATOM 1 C CA ALA A 7 . ? ? 0 0 0
+ATOM 2 C CA ALA A 8 B 108 ? 3.8 0 0`)}`);
+    expect(m.atoms.map((a) => [a.chainId, a.residueNumber])).toEqual([['A', 7], ['B', 108]]);
+  });
+
+  it('skips atom rows with fewer values than columns, and rows without coordinates', () => {
+    const m = parseMMCIF(`data_T
+${atoms(`ATOM 1 C CA ALA A 1 A 1 ? 0 0 0
+ATOM 2 C CA ALA A 2 A 2 ? 3.8 0
+ATOM 3 C CA ALA A 3 A 3 ? 7.6 x 0
+ATOM 4 C CA ALA A 4 A 4 ? 11.4 0 0`)}`);
+    expect(m.atoms.map((a) => a.residueNumber)).toEqual([1, 4]);
+  });
+
+  it('reads helix and sheet ranges from label_ columns when auth_ columns are missing', () => {
+    const m = parseMMCIF(`data_T
+loop_
+_struct_conf.conf_type_id
+_struct_conf.beg_label_asym_id
+_struct_conf.beg_label_seq_id
+_struct_conf.end_label_seq_id
+HELX_P A 1 2
+#
+loop_
+_struct_sheet_range.sheet_id
+_struct_sheet_range.beg_label_asym_id
+_struct_sheet_range.beg_label_seq_id
+_struct_sheet_range.end_label_seq_id
+S1 A 4 4
+#
+${atoms(`ATOM 1 C CA ALA A 1 ? ? ? 0 0 0
+ATOM 2 C CA ALA A 2 ? ? ? 3.8 0 0
+ATOM 3 C CA ALA A 3 ? ? ? 7.6 0 0
+ATOM 4 C CA ALA A 4 ? ? ? 11.4 0 0`)}`);
+    expect(ss(m)).toEqual(['A1:helix', 'A2:helix', 'A3:coil', 'A4:sheet']);
+  });
+
+  it('falls through auth_ values of . or ? in ranges to the label_ columns', () => {
+    const m = parseMMCIF(`data_T
+loop_
+_struct_conf.conf_type_id
+_struct_conf.beg_auth_asym_id
+_struct_conf.beg_label_asym_id
+_struct_conf.beg_auth_seq_id
+_struct_conf.beg_label_seq_id
+_struct_conf.end_auth_seq_id
+_struct_conf.end_label_seq_id
+HELX_P ? A . 2 ? 3
+#
+${atoms(`ATOM 1 C CA ALA A 1 ? ? ? 0 0 0
+ATOM 2 C CA ALA A 2 ? ? ? 3.8 0 0
+ATOM 3 C CA ALA A 3 ? ? ? 7.6 0 0`)}`);
+    expect(ss(m)).toEqual(['A1:coil', 'A2:helix', 'A3:helix']);
+  });
+
+  it('ignores conf types other than HELX, rows without a type, short rows and unreadable ranges', () => {
+    const m = parseMMCIF(`data_T
+loop_
+_struct_conf.conf_type_id
+_struct_conf.beg_auth_asym_id
+_struct_conf.beg_auth_seq_id
+_struct_conf.end_auth_seq_id
+TURN_P A 1 1
+? A 2 2
+HELX_P A 3
+HELX_P A x 4
+HELX_P ? 4 4
+helx_lh_pp_p A 5 5
+#
+loop_
+_struct_sheet_range.beg_auth_asym_id
+_struct_sheet_range.beg_auth_seq_id
+_struct_sheet_range.end_auth_seq_id
+A 6
+A 6 y
+. 6 6
+A 7 7
+#
+${atoms(`ATOM 1 C CA ALA A 1 A 1 ? 0 0 0
+ATOM 2 C CA ALA A 2 A 2 ? 3.8 0 0
+ATOM 3 C CA ALA A 3 A 3 ? 7.6 0 0
+ATOM 4 C CA ALA A 4 A 4 ? 11.4 0 0
+ATOM 5 C CA ALA A 5 A 5 ? 15.2 0 0
+ATOM 6 C CA ALA A 6 A 6 ? 19.0 0 0
+ATOM 7 C CA ALA A 7 A 7 ? 22.8 0 0`)}`);
+    expect(ss(m)).toEqual(['A1:coil', 'A2:coil', 'A3:coil', 'A4:coil', 'A5:helix', 'A6:coil', 'A7:sheet']);
+  });
+
+  it('reads insertion codes on atoms and on both ends of helix and sheet ranges', () => {
+    const m = parseMMCIF(`data_T
+loop_
+_struct_conf.conf_type_id
+_struct_conf.beg_auth_asym_id
+_struct_conf.beg_auth_seq_id
+_struct_conf.pdbx_beg_PDB_ins_code
+_struct_conf.end_auth_seq_id
+_struct_conf.pdbx_end_PDB_ins_code
+HELX_P A 10 A 10 B
+#
+loop_
+_struct_sheet_range.beg_auth_asym_id
+_struct_sheet_range.beg_auth_seq_id
+_struct_sheet_range.pdbx_beg_PDB_ins_code
+_struct_sheet_range.end_auth_seq_id
+_struct_sheet_range.pdbx_end_PDB_ins_code
+A 11 ? 11 A
+#
+${atoms(`ATOM 1 C CA ALA A 10 A 10 ? 0 0 0
+ATOM 2 C CA ALA A 10 A 10 A 3.8 0 0
+ATOM 3 C CA ALA A 10 A 10 B 7.6 0 0
+ATOM 4 C CA ALA A 10 A 10 C 11.4 0 0
+ATOM 5 C CA ALA A 11 A 11 . 15.2 0 0
+ATOM 6 C CA ALA A 11 A 11 A 19.0 0 0
+ATOM 7 C CA ALA A 11 A 11 B 22.8 0 0`)}`);
+    expect(ss(m)).toEqual([
+      'A10:coil', 'A10A:helix', 'A10B:helix', 'A10C:coil',
+      'A11:sheet', 'A11A:sheet', 'A11B:coil',
+    ]);
+  });
+});
+
+describe('parseMMCIF indented loop headers', () => {
+  const indent = (block: string) => block.replace(/^_/gm, '  _');
+  const atomLoop = `loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_comp_id
+_atom_site.auth_asym_id
+_atom_site.auth_seq_id
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+ATOM 1 C CA ALA A 1 0.0 0.0 0.0
+ATOM 2 C CA ALA A 2 3.8 0.0 0.0
+ATOM 3 C CA ALA A 3 7.6 0.0 0.0
+#
+`;
+  const helixLoop = `loop_
+_struct_conf.conf_type_id
+_struct_conf.beg_auth_asym_id
+_struct_conf.beg_auth_seq_id
+_struct_conf.end_auth_seq_id
+HELX_P A 1 1
+#
+`;
+  const sheetLoop = `loop_
+_struct_sheet_range.beg_auth_asym_id
+_struct_sheet_range.beg_auth_seq_id
+_struct_sheet_range.end_auth_seq_id
+A 3 3
+#
+`;
+
+  it('reads an atom loop with indented headers', () => {
+    const m = parseMMCIF(`data_T\n${indent(atomLoop)}`);
+    expect(m.atoms.map((a) => a.residueNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('reads helix and sheet loops with indented headers', () => {
+    const m = parseMMCIF(`data_T\n${indent(helixLoop)}${indent(sheetLoop)}${atomLoop}`);
+    expect(m.atoms.map((a) => a.secondaryStructure)).toEqual(['helix', 'coil', 'sheet']);
+  });
+});

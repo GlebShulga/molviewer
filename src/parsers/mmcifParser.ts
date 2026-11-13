@@ -78,83 +78,107 @@ function tokenizeLine(line: string): string[] {
   return tokens;
 }
 
+/** A loop's column headers: where each column is, and where the data rows start. */
+interface LoopHeader {
+  /** Index of a column by its name after the category prefix (e.g. 'Cartn_x'). */
+  col(name: string): number | undefined;
+  /** Number of columns: a row with fewer values is skipped. */
+  width: number;
+  /** Index of the first line after the headers. */
+  dataStart: number;
+}
+
+/**
+ * Read a loop's column headers from `start`, matched on the trimmed line like
+ * the loop detection in parseMMCIF and readKeyValueBlock, so an indented
+ * header is read too.
+ */
+function readLoopHeader(lines: string[], start: number, prefix: string): LoopHeader {
+  const columns = new Map<string, number>();
+  let i = start;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line.startsWith(prefix)) break;
+    columns.set(line.slice(prefix.length), columns.size);
+    i++;
+  }
+  return { col: (name) => columns.get(name), width: columns.size, dataStart: i };
+}
+
+/**
+ * Call `onRow` with the values of each data row, one row at a time (an atom
+ * loop can hold hundreds of thousands of rows), skipping blank lines and rows
+ * with fewer than `width` values. Returns the index of the line that ended the
+ * loop (the next `loop_`, `data_`, `#` or `_` line), or `lines.length`.
+ */
+function forEachLoopRow(lines: string[], dataStart: number, width: number, onRow: (tokens: string[]) => void): number {
+  let i = dataStart;
+  for (; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('loop_') || line.startsWith('data_') || line.startsWith('#') || line.startsWith('_')) break;
+    if (!line) continue;
+    const tokens = tokenizeLine(line);
+    if (tokens.length >= width) onRow(tokens);
+  }
+  return i;
+}
+
+/**
+ * The first value among the given columns that is present and not `.`/`?`
+ * (or empty): `first(tokens, auth, label)` prefers the auth_ column and falls
+ * back to the label_ one.
+ */
+function first(tokens: string[], ...indices: (number | undefined)[]): string | null {
+  for (const index of indices) {
+    if (index === undefined) continue;
+    const value = parseValue(tokens[index]);
+    if (value) return value;
+  }
+  return null;
+}
+
 /**
  * Parse the _atom_site loop to extract atom data
  */
 function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[], endIndex: number } {
   const atoms: Atom[] = [];
-  const columnMap: Map<string, number> = new Map();
-
-  // Parse column headers
-  let i = startIndex;
-  while (i < lines.length && lines[i].startsWith('_atom_site.')) {
-    const columnName = lines[i].trim();
-    columnMap.set(columnName, columnMap.size);
-    i++;
-  }
+  const { col, width, dataStart } = readLoopHeader(lines, startIndex, '_atom_site.');
 
   // Required columns
-  const requiredCols = ['_atom_site.Cartn_x', '_atom_site.Cartn_y', '_atom_site.Cartn_z'];
-  for (const col of requiredCols) {
-    if (!columnMap.has(col)) {
-      throw new Error(`Missing required column: ${col}`);
-    }
+  const cartnXIdx = col('Cartn_x');
+  const cartnYIdx = col('Cartn_y');
+  const cartnZIdx = col('Cartn_z');
+  if (cartnXIdx === undefined || cartnYIdx === undefined || cartnZIdx === undefined) {
+    const missing = ['Cartn_x', 'Cartn_y', 'Cartn_z'].find((name) => col(name) === undefined);
+    throw new Error(`Missing required column: _atom_site.${missing}`);
   }
 
   // Column indices (with fallbacks)
-  const idIdx = columnMap.get('_atom_site.id');
-  const typeSymbolIdx = columnMap.get('_atom_site.type_symbol');
-  const labelAtomIdIdx = columnMap.get('_atom_site.label_atom_id');
-  const labelCompIdIdx = columnMap.get('_atom_site.label_comp_id');
-  const authAsymIdIdx = columnMap.get('_atom_site.auth_asym_id');
-  const labelAsymIdIdx = columnMap.get('_atom_site.label_asym_id');
-  const authSeqIdIdx = columnMap.get('_atom_site.auth_seq_id');
-  const labelSeqIdIdx = columnMap.get('_atom_site.label_seq_id');
-  const cartnXIdx = columnMap.get('_atom_site.Cartn_x')!;
-  const cartnYIdx = columnMap.get('_atom_site.Cartn_y')!;
-  const cartnZIdx = columnMap.get('_atom_site.Cartn_z')!;
-  const occupancyIdx = columnMap.get('_atom_site.occupancy');
-  const bFactorIdx = columnMap.get('_atom_site.B_iso_or_equiv');
-  const modelNumIdx = columnMap.get('_atom_site.pdbx_PDB_model_num');
-  const altIdIdx = columnMap.get('_atom_site.label_alt_id');
-  const insCodeIdx = columnMap.get('_atom_site.pdbx_PDB_ins_code');
+  const idIdx = col('id');
+  const typeSymbolIdx = col('type_symbol');
+  const labelAtomIdIdx = col('label_atom_id');
+  const labelCompIdIdx = col('label_comp_id');
+  const authAsymIdIdx = col('auth_asym_id');
+  const labelAsymIdIdx = col('label_asym_id');
+  const authSeqIdIdx = col('auth_seq_id');
+  const labelSeqIdIdx = col('label_seq_id');
+  const occupancyIdx = col('occupancy');
+  const bFactorIdx = col('B_iso_or_equiv');
+  const modelNumIdx = col('pdbx_PDB_model_num');
+  const altIdIdx = col('label_alt_id');
+  const insCodeIdx = col('pdbx_PDB_ins_code');
 
-  let atomIndex = 0;
   let firstModel: string | null = null;
   const keepAltLoc = createAltLocFilter();
 
-  // Parse data rows
-  while (i < lines.length) {
-    const line = lines[i].trim();
-
-    // Stop at next loop_, data_, or # comment
-    if (line.startsWith('loop_') || line.startsWith('data_') ||
-        line.startsWith('#') || line.startsWith('_')) {
-      break;
-    }
-
-    // Skip empty lines
-    if (!line) {
-      i++;
-      continue;
-    }
-
-    const tokens = tokenizeLine(line);
-    if (tokens.length < columnMap.size) {
-      i++;
-      continue;
-    }
-
+  const endIndex = forEachLoopRow(lines, dataStart, width, (tokens) => {
     // Handle multi-model structures (NMR): only parse first model
-    if (modelNumIdx !== undefined) {
-      const modelNum = parseValue(tokens[modelNumIdx]);
-      if (modelNum !== null) {
-        if (firstModel === null) {
-          firstModel = modelNum;
-        } else if (modelNum !== firstModel) {
-          i++;
-          continue; // Skip atoms from other models
-        }
+    const modelNum = first(tokens, modelNumIdx);
+    if (modelNum !== null) {
+      if (firstModel === null) {
+        firstModel = modelNum;
+      } else if (modelNum !== firstModel) {
+        return; // Skip atoms from other models
       }
     }
 
@@ -162,35 +186,25 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
     const x = parseFloat(tokens[cartnXIdx]);
     const y = parseFloat(tokens[cartnYIdx]);
     const z = parseFloat(tokens[cartnZIdx]);
+    if (isNaN(x) || isNaN(y) || isNaN(z)) return;
 
-    if (isNaN(x) || isNaN(y) || isNaN(z)) {
-      i++;
-      continue;
-    }
-
+    const atomIndex = atoms.length;
     const serial = idIdx !== undefined ? parseInt(tokens[idIdx], 10) : atomIndex + 1;
-    const element = typeSymbolIdx !== undefined ? parseValue(tokens[typeSymbolIdx]) || 'C' : 'C';
-    const name = labelAtomIdIdx !== undefined ? parseValue(tokens[labelAtomIdIdx]) || element : element;
-    const residueName = labelCompIdIdx !== undefined ? parseValue(tokens[labelCompIdIdx]) || 'UNK' : 'UNK';
+    const element = first(tokens, typeSymbolIdx) || 'C';
+    const name = first(tokens, labelAtomIdIdx) || element;
+    const residueName = first(tokens, labelCompIdIdx) || 'UNK';
 
     // Prefer auth_ fields with fallback to label_ fields
-    const chainId = (authAsymIdIdx !== undefined ? parseValue(tokens[authAsymIdIdx]) : null)
-                 || (labelAsymIdIdx !== undefined ? parseValue(tokens[labelAsymIdIdx]) : null)
-                 || undefined;
-
-    const residueNumberStr = (authSeqIdIdx !== undefined ? parseValue(tokens[authSeqIdIdx]) : null)
-                          || (labelSeqIdIdx !== undefined ? parseValue(tokens[labelSeqIdIdx]) : null);
+    const chainId = first(tokens, authAsymIdIdx, labelAsymIdIdx) || undefined;
+    const residueNumberStr = first(tokens, authSeqIdIdx, labelSeqIdIdx);
     const residueNumber = residueNumberStr ? parseInt(residueNumberStr, 10) : undefined;
     // '?' and '.' (parseValue's null) mean no insertion code
-    const insertionCode = (insCodeIdx !== undefined ? parseValue(tokens[insCodeIdx]) : null) || undefined;
+    const insertionCode = first(tokens, insCodeIdx) || undefined;
 
     // One alternate location per residue (the first seen), so a residue
     // whose only conformer is B is kept
-    const altLoc = (altIdIdx !== undefined ? parseValue(tokens[altIdIdx]) : null) || undefined;
-    if (!keepAltLoc({ altLoc, chainId, residueNumber, insertionCode, residueName })) {
-      i++;
-      continue;
-    }
+    const altLoc = first(tokens, altIdIdx) || undefined;
+    if (!keepAltLoc({ altLoc, chainId, residueNumber, insertionCode, residueName })) return;
 
     // 0 is a real occupancy; '?' and '.' (and a missing column) mean 1
     const occupancyValue = occupancyIdx !== undefined ? parseFloat(tokens[occupancyIdx]) : NaN;
@@ -213,166 +227,63 @@ function parseAtomSiteLoop(lines: string[], startIndex: number): { atoms: Atom[]
       ...(altLoc ? { altLoc } : {}),
       tempFactor: isNaN(tempFactor!) ? undefined : tempFactor,
     });
+  });
 
-    atomIndex++;
-    i++;
-  }
-
-  return { atoms, endIndex: i };
+  return { atoms, endIndex };
 }
 
-/**
- * Parse _struct_conf loop for helix records
- */
-function parseStructConf(lines: string[], startIndex: number): { ranges: SecondaryStructureRange[], endIndex: number } {
-  const ranges: SecondaryStructureRange[] = [];
-  const columnMap: Map<string, number> = new Map();
-
-  // Parse column headers
-  let i = startIndex;
-  while (i < lines.length && lines[i].startsWith('_struct_conf.')) {
-    const columnName = lines[i].trim();
-    columnMap.set(columnName, columnMap.size);
-    i++;
-  }
-
-  const confTypeIdx = columnMap.get('_struct_conf.conf_type_id');
-  const begAuthAsymIdx = columnMap.get('_struct_conf.beg_auth_asym_id');
-  const begLabelAsymIdx = columnMap.get('_struct_conf.beg_label_asym_id');
-  const begAuthSeqIdx = columnMap.get('_struct_conf.beg_auth_seq_id');
-  const begLabelSeqIdx = columnMap.get('_struct_conf.beg_label_seq_id');
-  const endAuthSeqIdx = columnMap.get('_struct_conf.end_auth_seq_id');
-  const endLabelSeqIdx = columnMap.get('_struct_conf.end_label_seq_id');
-  const begInsIdx = columnMap.get('_struct_conf.pdbx_beg_PDB_ins_code');
-  const endInsIdx = columnMap.get('_struct_conf.pdbx_end_PDB_ins_code');
-
-  // Parse data rows
-  while (i < lines.length) {
-    const line = lines[i].trim();
-
-    if (line.startsWith('loop_') || line.startsWith('data_') ||
-        line.startsWith('#') || line.startsWith('_')) {
-      break;
-    }
-
-    if (!line) {
-      i++;
-      continue;
-    }
-
-    const tokens = tokenizeLine(line);
-    if (tokens.length < columnMap.size) {
-      i++;
-      continue;
-    }
-
-    const confType = confTypeIdx !== undefined ? parseValue(tokens[confTypeIdx]) : null;
-
-    // Only parse helix types (HELX_*, HELIX, etc.)
-    if (confType && confType.toUpperCase().startsWith('HELX')) {
-      const chainId = (begAuthAsymIdx !== undefined ? parseValue(tokens[begAuthAsymIdx]) : null)
-                   || (begLabelAsymIdx !== undefined ? parseValue(tokens[begLabelAsymIdx]) : null);
-
-      const startResStr = (begAuthSeqIdx !== undefined ? parseValue(tokens[begAuthSeqIdx]) : null)
-                       || (begLabelSeqIdx !== undefined ? parseValue(tokens[begLabelSeqIdx]) : null);
-
-      const endResStr = (endAuthSeqIdx !== undefined ? parseValue(tokens[endAuthSeqIdx]) : null)
-                     || (endLabelSeqIdx !== undefined ? parseValue(tokens[endLabelSeqIdx]) : null);
-
-      if (chainId && startResStr && endResStr) {
-        const startRes = parseInt(startResStr, 10);
-        const endRes = parseInt(endResStr, 10);
-        if (!isNaN(startRes) && !isNaN(endRes)) {
-          ranges.push({
-            type: 'helix',
-            chainId,
-            startResNum: startRes,
-            startInsertionCode: (begInsIdx !== undefined ? parseValue(tokens[begInsIdx]) : null) || undefined,
-            endResNum: endRes,
-            endInsertionCode: (endInsIdx !== undefined ? parseValue(tokens[endInsIdx]) : null) || undefined,
-          });
-        }
-      }
-    }
-
-    i++;
-  }
-
-  return { ranges, endIndex: i };
+/** A category of secondary-structure ranges: helices or sheet strands. */
+interface RangeCategory {
+  prefix: string;
+  type: SecondaryStructureRange['type'];
+  /** Only rows whose value in this column starts with `typePrefix` (case-insensitive) are ranges. */
+  typeColumn?: string;
+  typePrefix?: string;
 }
 
+const RANGE_CATEGORIES: readonly RangeCategory[] = [
+  // Only helix types (HELX_P, HELX_LH_PP_P, ...): turns share the category
+  { prefix: '_struct_conf.', type: 'helix', typeColumn: 'conf_type_id', typePrefix: 'HELX' },
+  { prefix: '_struct_sheet_range.', type: 'sheet' },
+];
+
 /**
- * Parse _struct_sheet_range loop for sheet records
+ * Parse a _struct_conf or _struct_sheet_range loop into ranges: chain, start
+ * and end residue (auth_ columns, else label_), with insertion codes.
  */
-function parseStructSheetRange(lines: string[], startIndex: number): { ranges: SecondaryStructureRange[], endIndex: number } {
+function parseRangeLoop(
+  lines: string[],
+  startIndex: number,
+  { prefix, type, typeColumn, typePrefix = '' }: RangeCategory
+): { ranges: SecondaryStructureRange[], endIndex: number } {
   const ranges: SecondaryStructureRange[] = [];
-  const columnMap: Map<string, number> = new Map();
+  const { col, width, dataStart } = readLoopHeader(lines, startIndex, prefix);
+  const typeIdx = typeColumn === undefined ? undefined : col(typeColumn);
+  const chainIdx = [col('beg_auth_asym_id'), col('beg_label_asym_id')];
+  const startIdx = [col('beg_auth_seq_id'), col('beg_label_seq_id')];
+  const endIdx = [col('end_auth_seq_id'), col('end_label_seq_id')];
+  const startInsIdx = col('pdbx_beg_PDB_ins_code');
+  const endInsIdx = col('pdbx_end_PDB_ins_code');
 
-  // Parse column headers
-  let i = startIndex;
-  while (i < lines.length && lines[i].startsWith('_struct_sheet_range.')) {
-    const columnName = lines[i].trim();
-    columnMap.set(columnName, columnMap.size);
-    i++;
-  }
+  const endIndex = forEachLoopRow(lines, dataStart, width, (tokens) => {
+    // A row without a type (or without the column) is not a range of this type
+    if (typeColumn !== undefined && !first(tokens, typeIdx)?.toUpperCase().startsWith(typePrefix)) return;
+    const chainId = first(tokens, ...chainIdx);
+    // A missing number ('') parses as NaN
+    const startResNum = parseInt(first(tokens, ...startIdx) ?? '', 10);
+    const endResNum = parseInt(first(tokens, ...endIdx) ?? '', 10);
+    if (!chainId || isNaN(startResNum) || isNaN(endResNum)) return;
+    ranges.push({
+      type,
+      chainId,
+      startResNum,
+      startInsertionCode: first(tokens, startInsIdx) ?? undefined,
+      endResNum,
+      endInsertionCode: first(tokens, endInsIdx) ?? undefined,
+    });
+  });
 
-  const begAuthAsymIdx = columnMap.get('_struct_sheet_range.beg_auth_asym_id');
-  const begLabelAsymIdx = columnMap.get('_struct_sheet_range.beg_label_asym_id');
-  const begAuthSeqIdx = columnMap.get('_struct_sheet_range.beg_auth_seq_id');
-  const begLabelSeqIdx = columnMap.get('_struct_sheet_range.beg_label_seq_id');
-  const endAuthSeqIdx = columnMap.get('_struct_sheet_range.end_auth_seq_id');
-  const endLabelSeqIdx = columnMap.get('_struct_sheet_range.end_label_seq_id');
-  const begInsIdx = columnMap.get('_struct_sheet_range.pdbx_beg_PDB_ins_code');
-  const endInsIdx = columnMap.get('_struct_sheet_range.pdbx_end_PDB_ins_code');
-
-  // Parse data rows
-  while (i < lines.length) {
-    const line = lines[i].trim();
-
-    if (line.startsWith('loop_') || line.startsWith('data_') ||
-        line.startsWith('#') || line.startsWith('_')) {
-      break;
-    }
-
-    if (!line) {
-      i++;
-      continue;
-    }
-
-    const tokens = tokenizeLine(line);
-    if (tokens.length < columnMap.size) {
-      i++;
-      continue;
-    }
-
-    const chainId = (begAuthAsymIdx !== undefined ? parseValue(tokens[begAuthAsymIdx]) : null)
-                 || (begLabelAsymIdx !== undefined ? parseValue(tokens[begLabelAsymIdx]) : null);
-
-    const startResStr = (begAuthSeqIdx !== undefined ? parseValue(tokens[begAuthSeqIdx]) : null)
-                     || (begLabelSeqIdx !== undefined ? parseValue(tokens[begLabelSeqIdx]) : null);
-
-    const endResStr = (endAuthSeqIdx !== undefined ? parseValue(tokens[endAuthSeqIdx]) : null)
-                   || (endLabelSeqIdx !== undefined ? parseValue(tokens[endLabelSeqIdx]) : null);
-
-    if (chainId && startResStr && endResStr) {
-      const startRes = parseInt(startResStr, 10);
-      const endRes = parseInt(endResStr, 10);
-      if (!isNaN(startRes) && !isNaN(endRes)) {
-        ranges.push({
-          type: 'sheet',
-          chainId,
-          startResNum: startRes,
-          startInsertionCode: (begInsIdx !== undefined ? parseValue(tokens[begInsIdx]) : null) || undefined,
-          endResNum: endRes,
-          endInsertionCode: (endInsIdx !== undefined ? parseValue(tokens[endInsIdx]) : null) || undefined,
-        });
-      }
-    }
-
-    i++;
-  }
-
-  return { ranges, endIndex: i };
+  return { ranges, endIndex };
 }
 
 /**
@@ -461,6 +372,28 @@ export function parseMMCIF(
     }
   }
 
+  // The categories read, each from a loop (header lines from `start`) or a
+  // key-value block (turned into the same shape); returns the end index
+  const readers: { prefix: string; read: (block: string[], start: number) => number }[] = [
+    {
+      prefix: '_atom_site.',
+      read: (block, start) => {
+        const result = parseAtomSiteLoop(block, start);
+        atoms = result.atoms;
+        return result.endIndex;
+      },
+    },
+    ...RANGE_CATEGORIES.map((category) => ({
+      prefix: category.prefix,
+      read: (block: string[], start: number) => {
+        const result = parseRangeLoop(block, start, category);
+        ssRanges.push(...result.ranges);
+        return result.endIndex;
+      },
+    })),
+  ];
+  const readerFor = (text: string) => readers.find((r) => text.startsWith(r.prefix));
+
   // Parse the file
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -472,39 +405,16 @@ export function parseMMCIF(
       // would pair up two by two)
       let header = i + 1;
       while (header < lines.length && (!lines[header].trim() || lines[header].trim().startsWith('#'))) header++;
-      if (header < lines.length) {
-        const nextLine = lines[header].trim();
-
-        if (nextLine.startsWith('_atom_site.')) {
-          const result = parseAtomSiteLoop(lines, header);
-          atoms = result.atoms;
-          i = result.endIndex - 1;
-        } else if (nextLine.startsWith('_struct_conf.')) {
-          const result = parseStructConf(lines, header);
-          ssRanges.push(...result.ranges);
-          i = result.endIndex - 1;
-        } else if (nextLine.startsWith('_struct_sheet_range.')) {
-          const result = parseStructSheetRange(lines, header);
-          ssRanges.push(...result.ranges);
-          i = result.endIndex - 1;
-        }
-      }
+      const loopReader = header < lines.length ? readerFor(lines[header].trim()) : undefined;
+      if (loopReader) i = loopReader.read(lines, header) - 1;
+      continue;
     }
 
     // The same categories written as key-value pairs (a single row, no loop_)
-    if (line.startsWith('_atom_site.')) {
-      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_atom_site.');
-      atoms = parseAtomSiteLoop(loopLines, 0).atoms;
-      i = endIndex - 1;
-      continue;
-    } else if (line.startsWith('_struct_conf.')) {
-      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_struct_conf.');
-      ssRanges.push(...parseStructConf(loopLines, 0).ranges);
-      i = endIndex - 1;
-      continue;
-    } else if (line.startsWith('_struct_sheet_range.')) {
-      const { loopLines, endIndex } = readKeyValueBlock(lines, i, '_struct_sheet_range.');
-      ssRanges.push(...parseStructSheetRange(loopLines, 0).ranges);
+    const reader = readerFor(line);
+    if (reader) {
+      const { loopLines, endIndex } = readKeyValueBlock(lines, i, reader.prefix);
+      reader.read(loopLines, 0);
       i = endIndex - 1;
       continue;
     }

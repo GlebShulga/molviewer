@@ -1,8 +1,17 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { fetchPdbDetails, normalizeEntities } from './pdb';
+import {
+  fetchPdbDetails,
+  normalizeEntities,
+  normalizePdbeSecondaryStructure,
+  normalizeRcsbSecondaryStructure,
+} from './pdb';
 import { fixtureFetch } from './__fixtures__/fixtureFetch';
 import type { PdbDetails } from './types';
+
+// Timeout for the tests where an upstream hangs or answers late. It caps every
+// request in the test, not only the slow one, so it needs headroom on a busy machine.
+const TIMEOUT_MS = 300;
 
 async function okData(result: Awaited<ReturnType<typeof fetchPdbDetails>>): Promise<PdbDetails> {
   expect(result.status).toBe('ok');
@@ -150,16 +159,16 @@ describe('fetchPdbDetails (3DNI fixtures)', () => {
 
   it('treats a PDBe timeout like an outage (fallback, partial)', async () => {
     const { fetchImpl } = fixtureFetch({ 'pdbe-ss-3DNI.json': { hang: true } });
-    const d = await okData(await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: 50 }));
+    const d = await okData(await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: TIMEOUT_MS }));
     expect(d.partial).toContain('pdbeSecondaryStructure');
     expect(d.secondaryStructure?.source).toBe('rcsb');
   });
 
   it('falls back on a slow PDBe answer and lets it finish in the background', async () => {
-    const { fetchImpl } = fixtureFetch({ 'pdbe-ss-3DNI.json': { delayMs: 200 } });
+    const { fetchImpl } = fixtureFetch({ 'pdbe-ss-3DNI.json': { delayMs: 2 * TIMEOUT_MS } });
     const background: Promise<unknown>[] = [];
     const d = await okData(
-      await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: 50, waitUntil: (p) => void background.push(p) })
+      await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: TIMEOUT_MS, waitUntil: (p) => void background.push(p) })
     );
     expect(d.partial).toContain('pdbeSecondaryStructure');
     expect(d.secondaryStructure?.source).toBe('rcsb');
@@ -200,7 +209,7 @@ describe('fetchPdbDetails (3DNI fixtures)', () => {
 
   it('marks related as partial when the search API fails', async () => {
     const { fetchImpl } = fixtureFetch({ 'rcsb-search-P00639.json': { hang: true } });
-    const d = await okData(await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: 50 }));
+    const d = await okData(await fetchPdbDetails('3DNI', { fetchImpl, timeoutMs: TIMEOUT_MS }));
     expect(d.related).toEqual([]);
     expect(d.partial).toEqual(['related']);
   });
@@ -248,5 +257,343 @@ describe('normalizeEntities ligand filtering', () => {
     });
     expect(out.ligands.map((l) => `${l.id}x${l.instanceCount}`)).toEqual(['HEMx4', 'ZNx1', 'MGx1']);
     expect(out.excludedLigandIds).toEqual(['SO4', 'GOL', 'HOH']);
+  });
+});
+
+// Upstream JSON has nulls where the types say string: the normalizers drop them.
+type EntitiesInput = Parameters<typeof normalizeEntities>[0];
+type PdbeInput = Parameters<typeof normalizePdbeSecondaryStructure>[1];
+type RcsbInput = Parameters<typeof normalizeRcsbSecondaryStructure>[0];
+
+describe('normalizeEntities missing and null fields', () => {
+  it('returns empty sections for an entry without data', () => {
+    expect(normalizeEntities({ entry: null })).toEqual({
+      entities: [],
+      ligands: [],
+      excludedLigandIds: [],
+      assembly: undefined,
+    });
+  });
+
+  it('reads a polymer entity with no fields as an empty one of type other', () => {
+    const out = normalizeEntities({ entry: { polymer_entities: [{}] } });
+    expect(out.entities).toEqual([
+      {
+        entityId: '',
+        description: undefined,
+        chainIds: [],
+        organisms: [],
+        uniprotIds: [],
+        sequence: undefined,
+        length: undefined,
+        type: 'other',
+      },
+    ]);
+  });
+
+  it('drops null and blank values, merges UniProt ids and sorts entities by id', () => {
+    const out = normalizeEntities({
+      entry: {
+        polymer_entities: [
+          {
+            rcsb_polymer_entity_container_identifiers: { entity_id: '10', auth_asym_ids: ['C'] },
+            entity_poly: { rcsb_entity_polymer_type: 'NA-hybrid' },
+          },
+          {
+            rcsb_polymer_entity: { pdbx_description: '  ?  ' },
+            rcsb_polymer_entity_container_identifiers: {
+              entity_id: '2',
+              auth_asym_ids: ['A', null, 'B'],
+              uniprot_ids: ['P1', null],
+              reference_sequence_identifiers: [
+                { database_name: 'UniProt', database_accession: 'P1' },
+                { database_name: 'UniProt', database_accession: 'P2' },
+                { database_name: 'GenBank', database_accession: 'G1' },
+                { database_name: 'UniProt' },
+              ],
+            },
+            rcsb_entity_source_organism: [
+              { scientific_name: 'Homo sapiens' },
+              { scientific_name: null },
+              { scientific_name: 'Homo sapiens' },
+            ],
+            entity_poly: {
+              pdbx_seq_one_letter_code_can: 'MKV\nLAA ',
+              rcsb_sample_sequence_length: null,
+              rcsb_entity_polymer_type: 'DNA',
+            },
+          },
+          {
+            rcsb_polymer_entity_container_identifiers: { entity_id: '1' },
+            entity_poly: { rcsb_entity_polymer_type: 'RNA', rcsb_sample_sequence_length: 76 },
+          },
+        ],
+      },
+    } as unknown as EntitiesInput);
+    expect(out.entities.map((e) => [e.entityId, e.type])).toEqual([
+      ['1', 'RNA'],
+      ['2', 'DNA'],
+      ['10', 'NA-hybrid'],
+    ]);
+    expect(out.entities[0].length).toBe(76);
+    expect(out.entities[1]).toMatchObject({
+      description: undefined,
+      chainIds: ['A', 'B'],
+      organisms: ['Homo sapiens'],
+      uniprotIds: ['P1', 'P2'],
+      sequence: 'MKVLAA',
+      length: 6,
+    });
+  });
+
+  it('names a ligand by its entity id when chem_comp is missing, and skips one without any id', () => {
+    const out = normalizeEntities({
+      entry: {
+        nonpolymer_entities: [
+          { rcsb_nonpolymer_entity_container_identifiers: { nonpolymer_comp_id: 'ATP', auth_asym_ids: null } },
+          { nonpolymer_comp: { chem_comp: null } },
+          { nonpolymer_comp: { chem_comp: { id: '  ' } } },
+        ],
+      },
+    });
+    expect(out.ligands).toEqual([
+      { id: 'ATP', name: undefined, formula: undefined, formulaWeight: undefined, instanceCount: 1, chainIds: [] },
+    ]);
+  });
+
+  it('counts a ligand by its chains when the molecule count is missing, and merges entities of one component', () => {
+    const out = normalizeEntities({
+      entry: {
+        nonpolymer_entities: [
+          {
+            rcsb_nonpolymer_entity_container_identifiers: { auth_asym_ids: ['A', 'B'] },
+            nonpolymer_comp: {
+              chem_comp: { id: 'NAG', name: 'N-ACETYL-D-GLUCOSAMINE', formula: 'C8 H15 N O6', formula_weight: 221.208 },
+            },
+          },
+          {
+            rcsb_nonpolymer_entity_container_identifiers: { auth_asym_ids: ['B', 'C'] },
+            rcsb_nonpolymer_entity: { pdbx_number_of_molecules: 5 },
+            nonpolymer_comp: { chem_comp: { id: 'NAG' } },
+          },
+        ],
+      },
+    });
+    expect(out.ligands).toEqual([
+      {
+        id: 'NAG',
+        name: 'N-ACETYL-D-GLUCOSAMINE',
+        formula: 'C8 H15 N O6',
+        formulaWeight: 221.208,
+        instanceCount: 7,
+        chainIds: ['A', 'B', 'C'],
+      },
+    ]);
+  });
+
+  it('reads the first assembly, preferring global symmetry and dropping non-string stoichiometry', () => {
+    const out = normalizeEntities({
+      entry: {
+        assemblies: [
+          null,
+          {
+            pdbx_struct_assembly: { oligomeric_count: 4, oligomeric_details: 'tetrameric' },
+            rcsb_struct_symmetry: [
+              null,
+              { kind: 'Pseudo Symmetry', oligomeric_state: 'Homo 4-mer', stoichiometry: ['A4'] },
+              { kind: 'Global Symmetry', oligomeric_state: 'Hetero 4-mer', stoichiometry: ['A2', null, 'B2'] },
+            ],
+          },
+        ],
+      },
+    } as unknown as EntitiesInput);
+    expect(out.assembly).toEqual({
+      chainCount: 4,
+      oligomericDetails: 'tetrameric',
+      oligomericState: 'Hetero 4-mer',
+      stoichiometry: ['A2', 'B2'],
+    });
+  });
+
+  it('falls back to the first symmetry, and drops an assembly with neither count nor details', () => {
+    const withState = normalizeEntities({
+      entry: {
+        assemblies: [
+          {
+            pdbx_struct_assembly: { oligomeric_details: 'monomeric' },
+            rcsb_struct_symmetry: [{ kind: 'Local Symmetry', oligomeric_state: 'Monomer' }],
+          },
+        ],
+      },
+    });
+    expect(withState.assembly).toEqual({
+      chainCount: undefined,
+      oligomericDetails: 'monomeric',
+      oligomericState: 'Monomer',
+      stoichiometry: [],
+    });
+    const empty = normalizeEntities({
+      entry: { assemblies: [{ pdbx_struct_assembly: null, rcsb_struct_symmetry: null }] },
+    });
+    expect(empty.assembly).toBeUndefined();
+  });
+});
+
+describe('normalizePdbeSecondaryStructure missing and null fields', () => {
+  const res = (n: number, auth = n, ins?: string | null) => ({
+    residue_number: n,
+    author_residue_number: auth,
+    author_insertion_code: ins,
+  });
+
+  it('returns no chains for an empty answer', () => {
+    expect(normalizePdbeSecondaryStructure('1abc', {})).toEqual({ source: 'pdbe', numbering: 'author', chains: [] });
+  });
+
+  it('reads the only entry when its key is not the requested id', () => {
+    const out = normalizePdbeSecondaryStructure('1abc', {
+      '9xyz': {
+        molecules: [{ chains: [{ chain_id: 'A', secondary_structure: { helices: [{ start: res(1), end: res(4) }] } }] }],
+      },
+    });
+    expect(out.chains.map((c) => c.chainId)).toEqual(['A']);
+    expect(out.chains[0].entityId).toBeUndefined();
+  });
+
+  it('skips chains without an id or without segments, and segments with a missing number', () => {
+    const out = normalizePdbeSecondaryStructure('1abc', {
+      '1abc': {
+        molecules: [
+          {
+            entity_id: 2,
+            chains: [
+              { secondary_structure: { helices: [{ start: res(1), end: res(4) }] } },
+              { chain_id: 'C' },
+              { chain_id: 'D', secondary_structure: { helices: [{ start: res(1) }, { end: res(4) }] } },
+              {
+                chain_id: 'B',
+                secondary_structure: {
+                  helices: [
+                    { start: res(20, 120), end: res(25, 125) },
+                    { start: { residue_number: 1 }, end: res(4) },
+                    { start: res(5, 105, 'A'), end: res(9, 109, ' ') },
+                  ],
+                  strands: [
+                    { start: res(40), end: res(44), sheet_id: 0 },
+                    { start: res(30), end: res(33), sheet_id: null },
+                    { start: res(50), end: res(52), sheet_id: 'B' },
+                  ],
+                },
+              },
+            ],
+          },
+          { chains: undefined },
+        ],
+      },
+    } as unknown as PdbeInput);
+    expect(out.chains).toHaveLength(1);
+    const [chain] = out.chains;
+    expect(chain.chainId).toBe('B');
+    expect(chain.entityId).toBe('2');
+    expect(chain.helices).toEqual([
+      { start: { number: 105, insertionCode: 'A' }, end: { number: 109 }, seqStart: 5, seqEnd: 9, length: 5 },
+      { start: { number: 120 }, end: { number: 125 }, seqStart: 20, seqEnd: 25, length: 6 },
+    ]);
+    expect(chain.strands.map((s) => [s.seqStart, s.sheetId])).toEqual([
+      [30, undefined],
+      [40, '0'],
+      [50, 'B'],
+    ]);
+  });
+
+  it('sorts chains by id', () => {
+    const chain = (chain_id: string) => ({
+      chain_id,
+      secondary_structure: { strands: [{ start: res(1), end: res(3) }] },
+    });
+    const out = normalizePdbeSecondaryStructure('1abc', { '1abc': { molecules: [{ chains: [chain('B'), chain('A')] }] } });
+    expect(out.chains.map((c) => c.chainId)).toEqual(['A', 'B']);
+  });
+});
+
+describe('normalizeRcsbSecondaryStructure missing and null fields', () => {
+  it('returns no chains for an entry without data', () => {
+    expect(normalizeRcsbSecondaryStructure({ entry: null })).toEqual({ source: 'rcsb', numbering: 'label', chains: [] });
+    const noInstances = normalizeRcsbSecondaryStructure({
+      entry: { polymer_entities: [{ polymer_entity_instances: null }] },
+    });
+    expect(noInstances.chains).toEqual([]);
+  });
+
+  it('skips instances without a chain or features, other feature types and positions without a start', () => {
+    const out = normalizeRcsbSecondaryStructure({
+      entry: {
+        polymer_entities: [
+          {
+            rcsb_polymer_entity_container_identifiers: null,
+            polymer_entity_instances: [
+              { rcsb_polymer_entity_instance_container_identifiers: null },
+              {
+                rcsb_polymer_entity_instance_container_identifiers: { auth_asym_id: 'C' },
+                rcsb_polymer_instance_feature: null,
+              },
+              {
+                rcsb_polymer_entity_instance_container_identifiers: { auth_asym_id: 'D' },
+                rcsb_polymer_instance_feature: [
+                  { type: 'UNASSIGNED_SEC_STRUCT', feature_positions: [{ beg_seq_id: 1, end_seq_id: 9 }] },
+                ],
+              },
+              {
+                rcsb_polymer_entity_instance_container_identifiers: { auth_asym_id: 'B' },
+                rcsb_polymer_instance_feature: [
+                  {
+                    type: 'HELIX_P',
+                    feature_positions: [{ beg_seq_id: 20, end_seq_id: 30 }, { end_seq_id: 5 }, { beg_seq_id: 7, end_seq_id: null }],
+                  },
+                  { type: 'SHEET', feature_id: 'S3', feature_positions: [{ beg_seq_id: 40, end_seq_id: 44 }] },
+                  { type: 'SHEET', feature_id: 'sheet-x', feature_positions: [{ beg_seq_id: 50, end_seq_id: 52 }] },
+                  { type: 'SHEET', feature_id: null, feature_positions: null },
+                  { type: 'SHEET', feature_id: '  ', feature_positions: [{ beg_seq_id: 60, end_seq_id: 61 }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    } as unknown as RcsbInput);
+    expect(out.chains).toHaveLength(1);
+    const [chain] = out.chains;
+    expect(chain.chainId).toBe('B');
+    expect(chain.entityId).toBeUndefined();
+    expect(chain.helices.map((h) => [h.seqStart, h.seqEnd, h.length])).toEqual([
+      [7, 7, 1],
+      [20, 30, 11],
+    ]);
+    expect(chain.strands.map((s) => [s.seqStart, s.sheetId])).toEqual([
+      [40, '3'],
+      [50, 'sheet-x'],
+      [60, undefined],
+    ]);
+  });
+
+  it('sorts chains by id', () => {
+    const instance = (auth_asym_id: string) => ({
+      rcsb_polymer_entity_instance_container_identifiers: { auth_asym_id },
+      rcsb_polymer_instance_feature: [{ type: 'HELIX_P', feature_positions: [{ beg_seq_id: 1, end_seq_id: 4 }] }],
+    });
+    const out = normalizeRcsbSecondaryStructure({
+      entry: {
+        polymer_entities: [
+          {
+            rcsb_polymer_entity_container_identifiers: { entity_id: '1' },
+            polymer_entity_instances: [instance('B'), instance('A')],
+          },
+        ],
+      },
+    });
+    expect(out.chains.map((c) => [c.chainId, c.entityId])).toEqual([
+      ['A', '1'],
+      ['B', '1'],
+    ]);
   });
 });
