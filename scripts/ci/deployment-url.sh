@@ -2,7 +2,9 @@
 # Prints the address the E2E and snapshot workflows test, as base_url=... in
 # $GITHUB_OUTPUT: the workflow's base_url input when one is given, otherwise
 # the Cloudflare Pages deployment of the commit the run is on
-# (<hash>.molviewer.pages.dev; for main's head that is the production build).
+# (<id>.molviewer.pages.dev, where <id> is the start of Cloudflare's
+# deployment id, not the commit hash; for main's head that deployment is the
+# production build).
 #
 # Not molviewer.bio: its zone WAF challenges cloud runner IPs, which failed
 # every test of run 43930423486 for an hour. Not molviewer.pages.dev: it
@@ -61,10 +63,14 @@ filter='[.check_runs[] | select(.app.slug == "cloudflare-workers-and-pages")]
         // "" ) ]
   | join("|")'
 
+errors=$(mktemp)
+trap 'rm -f "$errors"' EXIT
+
 deadline=$((SECONDS + MAX_WAIT_SECONDS))
 details=''
 while :; do
-  if line=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=Cloudflare%20Pages" --jq "$filter" 2>&1); then
+  error=''
+  if line=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/check-runs?check_name=Cloudflare%20Pages" --jq "$filter" 2>"$errors"); then
     if [[ -z $line ]]; then
       echo "No Cloudflare Pages deployment of $short yet, waiting"
     else
@@ -80,7 +86,15 @@ while :; do
       fi
     fi
   else
-    echo "::warning::Reading the check runs of $short failed, retrying: ${line%%$'\n'*}"
+    # gh ends its error with "(HTTP <status>)". Rate limits, server errors and
+    # network failures can pass on a later try. Other 4xx answers (422 "No
+    # commit found", 404 for a wrong repository, 401/403 for the token) can't.
+    error=$(tr '\n' ' ' <"$errors" | sed 's/^gh: //; s/ *$//')
+    case $error in
+      *"rate limit"* | *"(HTTP 429)"* | *"(HTTP 5"[0-9][0-9]")"*) ;;
+      *"(HTTP 4"[0-9][0-9]")"*) fail "Reading the check runs of $short failed: $error" ;;
+    esac
+    echo "::warning::Reading the check runs of $short failed, retrying: $error"
   fi
   if ((SECONDS + POLL_SECONDS > deadline)); then
     break
@@ -89,6 +103,9 @@ while :; do
 done
 
 minutes=$((MAX_WAIT_SECONDS / 60))
+if [[ -n $error ]]; then
+  fail "Couldn't read the check runs of $short for $minutes min, last error: $error"
+fi
 if [[ -n $details ]]; then
   fail "Cloudflare Pages deployment of $short still not finished after $minutes min: $details. Pass base_url to test another address."
 fi

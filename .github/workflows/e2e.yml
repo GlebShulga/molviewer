@@ -12,8 +12,9 @@ on:
 
 jobs:
   # The address to test: the Cloudflare Pages deployment of this commit
-  # (<hash>.molviewer.pages.dev; on a schedule run github.sha is main's head,
-  # so that is the production build). Not molviewer.bio: its zone WAF
+  # (<id>.molviewer.pages.dev, <id> from Cloudflare's deployment id, not the
+  # commit hash; on a schedule run github.sha is main's head, so that
+  # deployment is the production build). Not molviewer.bio: its zone WAF
   # challenges cloud runner IPs, which failed every test for an hour in run
   # 43930423486. Not molviewer.pages.dev: it redirects to molviewer.bio.
   target:

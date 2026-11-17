@@ -3,10 +3,11 @@ import { test as base } from '@playwright/test';
 // Custom test fixture with one-time storage clearing
 export const test = base.extend({
   // CI runs these tests against the Cloudflare Pages deployment of the commit
-  // (BASE_URL; production for main): keep them out of its analytics, both Cloudflare Web Analytics and the product events, and out
-  // of the error log (production builds report errors to /api/log). Answered
-  // rather than aborted: an aborted request logs a console error, and some
-  // tests fail on those.
+  // (BASE_URL; production for main): keep them out of its analytics, both
+  // Cloudflare Web Analytics and the product events, and out of the error log
+  // (production builds report errors to /api/log). Answered rather than
+  // aborted: an aborted request logs a console error, and some tests fail on
+  // those.
   context: async ({ context }, use) => {
     await context.route(/cloudflareinsights\.com/, (route) =>
       route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
