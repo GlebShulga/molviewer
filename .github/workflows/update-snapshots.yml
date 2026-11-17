@@ -52,6 +52,8 @@ jobs:
 
       - name: Generate Linux snapshots
         run: pnpm test:e2e --project=chromium-visual --project=webkit --update-snapshots
+        # Above Playwright's globalTimeout (40 min), so Playwright ends a stuck run itself
+        timeout-minutes: 45
         env:
           BASE_URL: ${{ needs.target.outputs.base_url }}
           CI: true

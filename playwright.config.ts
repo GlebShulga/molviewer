@@ -15,6 +15,16 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 4 : undefined,
+  // A target that blocks the runner fails every test slowly: on 2026-11-16 a
+  // Cloudflare challenge took each shard the full hour (run 43930423486).
+  // Real failing runs end with 1 or 2 failed tests per shard; maxFailures
+  // counts a test only after its last retry. globalTimeout stays under the
+  // workflow step's 45 min, so the blob report is still written.
+  maxFailures: process.env.CI ? 10 : undefined,
+  globalTimeout: process.env.CI ? 40 * 60_000 : undefined,
+  // Checks that BASE_URL serves MolViewer to this machine before any test runs.
+  // The local dev server needs no check.
+  globalSetup: process.env.BASE_URL ? './e2e/global-setup.ts' : undefined,
   reporter: process.env.CI
     ? [['blob'], ['list']]
     : [['html', { outputFolder: './playwright-report' }], ['list']],
