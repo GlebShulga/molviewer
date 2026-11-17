@@ -62,6 +62,7 @@ This is an **open-source project** with the following constraints:
 - **Always use Playwright MCP** for e2e tests
 - Run tests: `pnpm test:e2e`
 - Tests located in `e2e/` directory
+- CI (`e2e.yml`, `update-snapshots.yml`) tests the commit's `<hash>.molviewer.pages.dev` deployment, found by `scripts/ci/deployment-url.sh` from the `Cloudflare Pages` check run, not molviewer.bio, whose WAF challenges cloud runner IPs. `e2e/global-setup.ts` checks the target first.
 
 ### WebGL Testing Best Practices
 
