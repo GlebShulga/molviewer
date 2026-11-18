@@ -16,6 +16,7 @@
     "/theme-init.js",
     "/footer.js",
     "/entry.js",
+    "/web-analytics.js",
     "/robots.txt",
     "/llms.txt",
     "/sitemap.xml",

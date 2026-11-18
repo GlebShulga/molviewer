@@ -30,9 +30,6 @@ export interface StaticDocument {
   footerCollections?: { slug: string; title: string }[];
 }
 
-const ANALYTICS_SNIPPET =
-  `<script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "a3389c7a6f424ecaaf63057532dc0e1b"}'></script>`;
-
 export function breadcrumbJsonLd(crumbs: Crumb[]): object {
   return {
     '@context': 'https://schema.org',
@@ -81,6 +78,7 @@ export function renderStaticDocument(doc: StaticDocument): string {
 <script src="/theme-init.js"></script>
 <script src="/footer.js" defer></script>
 <script src="/entry.js" defer></script>
+<script src="/web-analytics.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${t}</title>
 <meta name="description" content="${d}">
@@ -112,7 +110,6 @@ ${doc.breadcrumbs?.length ? renderBreadcrumbs(doc.breadcrumbs) : ''}
 ${doc.mainHtml}
 </main>
 ${renderFooter(doc.footerCollections ?? FEATURED_COLLECTIONS)}
-${ANALYTICS_SNIPPET}
 </body>
 </html>
 `;

@@ -10,7 +10,7 @@
 
 const BASE_DIRECTIVES: Record<string, string> = {
   'default-src': "'self'",
-  // Cloudflare Web Analytics beacon (the hard-coded snippet in index.html).
+  // Cloudflare Web Analytics beacon, loaded on molviewer.bio by public/web-analytics.js.
   'script-src': "'self' https://static.cloudflareinsights.com",
   'style-src': "'self' 'unsafe-inline'",
   'connect-src': [
