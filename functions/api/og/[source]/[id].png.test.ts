@@ -38,7 +38,7 @@ describe('/api/og/:source/:id.png', () => {
     expect(res.headers.get('content-type')).toBe('image/jpeg');
     expect(res.headers.get('cache-control')).toMatch(/max-age=\d+/);
     expect(await res.text()).toBe('jpeg-bytes');
-    expect(fetchMock).toHaveBeenCalledWith('https://cdn.rcsb.org/images/structures/1abc_assembly-1.jpeg', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('https://cdn.rcsb.org/images/structures/pdb/1abc_assembly-1.jpeg', expect.anything());
   });
 
   it('falls back to the square JPEG the page announced when RCSB has no image', async () => {

@@ -39,7 +39,7 @@ export function siteOgImage(origin: string): OgImage {
 
 /** RCSB's prerendered image of the first biological assembly (500x500 JPEG). */
 export function rcsbImageUrl(id: string): string {
-  return `https://cdn.rcsb.org/images/structures/${id.toLowerCase()}_assembly-1.jpeg`;
+  return `https://cdn.rcsb.org/images/structures/pdb/${id.toLowerCase()}_assembly-1.jpeg`;
 }
 
 export function compoundImageUrl(cid: number): string {
