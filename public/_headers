@@ -14,3 +14,7 @@
 # Hashed chunks never change.
 /widget/v1/assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The site's own Vite build: every file name carries its content hash.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
