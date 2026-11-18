@@ -10,6 +10,7 @@
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --search [days=7]
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --styles [days=7]
  *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --funnel [days=7]
+ *   CF_ACCOUNT_ID=... CF_API_TOKEN=... pnpm exec tsx scripts/query-events.ts --export 2026-09 > 2026-09.jsonl
  * The token can also come from .env (CF_API_TOKEN_ANALYTICS_READ), which tsx
  * doesn't read by itself: `pnpm exec tsx --env-file=.env scripts/query-events.ts ...`.
  *
@@ -35,6 +36,12 @@
  * nothing loaded by hand. It reads the running totals, not the load events:
  * Analytics Engine drops some rows within busy sessions at write time, so
  * counting a session's own events can miss its one real load.
+ *
+ * --export YYYY-MM writes every row of that calendar month (UTC) to stdout, one
+ * JSON object per line, all environments included. Analytics Engine keeps
+ * about 3 months, so run it monthly and keep the files outside the repo. The
+ * rows include _sample_interval, which every weighted count needs. It then
+ * counts the month's rows again and fails if the two numbers differ.
  *
  * Every query here counts production traffic only (PROD): events from preview
  * deployments and from the owner's browsers (?internal=1) are left out. Events
@@ -125,7 +132,7 @@ const STYLE_EVENTS_SQL = `SELECT blob1 AS event, ${SIZE_SQL} AS size, blob7 AS s
 
 type Row = Record<string, unknown>;
 
-async function query(sql: string): Promise<{ data?: Row[] }> {
+async function queryText(sql: string): Promise<string> {
   const resp = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}` },
@@ -135,7 +142,39 @@ async function query(sql: string): Promise<{ data?: Row[] }> {
     console.error(`SQL API error ${resp.status}: ${await resp.text()}`);
     process.exit(1);
   }
-  return (await resp.json()) as { data?: Row[] };
+  return resp.text();
+}
+
+async function query(sql: string): Promise<{ data?: Row[] }> {
+  return JSON.parse(await queryText(sql)) as { data?: Row[] };
+}
+
+/** The [start, end) of a "YYYY-MM" month as SQL conditions on timestamp (UTC). */
+function monthRange(month: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) {
+    console.error(`--export takes a month as YYYY-MM, got "${month}".`);
+    process.exit(1);
+  }
+  const year = Number(match[1]);
+  const next = Number(match[2]) === 12 ? `${year + 1}-01` : `${year}-${String(Number(match[2]) + 1).padStart(2, '0')}`;
+  return `timestamp >= toDateTime('${month}-01 00:00:00') AND timestamp < toDateTime('${next}-01 00:00:00')`;
+}
+
+async function exportMonth(month: string): Promise<void> {
+  const range = monthRange(month);
+  const rows = await queryText(`SELECT * FROM molviewer_events WHERE ${range} FORMAT JSONEachRow`);
+  const lines = rows.split('\n').filter((line) => line.trim() !== '').length;
+  const counted = await query(`SELECT count() AS n FROM molviewer_events WHERE ${range} FORMAT JSON`);
+  const expected = Number(counted.data?.[0]?.n);
+  // Check before writing: a short file that looks complete can't be redone
+  // once Analytics Engine has dropped the month (about 3 months).
+  if (lines !== expected) {
+    console.error(`Export incomplete: got ${lines} rows, the month has ${expected}. Nothing written.`);
+    process.exit(1);
+  }
+  process.stdout.write(rows.endsWith('\n') || rows === '' ? rows : `${rows}\n`);
+  console.error(`Exported ${lines} rows for ${month}.`);
 }
 
 async function printStyles(): Promise<void> {
@@ -203,7 +242,11 @@ const FUNNEL_SQL = `SELECT index1 AS session, MAX(double11) AS samples, MAX(doub
        GROUP BY session
        FORMAT JSON`;
 
-if (args.includes('--styles')) {
+const exportIndex = args.indexOf('--export');
+
+if (exportIndex >= 0) {
+  await exportMonth(args[exportIndex + 1] ?? '');
+} else if (args.includes('--styles')) {
   await printStyles();
 } else if (args.includes('--funnel')) {
   const result = await query(FUNNEL_SQL);
