@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import type { ServerContext } from '@modelcontextprotocol/server';
-import { limitCaller } from './rateLimit';
+import { clientOf, limitCaller } from './rateLimit';
 import type { Env } from './server';
 
 /** A limiter that allows `max` calls per key and records the keys it saw. */
@@ -25,6 +25,28 @@ function ctx(ip: string, subject?: string): ServerContext {
     http: { req: new Request('https://mcp.molviewer.bio/mcp', { headers: { 'cf-connecting-ip': ip } }) },
   } as unknown as ServerContext;
 }
+
+describe('clientOf', () => {
+  function withAgent(userAgent: string, subject?: string): ServerContext {
+    return {
+      mcpReq: { _meta: subject ? { 'openai/subject': subject } : {} },
+      http: { req: new Request('https://mcp.molviewer.bio/mcp', { headers: { 'user-agent': userAgent } }) },
+    } as unknown as ServerContext;
+  }
+
+  it('labels both Codex user agents codex, even with a ChatGPT subject', () => {
+    expect(clientOf(withAgent('codex-mcp-client/0.164.0'))).toBe('codex');
+    expect(clientOf(withAgent('openai-mcp/1.0.0 (Codex)'))).toBe('codex');
+    expect(clientOf(withAgent('openai-mcp/1.0.0 (Codex)', 'user-1'))).toBe('codex');
+  });
+
+  it('keeps ChatGPT, Claude and other clients as before', () => {
+    expect(clientOf(withAgent('openai-mcp/1.0.0', 'user-1'))).toBe('chatgpt');
+    expect(clientOf(withAgent('openai-mcp/1.0.0'))).toBe('chatgpt');
+    expect(clientOf(withAgent('Claude-User'))).toBe('claude');
+    expect(clientOf(withAgent('node'))).toBe('other');
+  });
+});
 
 describe('limitCaller', () => {
   it('limits each ChatGPT user separately, under the shared per-IP allowance', async () => {

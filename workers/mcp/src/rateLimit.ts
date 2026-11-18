@@ -25,10 +25,15 @@ function ipOf(ctx: ServerContext): string {
   return ctx.http?.req?.headers.get('cf-connecting-ip') ?? 'unknown';
 }
 
-/** Which chat client made the call, for analytics only (self-reported, so approximate). */
-export function clientOf(ctx: ServerContext): 'chatgpt' | 'claude' | 'other' {
-  if (subjectOf(ctx)) return 'chatgpt';
+/**
+ * Which chat client made the call, for analytics only (self-reported, so approximate).
+ * Codex comes first: current builds send `codex-mcp-client/…`, older ones
+ * `openai-mcp/1.0.0 (Codex)`, which the OpenAI check would count as ChatGPT.
+ */
+export function clientOf(ctx: ServerContext): 'chatgpt' | 'claude' | 'codex' | 'other' {
   const ua = ctx.http?.req?.headers.get('user-agent') ?? '';
+  if (/codex/i.test(ua)) return 'codex';
+  if (subjectOf(ctx)) return 'chatgpt';
   if (/openai|chatgpt/i.test(ua)) return 'chatgpt';
   if (/claude|anthropic/i.test(ua)) return 'claude';
   return 'other';
