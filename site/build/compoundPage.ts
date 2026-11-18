@@ -23,11 +23,33 @@ export function compoundTitle(c: Compound): string {
   return t.length <= 70 ? t : `${c.name} 3D structure | MolViewer`;
 }
 
+/** Longest meta description Google shows in full on desktop. */
+const MAX_DESCRIPTION = 160;
+const ALL_VIEWS = 'rotate it and switch between ball-and-stick, stick and space-filling views';
+const TWO_VIEWS = 'rotate it and switch between ball-and-stick and space-filling views';
+
+/**
+ * "{name} 3D structure: rotate it and switch between … views. {formula}, {weight} g/mol. Free in your browser, no install."
+ * Over the limit it gives up, in order: the long tail, the tail, the weight, the
+ * stick view. The name, "3D structure" and the formula always stay. The name
+ * is used as stored: dATP must not become DATP.
+ */
+export function compoundDescription(c: Compound): string {
+  const facts = `${c.formula}, ${c.weight} g/mol.`;
+  const candidates = [
+    `${c.name} 3D structure: ${ALL_VIEWS}. ${facts} Free in your browser, no install.`,
+    `${c.name} 3D structure: ${ALL_VIEWS}. ${facts} Free, no install.`,
+    `${c.name} 3D structure: ${ALL_VIEWS}. ${facts}`,
+    `${c.name} 3D structure: ${ALL_VIEWS}. ${c.formula}.`,
+    `${c.name} 3D structure: ${TWO_VIEWS}. ${c.formula}.`,
+  ];
+  return candidates.find((d) => d.length <= MAX_DESCRIPTION) ?? candidates[candidates.length - 1];
+}
+
 export function renderCompoundPage(c: Compound, related: Compound[]): ShellMeta {
   const canonicalUrl = `${SITE_ORIGIN}/compound/${c.slug}`;
   const title = compoundTitle(c);
-  let description = `See ${c.name} (${c.formula}, ${c.weight} g/mol) in 3D: rotate the molecule and measure bond lengths and angles. Free in your browser, no install.`;
-  if (description.length > 165) description = `See ${c.name} (${c.formula}) in 3D: rotate it and measure bond lengths and angles. Free in your browser, no install.`;
+  const description = compoundDescription(c);
   const category = COMPOUND_CATEGORY_LABELS[c.category];
   const synonyms = c.synonyms.filter((s) => s.toLowerCase() !== c.name.toLowerCase()).slice(0, 5);
 

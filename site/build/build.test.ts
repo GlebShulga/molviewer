@@ -7,7 +7,7 @@ import slugsByCid from '../../data/compoundSlugs.json';
 import compoundData from '../../data/compounds.json';
 import type { Collection, Compound } from '../dataTypes';
 import { COLLECTIONS, FEATURED_COLLECTIONS } from '../collections';
-import { renderCompoundPage } from './compoundPage';
+import { compoundDescription, renderCompoundPage } from './compoundPage';
 import { renderCollectionPage, renderCollectionsIndex } from './staticPages';
 import { cardTree, compoundCardSpec, renderSquareFallback } from './ogCards';
 import { renderStaticDocument } from '../render/layout';
@@ -120,6 +120,35 @@ describe('compound slug map', () => {
   it('matches data/compounds.json exactly', () => {
     const expected = Object.fromEntries(COMPOUNDS.map((c) => [String(c.cid), c.slug]));
     expect(slugsByCid).toEqual(expected);
+  });
+});
+
+describe('compound descriptions', () => {
+  it('fit 160 characters and keep the name, "3D structure" and the formula for every compound', () => {
+    for (const c of COMPOUNDS) {
+      const d = compoundDescription(c);
+      expect(d.length, c.slug).toBeLessThanOrEqual(160);
+      expect(d.startsWith(`${c.name} 3D structure: `), c.slug).toBe(true);
+      expect(d, c.slug).toContain(c.formula);
+    }
+  });
+
+  it('give up the tail before anything else', () => {
+    const tails = { full: 0, short: 0, none: 0 };
+    for (const c of COMPOUNDS) {
+      const d = compoundDescription(c);
+      expect(d, c.slug).toContain(`${c.weight} g/mol`);
+      expect(d, c.slug).toContain('ball-and-stick, stick and space-filling');
+      if (d.endsWith('Free in your browser, no install.')) tails.full++;
+      else if (d.endsWith('Free, no install.')) tails.short++;
+      else tails.none++;
+    }
+    expect(tails).toEqual({ full: 687, short: 299, none: 2 });
+  });
+
+  it('uses the name as stored', () => {
+    const datp = COMPOUNDS.find((c) => c.name === 'dATP')!;
+    expect(compoundDescription(datp)).toMatch(/^dATP 3D structure: /);
   });
 });
 
