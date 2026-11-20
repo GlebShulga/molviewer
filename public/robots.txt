@@ -43,5 +43,13 @@ Disallow: /oembed
 Disallow: /api/
 Allow: /
 
+# KakaoBot (Daum search) made 12k to 20k requests a day, almost all /pdb/*
+# (a Pages Function each). Crawl-delay slows it down without blocking it.
+User-agent: KakaoBot
+Crawl-delay: 10
+Disallow: /oembed
+Disallow: /api/
+Allow: /
+
 # Sitemap
 Sitemap: https://molviewer.bio/sitemap.xml
