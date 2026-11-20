@@ -1,0 +1,79 @@
+name: Chrome WAF threshold
+
+# Keeps the molviewer.bio WAF rule that challenges unreleased Chrome versions
+# current (scripts/ci/chrome-waf-threshold.sh). A failed run is urgent: the
+# rule then fails closed and starts challenging real Chrome users, Canary and
+# Dev first. The failure step opens a waf-threshold issue; a later successful
+# run closes it.
+on:
+  # GitHub turns this schedule off after 60 days without activity in the repo,
+  # and no failed run reports that. Turn it back on in Actions > Chrome WAF
+  # threshold > Enable workflow (or disable the rule in Security > WAF).
+  schedule:
+    - cron: '23 5 * * *' # daily, off the hour: GitHub delays or drops scheduled runs at :00 under load
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    concurrency: chrome-waf
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # A step timeout fails the step, so the issue step below still runs. A
+      # job timeout would cancel the job, and `if: failure()` steps don't run
+      # on a cancelled job. The script's own worst case (7 retrying reads of
+      # about 35 s and one write) stays under this limit; see its header.
+      - name: Update the rule
+        timeout-minutes: 5
+        run: bash scripts/ci/chrome-waf-threshold.sh
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_WAF_TOKEN }}
+          CF_ZONE_ID: e0ce9629da6e17033ef9a51f507d1b83 # molviewer.bio, not a secret
+
+      # GH_REPO lets gh work without the checkout, in case that's what failed.
+      - name: Report the failure in an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create waf-threshold --force --color B60205 \
+            --description "The Chrome WAF threshold workflow is failing"
+          number=$(gh issue list --label waf-threshold --state open --json number --jq '.[0].number // empty')
+          if [[ -n $number ]]; then
+            gh issue comment "$number" --body "Failed again: $RUN_URL"
+            exit 0
+          fi
+          {
+            cat <<'EOF'
+          The daily run that keeps the molviewer.bio WAF rule "chrome-unreleased-versions" current has failed.
+
+          A stale rule fails closed: it challenges real Chrome users once their version reaches the rule's threshold.
+          Canary and Dev users reach it 2 to 4 weeks after the last successful update, Beta users 4 to 8 weeks after
+          it, and stable users one to three weeks after Beta. The exact Canary and stable dates are in the rule's
+          description (Cloudflare dashboard > molviewer.bio > Security > WAF > Custom rules).
+
+          **Repair the run, or disable the rule in the dashboard before the Canary date.** A disabled rule stays
+          disabled until someone turns it back on.
+          EOF
+            echo
+            echo "Failed run: $RUN_URL"
+          } | gh issue create --title "URGENT: Chrome WAF threshold is not updating" \
+            --label waf-threshold --body-file -
+
+      - name: Close the failure issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for number in $(gh issue list --label waf-threshold --state open --json number --jq '.[].number'); do
+            gh issue close "$number" --comment "Fixed: $RUN_URL updated the rule."
+          done
