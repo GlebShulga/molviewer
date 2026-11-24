@@ -37,7 +37,8 @@ jobs:
   update-snapshots:
     needs: target
     runs-on: ubuntu-24.04 # same image as e2e.yml, so the baselines match the runs that check them
-    timeout-minutes: 60
+    # Browser install backstop (45) + test step (45) + setup and uploads
+    timeout-minutes: 95
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -46,9 +47,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install
-      - run: pnpm exec playwright install --with-deps chromium webkit
-        # Usually 1-2 minutes; an apt mirror stall once held it for the whole job timeout
-        timeout-minutes: 10
+      - run: bash scripts/ci/install-browsers.sh
+        # Usually under a minute. The script stops and retries a stalled part
+        # itself (worst case 42 minutes); this is only a backstop.
+        timeout-minutes: 45
 
       - name: Generate Linux snapshots
         run: pnpm test:e2e --project=chromium-visual --project=webkit --update-snapshots
