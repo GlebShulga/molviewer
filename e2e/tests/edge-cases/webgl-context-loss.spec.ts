@@ -1,13 +1,108 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { MoleculeViewerPage } from '../../page-objects';
 
 /**
  * A browser can take the WebGL context away from a tab (usually a background
  * one) and give it back later. The viewer has to keep its canvas through the
- * loss, or there is nothing to restore.
+ * loss, or there is nothing to restore. If the context doesn't come back, the
+ * viewer offers "Reload viewer", which builds a new canvas.
  */
 
 type LoseContextWindow = Window & { __loseContext?: WEBGL_lose_context | null };
+type CameraWindow = Window & { __mol3d_camera?: { position: { x: number; y: number; z: number }; zoom: number } };
+type StoreWindow = Window & {
+  __mol3d_store: { getState(): { setPendingCameraSnapshot(snapshot: CameraView): void } };
+};
+interface CameraView {
+  position: [number, number, number];
+  target: [number, number, number];
+  zoom: number;
+}
+
+/** Takes the context away. The extension object is kept: it can't be fetched from a lost context. */
+async function loseContext(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const el = document.querySelector('canvas') as HTMLCanvasElement;
+    const gl = (el.getContext('webgl2') ?? el.getContext('webgl')) as WebGLRenderingContext | null;
+    const ext = gl?.getExtension('WEBGL_lose_context') ?? null;
+    (window as LoseContextWindow).__loseContext = ext;
+    ext?.loseContext();
+    return ext !== null;
+  });
+}
+
+async function isContextLost(page: Page): Promise<boolean | undefined> {
+  return page.evaluate(() => {
+    const el = document.querySelector('canvas') as HTMLCanvasElement;
+    return (el.getContext('webgl2') ?? el.getContext('webgl'))?.isContextLost();
+  });
+}
+
+/** The canvas scaled to 64x64, as RGBA bytes. */
+async function canvasPixels(page: Page): Promise<number[]> {
+  return page.evaluate(() => {
+    const el = document.querySelector('canvas') as HTMLCanvasElement;
+    const copy = document.createElement('canvas');
+    copy.width = 64;
+    copy.height = 64;
+    const ctx = copy.getContext('2d')!;
+    ctx.drawImage(el, 0, 0, 64, 64);
+    return Array.from(ctx.getImageData(0, 0, 64, 64).data);
+  });
+}
+
+/** A blank canvas is one colour. */
+function colourCount(pixels: number[]): number {
+  const seen = new Set<number>();
+  for (let i = 0; i < pixels.length; i += 4) seen.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
+  return seen.size;
+}
+
+/** Mean difference per colour channel, 0 to 255. */
+function meanDifference(a: number[], b: number[]): number {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    sum += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+    n += 3;
+  }
+  return sum / n;
+}
+
+/** Camera position and zoom: x, y, z, zoom. */
+async function cameraNow(page: Page): Promise<number[] | null> {
+  return page.evaluate(() => {
+    const camera = (window as CameraWindow).__mol3d_camera;
+    return camera ? [camera.position.x, camera.position.y, camera.position.z, camera.zoom] : null;
+  });
+}
+
+/** The largest difference between the camera now and the expected x, y, z, zoom. */
+async function cameraOffBy(page: Page, expected: number[]): Promise<number> {
+  const now = await cameraNow(page);
+  if (!now) return Infinity;
+  return Math.max(...expected.map((value, i) => Math.abs(value - now[i])));
+}
+
+/**
+ * The overlay shown while the context is lost. By class, not by role: it is
+ * hidden for its first 2 s, and role locators skip hidden elements.
+ */
+const overlayOf = (page: Page) => page.locator('[class*="contextLost"]');
+
+/** Drags across the canvas to rotate. */
+async function rotate(page: Page): Promise<void> {
+  const box = await page.locator('canvas').boundingBox();
+  if (!box) throw new Error('canvas has no bounding box');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 80, cy + 40, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+}
 
 test.describe('WebGL context loss', () => {
   test('[EH-WGL-01] the viewer survives a context loss and draws again after restore', async ({ page }) => {
@@ -22,64 +117,111 @@ test.describe('WebGL context loss', () => {
 
     const canvas = page.locator('canvas');
     const viewerError = page.getByRole('heading', { name: 'Viewer error' });
-    const banner = moleculeViewer.canvas.errorMessage;
+    const overlay = overlayOf(page);
+    const reloadButton = page.getByRole('button', { name: 'Reload viewer' });
     await expect(canvas).toHaveCount(1);
 
-    // The extension object is kept: it can't be fetched from a lost context.
-    const lost = await page.evaluate(() => {
-      const el = document.querySelector('canvas') as HTMLCanvasElement;
-      const gl = (el.getContext('webgl2') ?? el.getContext('webgl')) as WebGLRenderingContext | null;
-      const ext = gl?.getExtension('WEBGL_lose_context') ?? null;
-      (window as LoseContextWindow).__loseContext = ext;
-      ext?.loseContext();
-      return ext !== null;
-    });
-    expect(lost).toBe(true);
+    expect(await loseContext(page)).toBe(true);
 
-    // The banner's own render is the one that used to crash the viewer.
-    await expect(banner).toContainText('WebGL context lost');
+    // The overlay is there but stays hidden for its first 2 s, so a loss that
+    // is restored at once shows nothing.
+    await expect(overlay).toHaveCount(1);
+    await expect(reloadButton).toBeHidden({ timeout: 1 });
+
+    // A render during the loss is what used to crash the viewer.
     await page.waitForTimeout(1000);
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
 
     await page.evaluate(() => (window as LoseContextWindow).__loseContext?.restoreContext());
 
-    await expect(banner).toHaveCount(0);
+    await expect(overlay).toHaveCount(0);
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
-    expect(await page.evaluate(() => {
-      const el = document.querySelector('canvas') as HTMLCanvasElement;
-      return (el.getContext('webgl2') ?? el.getContext('webgl'))?.isContextLost();
-    })).toBe(false);
+    expect(await isContextLost(page)).toBe(false);
 
     // Rotating redraws through a composer built on the restored context.
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('canvas has no bounding box');
-    const cx = box.x + box.width / 2;
-    const cy = box.y + box.height / 2;
-    await page.mouse.move(cx, cy);
-    await page.mouse.down();
-    await page.mouse.move(cx + 80, cy + 40, { steps: 5 });
-    await page.mouse.up();
-    await page.waitForTimeout(500);
+    await rotate(page);
 
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
     expect(pageErrors).toEqual([]);
 
-    // The molecule is on screen again: a blank canvas would be one colour.
-    const colours = await page.evaluate(() => {
-      const el = document.querySelector('canvas') as HTMLCanvasElement;
-      const copy = document.createElement('canvas');
-      copy.width = 64;
-      copy.height = 64;
-      const ctx = copy.getContext('2d')!;
-      ctx.drawImage(el, 0, 0, 64, 64);
-      const data = ctx.getImageData(0, 0, 64, 64).data;
-      const seen = new Set<number>();
-      for (let i = 0; i < data.length; i += 4) seen.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
-      return seen.size;
-    });
-    expect(colours).toBeGreaterThan(10);
+    // The molecule is on screen again.
+    expect(colourCount(await canvasPixels(page))).toBeGreaterThan(10);
+  });
+
+  test('[EH-WGL-02] Reload viewer brings the scene and the camera back when the context is not restored', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    const moleculeViewer = new MoleculeViewerPage(page);
+    await moleculeViewer.goto();
+    await moleculeViewer.loadSampleMolecule('caffeine');
+
+    const canvas = page.locator('canvas');
+    const viewerError = page.getByRole('heading', { name: 'Viewer error' });
+    const overlay = overlayOf(page);
+    const reloadButton = page.getByRole('button', { name: 'Reload viewer' });
+
+    // A view that is not the default one, so a reset camera would show. Set
+    // through the store, the way a saved session is: a drag would leave the
+    // camera drifting on the controls' damping.
+    const view: CameraView = { position: [7, 5, 9], target: [0.5, 0.25, 0], zoom: 1.3 };
+    const expected = [...view.position, view.zoom];
+    await page.evaluate((v) => (window as unknown as StoreWindow).__mol3d_store.getState().setPendingCameraSnapshot(v), view);
+    await expect.poll(() => cameraOffBy(page, expected)).toBeLessThan(0.001);
+    await page.waitForTimeout(500);
+    const before = await canvasPixels(page);
+    expect(colourCount(before)).toBeGreaterThan(10);
+
+    expect(await loseContext(page)).toBe(true);
+
+    // Shown 2 s after the loss; the rest of the allowance is for a busy machine.
+    await expect(reloadButton).toBeVisible({ timeout: 15_000 });
+    await reloadButton.click({ force: true });
+    await page.waitForTimeout(300);
+
+    await expect(overlay).toHaveCount(0);
+    await expect(canvas).toHaveCount(1);
+    await expect(viewerError).toHaveCount(0);
+    expect(await isContextLost(page)).toBe(false);
+
+    // The new canvas needs a moment for its first frame.
+    await expect.poll(async () => colourCount(await canvasPixels(page))).toBeGreaterThan(10);
+
+    // The camera is where it was, and so is the picture.
+    await expect.poll(() => cameraOffBy(page, expected)).toBeLessThan(0.001);
+    await expect.poll(async () => meanDifference(before, await canvasPixels(page))).toBeLessThan(4);
+
+    expect(pageErrors).toEqual([]);
+  });
+
+  test('[EH-WGL-03] 3D labels go under the context-lost overlay', async ({ page }) => {
+    const moleculeViewer = new MoleculeViewerPage(page);
+    await moleculeViewer.goto();
+    await moleculeViewer.loadSampleMolecule('caffeine');
+
+    expect(await moleculeViewer.openContextMenu()).toBe(true);
+    await moleculeViewer.contextMenu.getByRole('button', { name: /label/i }).click({ force: true });
+    await page.waitForTimeout(300);
+
+    // Labels are DOM elements over the canvas with a z-index of their own.
+    const deleteLabel = page.locator('button[title="Remove label"]').first();
+    await expect(deleteLabel).toHaveCount(1);
+    const box = await deleteLabel.boundingBox();
+    if (!box) throw new Error('label has no bounding box');
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+
+    expect(await loseContext(page)).toBe(true);
+    await expect(page.getByRole('button', { name: 'Reload viewer' })).toBeVisible({ timeout: 15_000 });
+
+    const coveredByOverlay = await page.evaluate(
+      ([px, py]) =>
+        document.elementFromPoint(px, py)?.closest('[role="status"]')?.textContent?.includes('paused 3D graphics') ?? false,
+      [x, y]
+    );
+    expect(coveredByOverlay).toBe(true);
   });
 });

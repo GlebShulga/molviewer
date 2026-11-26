@@ -94,6 +94,42 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 35%, transparent);
 }
 
+/* Covers the viewer while the browser has taken the WebGL context away.
+   z-index 6: above the 3D labels (drei Html, zIndexRange up to 5), below the
+   embed and widget chrome (10) and the app's status chips and toolbars
+   (20 to 50). The background is the viewer's own, set inline. */
+.contextLost {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-align: center;
+  /* Most losses are restored at once: stay hidden for the first 2 s, so a
+     normal restore shows nothing. */
+  visibility: hidden;
+  opacity: 0;
+  animation: contextLostShow 0.2s ease-out 2s forwards;
+}
+
+.contextLost p {
+  margin: 0;
+}
+
+@keyframes contextLostShow {
+  to {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
 @media (pointer: coarse) {
   .chipButton {
     min-height: 36px;

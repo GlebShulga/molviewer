@@ -14,6 +14,7 @@ import { recordTurntable as recordTurntableFrames, type RecordTurntableOptions }
 import type { ModelFormat, ExportModelOptions, ExportModelResult } from "../../utils/exportModel";
 
 import type { CameraSnapshot } from "../../types/session";
+import overlayStyles from "./ViewerOverlays.module.css";
 export type { CameraSnapshot };
 
 export interface MoleculeViewerHandle {
@@ -53,13 +54,12 @@ export interface MoleculeViewerProps {
   getBoundingBox?: () => { min: THREE.Vector3; max: THREE.Vector3; center: THREE.Vector3 } | null;
 }
 
-/** The banner shown while the browser has taken the WebGL context away. */
-export const CONTEXT_LOST_MESSAGE = 'WebGL context lost. Attempting to restore...';
-
 interface SceneControllerProps {
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   autoRotate?: boolean;
   backgroundColor?: string;
+  /** Where the controls look at first. Without it, the origin. */
+  target?: CameraSnapshot['target'];
   /** Told when the WebGL context is lost (true) and restored (false). */
   onContextLostChange: (lost: boolean) => void;
 }
@@ -70,10 +70,20 @@ function sceneAtomCount(): number {
   return atoms;
 }
 
-function SceneController({ controlsRef, autoRotate, backgroundColor, onContextLostChange }: SceneControllerProps) {
+/** The camera as the controls hold it. Plain objects, so readable on a lost context too. */
+function cameraSnapshotOf(controls: OrbitControlsImpl | null): CameraSnapshot | null {
+  if (!controls) return null;
+  const camera = controls.object as THREE.PerspectiveCamera;
+  return {
+    position: [camera.position.x, camera.position.y, camera.position.z],
+    target: [controls.target.x, controls.target.y, controls.target.z],
+    zoom: camera.zoom,
+  };
+}
+
+function SceneController({ controlsRef, autoRotate, backgroundColor, target, onContextLostChange }: SceneControllerProps) {
   const { camera, gl, scene, invalidate } = useThree();
   const setControlsReady = useMoleculeStore(state => state.setControlsReady);
-  const setError = useMoleculeStore(state => state.setError);
 
   useEffect(() => {
     // Store refs for export functionality
@@ -88,13 +98,10 @@ function SceneController({ controlsRef, autoRotate, backgroundColor, onContextLo
     const handleContextLost = (event: Event) => {
       event.preventDefault();
       onContextLostChange(true);
-      setError(CONTEXT_LOST_MESSAGE);
       track('webgl_context_lost', { atoms: roundAtoms(sceneAtomCount()) });
     };
     const handleContextRestored = () => {
       onContextLostChange(false);
-      // A load error shown in the meantime stays.
-      if (useMoleculeStore.getState().error === CONTEXT_LOST_MESSAGE) setError(null);
       track('webgl_context_restored', { atoms: roundAtoms(sceneAtomCount()) });
       invalidate();
     };
@@ -104,7 +111,7 @@ function SceneController({ controlsRef, autoRotate, backgroundColor, onContextLo
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       canvas.removeEventListener('webglcontextrestored', handleContextRestored);
     };
-  }, [gl, setError, invalidate, onContextLostChange]);
+  }, [gl, invalidate, onContextLostChange]);
 
   // Set Three.js scene background color
   useEffect(() => {
@@ -134,6 +141,7 @@ function SceneController({ controlsRef, autoRotate, backgroundColor, onContextLo
       dampingFactor={ORBIT_CONTROLS.dampingFactor}
       autoRotate={autoRotate}
       autoRotateSpeed={2}
+      target={target}
     />
   );
 }
@@ -172,10 +180,22 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     // tab) and give it back later.
     const [contextLost, setContextLost] = useState(false);
 
+    // "Reload viewer" is the way out when the context doesn't come back: a new
+    // key gives a new Canvas, so a new canvas element and a new context. The
+    // view goes in as the first props of the new camera and controls. R3F
+    // applies a prop only when its value changes, so later renders don't pull
+    // the camera back to it.
+    const [reload, setReload] = useState<{ key: number; camera: CameraSnapshot | null }>({ key: 0, camera: null });
+    const reloadViewer = () => {
+      const camera = cameraSnapshotOf(controlsRef.current);
+      setReload((prev) => ({ key: prev.key + 1, camera }));
+      setContextLost(false);
+      track('webgl_viewer_reloaded', { atoms: roundAtoms(sceneAtomCount()) });
+    };
+
     // One element, kept between renders. EffectComposer re-adds its passes
     // whenever it gets new children, and adding a pass throws on a lost
-    // context, so an unrelated render (the context-lost banner is one) must
-    // not reach it. While the context is lost there is no composer at all;
+    // context, so any unrelated render must not reach it. While the context is lost there is no composer at all;
     // on restore a new one is built with new render targets.
     const postEffects = useMemo(() => {
       if (contextLost || (!ao && !smaa)) return null;
@@ -240,16 +260,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         controls.update();
         invalidate();
       },
-      getCameraSnapshot: (): CameraSnapshot | null => {
-        const controls = controlsRef.current;
-        if (!controls) return null;
-        const camera = controls.object as THREE.PerspectiveCamera;
-        return {
-          position: [camera.position.x, camera.position.y, camera.position.z],
-          target: [controls.target.x, controls.target.y, controls.target.z],
-          zoom: camera.zoom,
-        };
-      },
+      getCameraSnapshot: () => cameraSnapshotOf(controlsRef.current),
       applyCameraSnapshot: (snapshot: CameraSnapshot) => {
         const controls = controlsRef.current;
         if (!controls) return;
@@ -378,7 +389,9 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     }));
 
     return (
+      <>
       <Canvas
+        key={reload.key}
         style={{ background: backgroundColor, ...style }}
         className={className}
         dpr={[1, MAX_DPR]}
@@ -400,7 +413,12 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           setFrameloopRef.current = state.setFrameloop;
         }}
       >
-        <PerspectiveCamera makeDefault position={[...cameraPosition]} fov={cameraFov} />
+        <PerspectiveCamera
+          makeDefault
+          position={reload.camera?.position ?? [...cameraPosition]}
+          zoom={reload.camera?.zoom ?? 1}
+          fov={cameraFov}
+        />
 
         {/* Enhanced lighting setup */}
         <hemisphereLight
@@ -432,12 +450,23 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           controlsRef={controlsRef}
           autoRotate={autoRotate}
           backgroundColor={backgroundColor}
+          target={reload.camera?.target}
           onContextLostChange={setContextLost}
         />
 
         {/* Post-processing effects - conditional based on molecule size */}
         {postEffects}
       </Canvas>
+      {/* Shown (after a delay, in CSS) for as long as the context is lost. */}
+      {contextLost && (
+        <div className={overlayStyles.contextLost} role="status" style={{ backgroundColor }}>
+          <p>The browser paused 3D graphics. Waiting for it to come back.</p>
+          <button type="button" className={overlayStyles.chipButton} onClick={reloadViewer}>
+            Reload viewer
+          </button>
+        </div>
+      )}
+      </>
     );
   }
 );
