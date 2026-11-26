@@ -119,6 +119,14 @@
   animation: contextLostShow 0.2s ease-out 2s forwards;
 }
 
+/* A refused context: no restore to wait for, so the text shows at once. Must
+   stay after .contextLost (same specificity). */
+.contextLostFailed {
+  animation: none;
+  visibility: visible;
+  opacity: 1;
+}
+
 .contextLost p {
   margin: 0;
 }

@@ -19,8 +19,12 @@ export type { CameraSnapshot };
 
 export interface MoleculeViewerHandle {
   homeView: () => void;
-  /** Renders the view as a PNG; the caller saves or shares it. Null without a WebGL context. */
-  exportImage: (options?: { scale?: number; background?: string | null; watermark?: string }) => Blob | null;
+  /**
+   * Renders the view as a PNG; the caller saves or shares it. `null` when the
+   * WebGL context is lost or was refused, `undefined` when there is no
+   * renderer yet (the viewer is still starting).
+   */
+  exportImage: (options?: { scale?: number; background?: string | null; watermark?: string }) => Blob | null | undefined;
   getCameraSnapshot: () => CameraSnapshot | null;
   applyCameraSnapshot: (snapshot: CameraSnapshot) => void;
   /**
@@ -406,12 +410,13 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
 
         if (!viewerRefs.gl || !scene || !camera) {
           // No renderer is expected, and on screen, after a refused context
-          // and between "Reload viewer" and the new renderer. Otherwise log it.
-          if (!contextLost && !createFailed) {
-            console.error("WebGL context not available for export");
-            logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
-          }
-          return null;
+          // and between "Reload viewer" and the new renderer.
+          if (contextLost || createFailed) return null;
+          // Otherwise the viewer is still starting (R3F creates the renderer
+          // after the mount). Logged, but nothing for the user to be told.
+          console.error("WebGL context not available for export");
+          logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
+          return undefined;
         }
         // A lost context renders nothing, so the PNG would be blank. A loss is
         // expected (the overlay says so), not an error to log.
@@ -534,7 +539,11 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
       {/* Shown (after a delay, in CSS) for as long as the context is lost, and
           for good once a new context can't be created. */}
       {(contextLost || createFailed) && (
-        <div className={overlayStyles.contextLost} role="status" style={{ backgroundColor }}>
+        <div
+          className={createFailed ? `${overlayStyles.contextLost} ${overlayStyles.contextLostFailed}` : overlayStyles.contextLost}
+          role="status"
+          style={{ backgroundColor }}
+        >
           {createFailed ? (
             <p>3D graphics are not available. Reload the page to try again.</p>
           ) : (

@@ -267,6 +267,9 @@ test.describe('WebGL context loss', () => {
 
     await expect(page.getByText('3D graphics are not available')).toBeVisible();
     await expect(overlay).toHaveAttribute('data-mark', '1');
+    // A refused context has no 2 s delay: the same class shows the text at
+    // once when the first context of a page is refused.
+    await expect(overlay).toHaveCSS('animation-name', 'none');
     await expect(reloadButton).toHaveCount(0);
     await expect(page.locator('canvas')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Viewer error' })).toHaveCount(0);

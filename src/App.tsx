@@ -448,9 +448,12 @@ function AppContent() {
       watermark: getWatermarkText(),
     });
     if (!blob) {
-      // A viewer that returned no image: no renderer, or its context is lost
-      // (the browser paused 3D graphics).
-      setError('The 3D view is not available right now, so the image was not saved.');
+      // null: the WebGL context is lost or was refused (the browser paused or
+      // blocked 3D graphics), so say so. undefined: the viewer is still
+      // starting, which is not a failure either.
+      if (blob === null) {
+        setError('The 3D view is not available right now, so the image was not saved.');
+      }
       return;
     }
     track('export_png', { scale: settings.scale });
