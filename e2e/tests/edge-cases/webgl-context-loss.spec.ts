@@ -10,6 +10,10 @@ import { MoleculeViewerPage } from '../../page-objects';
  */
 
 type LoseContextWindow = Window & { __loseContext?: WEBGL_lose_context | null };
+/** The app's renderer (set in onCreated). Read through it, a helper never creates a context. */
+type RendererWindow = Window & {
+  __mol3d_gl?: { domElement: HTMLCanvasElement; getContext(): WebGLRenderingContext };
+};
 type CameraWindow = Window & { __mol3d_camera?: { position: { x: number; y: number; z: number }; zoom: number } };
 type StoreWindow = Window & {
   __mol3d_store: { getState(): { setPendingCameraSnapshot(snapshot: CameraView): void } };
@@ -23,8 +27,7 @@ interface CameraView {
 /** Takes the context away. The extension object is kept: it can't be fetched from a lost context. */
 async function loseContext(page: Page): Promise<boolean> {
   return page.evaluate(() => {
-    const el = document.querySelector('canvas') as HTMLCanvasElement;
-    const gl = (el.getContext('webgl2') ?? el.getContext('webgl')) as WebGLRenderingContext | null;
+    const gl = (window as RendererWindow).__mol3d_gl?.getContext();
     const ext = gl?.getExtension('WEBGL_lose_context') ?? null;
     (window as LoseContextWindow).__loseContext = ext;
     ext?.loseContext();
@@ -32,10 +35,12 @@ async function loseContext(page: Page): Promise<boolean> {
   });
 }
 
+/** Undefined until the canvas on screen has its renderer, which a new canvas gets only after a moment. */
 async function isContextLost(page: Page): Promise<boolean | undefined> {
   return page.evaluate(() => {
-    const el = document.querySelector('canvas') as HTMLCanvasElement;
-    return (el.getContext('webgl2') ?? el.getContext('webgl'))?.isContextLost();
+    const renderer = (window as RendererWindow).__mol3d_gl;
+    if (!renderer || renderer.domElement !== document.querySelector('canvas')) return undefined;
+    return renderer.getContext().isContextLost();
   });
 }
 
@@ -133,12 +138,18 @@ test.describe('WebGL context loss', () => {
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
 
+    // Export during the loss says so instead of saving a blank image. The
+    // toolbar sits above the overlay, so the button is reachable.
+    await page.locator('button[aria-label="Export"]').click({ force: true });
+    await page.waitForTimeout(300);
+    await expect(moleculeViewer.canvas.errorMessage).toContainText('not available right now');
+
     await page.evaluate(() => (window as LoseContextWindow).__loseContext?.restoreContext());
 
     await expect(overlay).toHaveCount(0);
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
-    expect(await isContextLost(page)).toBe(false);
+    await expect.poll(() => isContextLost(page)).toBe(false);
 
     // Rotating redraws through a composer built on the restored context.
     await rotate(page);
@@ -180,12 +191,12 @@ test.describe('WebGL context loss', () => {
     // Shown 2 s after the loss; the rest of the allowance is for a busy machine.
     await expect(reloadButton).toBeVisible({ timeout: 15_000 });
     await reloadButton.click({ force: true });
-    await page.waitForTimeout(300);
 
+    // Also the wait for the new canvas's renderer, before any pixel check.
+    await expect.poll(() => isContextLost(page)).toBe(false);
     await expect(overlay).toHaveCount(0);
     await expect(canvas).toHaveCount(1);
     await expect(viewerError).toHaveCount(0);
-    expect(await isContextLost(page)).toBe(false);
 
     // The new canvas needs a moment for its first frame.
     await expect.poll(async () => colourCount(await canvasPixels(page))).toBeGreaterThan(10);
@@ -223,5 +234,50 @@ test.describe('WebGL context loss', () => {
       [x, y]
     );
     expect(coveredByOverlay).toBe(true);
+  });
+
+  test('[EH-WGL-04] a reload that gets no WebGL context says so, once', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => pageErrors.push(err.message));
+
+    const moleculeViewer = new MoleculeViewerPage(page);
+    await moleculeViewer.goto();
+    await moleculeViewer.loadSampleMolecule('caffeine');
+
+    const overlay = overlayOf(page);
+    const reloadButton = page.getByRole('button', { name: 'Reload viewer' });
+
+    expect(await loseContext(page)).toBe(true);
+
+    // The browser refuses every new WebGL context from now on, as it does when
+    // it has blocked 3D graphics for the page.
+    await page.evaluate(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      const blocked = new Set(['webgl2', 'webgl', 'experimental-webgl']);
+      HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
+        if (blocked.has(type)) return null;
+        return (original as (...args: unknown[]) => RenderingContext | null).call(this, type, ...rest);
+      } as typeof HTMLCanvasElement.prototype.getContext;
+    });
+
+    await expect(reloadButton).toBeVisible({ timeout: 15_000 });
+    // A remounted overlay would lose this mark and be hidden again for 2 s.
+    await overlay.evaluate((el: HTMLElement) => { el.dataset.mark = '1'; });
+    await reloadButton.click({ force: true });
+
+    await expect(page.getByText('3D graphics are not available')).toBeVisible();
+    await expect(overlay).toHaveAttribute('data-mark', '1');
+    await expect(reloadButton).toHaveCount(0);
+    await expect(page.locator('canvas')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Viewer error' })).toHaveCount(0);
+
+    // A render of the whole viewer: a Canvas still mounted would try again.
+    await page.getByRole('button', { name: /Switch to (light|dark) mode/ }).click({ force: true });
+    await page.waitForTimeout(500);
+
+    // The rethrown creation error is an unhandled rejection by design; a
+    // second one means R3F tried again.
+    expect(pageErrors).toHaveLength(1);
+    expect(pageErrors[0]).toContain('Error creating WebGL context');
   });
 });

@@ -443,7 +443,11 @@ function AppContent() {
       background: settings.background,
       watermark: getWatermarkText(),
     });
-    if (!blob) return;
+    if (!blob) {
+      // No renderer, or its context is lost (the browser paused 3D graphics).
+      setError('The 3D view is not available right now, so the image was not saved.');
+      return;
+    }
     track('export_png', { scale: settings.scale });
     // Still inside the tap: a phone gets the share sheet, the rest a download
     const filename = buildExportFilename(settings.filename || molecule?.name, 'png');

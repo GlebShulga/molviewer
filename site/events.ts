@@ -48,6 +48,9 @@ export const EVENT_NAMES = [
   'webgl_context_restored',
   // A person pressed "Reload viewer" after a loss that wasn't restored.
   'webgl_viewer_reloaded',
+  // The browser refused a WebGL context: a failed "Reload viewer", or a first
+  // load in an embed or the widget.
+  'webgl_create_failed',
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];

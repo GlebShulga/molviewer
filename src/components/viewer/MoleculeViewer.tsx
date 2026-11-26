@@ -1,4 +1,4 @@
-import { Canvas, useThree, type RootState } from "@react-three/fiber";
+import { Canvas, useThree, type GLProps, type RootState } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { EffectComposer, N8AO, SMAA } from "@react-three/postprocessing";
 import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState, type ReactNode } from "react";
@@ -63,6 +63,9 @@ interface SceneControllerProps {
   /** Told when the WebGL context is lost (true) and restored (false). */
   onContextLostChange: (lost: boolean) => void;
 }
+
+/** What R3F passes to a `gl` function (its own type isn't exported). */
+type DefaultGLProps = Parameters<Extract<GLProps, (...args: never[]) => unknown>>[0];
 
 function sceneAtomCount(): number {
   let atoms = 0;
@@ -185,12 +188,43 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     // view goes in as the first props of the new camera and controls. R3F
     // applies a prop only when its value changes, so later renders don't pull
     // the camera back to it.
+    // The overlay stays until the new Canvas's onCreated clears contextLost. A
+    // second click before then finds no controls (the old ones are gone, the
+    // new ones may not be mounted yet) and keeps the view from the first.
     const [reload, setReload] = useState<{ key: number; camera: CameraSnapshot | null }>({ key: 0, camera: null });
     const reloadViewer = () => {
       const camera = cameraSnapshotOf(controlsRef.current);
-      setReload((prev) => ({ key: prev.key + 1, camera }));
-      setContextLost(false);
+      setReload((prev) => ({ key: prev.key + 1, camera: camera ?? prev.camera }));
       track('webgl_viewer_reloaded', { atoms: roundAtoms(sceneAtomCount()) });
+    };
+
+    // The browser refused a new WebGL context: a "Reload viewer" that failed,
+    // or a first load (the app checks for WebGL first, embed and widget don't).
+    const [createFailed, setCreateFailed] = useState(false);
+    const createRenderer = (defaults: DefaultGLProps) => {
+      try {
+        return new THREE.WebGLRenderer({
+          ...defaults,
+          canvas: defaults.canvas as HTMLCanvasElement,
+          // antialias stays on: exportImage renders with gl.render directly, past
+          // the composer's SMAA, so canvas MSAA is all a PNG export gets.
+          antialias: true,
+          preserveDrawingBuffer: true,
+          powerPreference: 'high-performance',
+        });
+      } catch (error) {
+        setCreateFailed(true);
+        track('webgl_create_failed', { atoms: roundAtoms(sceneAtomCount()) });
+        // R3F has no "no renderer" result, so it still has to throw. It
+        // surfaces as an unhandled rejection, which errorReporter logs.
+        throw error;
+      }
+    };
+
+    /** The renderer, unless its context is lost (or was lost on unmount). */
+    const liveRenderer = (): THREE.WebGLRenderer | null => {
+      const { gl } = viewerRefs;
+      return gl && !gl.getContext().isContextLost() ? gl : null;
     };
 
     // One element, kept between renders. EffectComposer re-adds its passes
@@ -276,7 +310,8 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
       },
       recordTurntable: async (options) => {
         const controls = controlsRef.current;
-        const { gl, scene } = viewerRefs;
+        const gl = liveRenderer();
+        const { scene } = viewerRefs;
         if (!controls || !gl || !scene) {
           throw new Error("Viewer is not ready for video export.");
         }
@@ -345,13 +380,17 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         return exportModel(scene, format, options);
       },
       exportImage: (options = {}) => {
-        const { gl, scene, camera } = viewerRefs;
+        const { scene, camera } = viewerRefs;
 
-        if (!gl || !scene || !camera) {
+        if (!viewerRefs.gl || !scene || !camera) {
           console.error("WebGL context not available for export");
           logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
           return null;
         }
+        // A lost context renders nothing, so the PNG would be blank. A loss is
+        // expected (the overlay says so), not an error to log.
+        const gl = liveRenderer();
+        if (!gl) return null;
 
         const { scale = 2, background = null, watermark } = options;
 
@@ -390,14 +429,17 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
 
     return (
       <>
+      {/* No Canvas once creation has failed: R3F retries a failed creation on
+          every render of the Canvas. Kept in this spot of the fragment so the
+          overlay below stays the same element (a new one would restart its
+          2 s delay). */}
+      {!createFailed && (
       <Canvas
         key={reload.key}
         style={{ background: backgroundColor, ...style }}
         className={className}
         dpr={[1, MAX_DPR]}
-        // antialias stays on: exportImage renders with gl.render directly, past
-        // the composer's SMAA, so canvas MSAA is all a PNG export gets.
-        gl={{ antialias: true, preserveDrawingBuffer: true, powerPreference: 'high-performance' }}
+        gl={createRenderer}
         // Draw only when something changes. Camera input redraws through
         // OrbitControls' 'change' events, prop changes through R3F; imperative
         // changes call invalidate().
@@ -411,6 +453,9 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           viewerRefs.ready = true;
           invalidateRef.current = state.invalidate;
           setFrameloopRef.current = state.setFrameloop;
+          // After "Reload viewer": the new context exists, so the overlay goes
+          // and the composer comes back.
+          setContextLost(false);
         }}
       >
         <PerspectiveCamera
@@ -457,13 +502,21 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         {/* Post-processing effects - conditional based on molecule size */}
         {postEffects}
       </Canvas>
-      {/* Shown (after a delay, in CSS) for as long as the context is lost. */}
-      {contextLost && (
+      )}
+      {/* Shown (after a delay, in CSS) for as long as the context is lost, and
+          for good once a new context can't be created. */}
+      {(contextLost || createFailed) && (
         <div className={overlayStyles.contextLost} role="status" style={{ backgroundColor }}>
-          <p>The browser paused 3D graphics. Waiting for it to come back.</p>
-          <button type="button" className={overlayStyles.chipButton} onClick={reloadViewer}>
-            Reload viewer
-          </button>
+          {createFailed ? (
+            <p>3D graphics are not available. Reload the page to try again.</p>
+          ) : (
+            <>
+              <p>The browser paused 3D graphics. Waiting for it to come back.</p>
+              <button type="button" className={overlayStyles.chipButton} onClick={reloadViewer}>
+                Reload viewer
+              </button>
+            </>
+          )}
         </div>
       )}
       </>
