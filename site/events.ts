@@ -44,6 +44,8 @@ export const EVENT_NAMES = [
   'structure_load_cancelled',
   'structure_rendered',
   'webgl_context_lost',
+  // The browser gave the context back and the viewer drew again.
+  'webgl_context_restored',
 ] as const;
 
 export type EventName = (typeof EVENT_NAMES)[number];

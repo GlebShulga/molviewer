@@ -79,6 +79,7 @@ export default defineConfig({
         '**/ui/component-settings.spec.ts',
         '**/ui/viewer-overlays.spec.ts',
         '**/edge-cases/error-handling.spec.ts',
+        '**/edge-cases/webgl-context-loss.spec.ts',
         '**/undo-redo/**/*.spec.ts',
         '**/onboarding/**/*.spec.ts',
       ],

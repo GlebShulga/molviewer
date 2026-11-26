@@ -1,7 +1,7 @@
 import { Canvas, useThree, type RootState } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { EffectComposer, N8AO, SMAA } from "@react-three/postprocessing";
-import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, type ReactNode } from "react";
+import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState, type ReactNode } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, MAX_DPR, getQualityPreset } from "../../config";
@@ -53,13 +53,24 @@ export interface MoleculeViewerProps {
   getBoundingBox?: () => { min: THREE.Vector3; max: THREE.Vector3; center: THREE.Vector3 } | null;
 }
 
+/** The banner shown while the browser has taken the WebGL context away. */
+export const CONTEXT_LOST_MESSAGE = 'WebGL context lost. Attempting to restore...';
+
 interface SceneControllerProps {
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
   autoRotate?: boolean;
   backgroundColor?: string;
+  /** Told when the WebGL context is lost (true) and restored (false). */
+  onContextLostChange: (lost: boolean) => void;
 }
 
-function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneControllerProps) {
+function sceneAtomCount(): number {
+  let atoms = 0;
+  for (const s of useMoleculeStore.getState().structures.values()) atoms += s.molecule.atoms.length;
+  return atoms;
+}
+
+function SceneController({ controlsRef, autoRotate, backgroundColor, onContextLostChange }: SceneControllerProps) {
   const { camera, gl, scene, invalidate } = useThree();
   const setControlsReady = useMoleculeStore(state => state.setControlsReady);
   const setError = useMoleculeStore(state => state.setError);
@@ -76,13 +87,15 @@ function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneCont
     const canvas = gl.domElement;
     const handleContextLost = (event: Event) => {
       event.preventDefault();
-      setError('WebGL context lost. Attempting to restore...');
-      let atoms = 0;
-      for (const s of useMoleculeStore.getState().structures.values()) atoms += s.molecule.atoms.length;
-      track('webgl_context_lost', { atoms: roundAtoms(atoms) });
+      onContextLostChange(true);
+      setError(CONTEXT_LOST_MESSAGE);
+      track('webgl_context_lost', { atoms: roundAtoms(sceneAtomCount()) });
     };
     const handleContextRestored = () => {
-      setError(null);
+      onContextLostChange(false);
+      // A load error shown in the meantime stays.
+      if (useMoleculeStore.getState().error === CONTEXT_LOST_MESSAGE) setError(null);
+      track('webgl_context_restored', { atoms: roundAtoms(sceneAtomCount()) });
       invalidate();
     };
     canvas.addEventListener('webglcontextlost', handleContextLost);
@@ -91,7 +104,7 @@ function SceneController({ controlsRef, autoRotate, backgroundColor }: SceneCont
       canvas.removeEventListener('webglcontextlost', handleContextLost);
       canvas.removeEventListener('webglcontextrestored', handleContextRestored);
     };
-  }, [gl, setError, invalidate]);
+  }, [gl, setError, invalidate, onContextLostChange]);
 
   // Set Three.js scene background color
   useEffect(() => {
@@ -153,6 +166,43 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     // Get quality preset based on atom count
     const qualityPreset = useMemo(() => getQualityPreset(atomCount), [atomCount]);
     const { postProcessing, aoQuality } = qualityPreset;
+    const { ao, smaa } = postProcessing;
+
+    // The browser can take the WebGL context away (usually from a background
+    // tab) and give it back later.
+    const [contextLost, setContextLost] = useState(false);
+
+    // One element, kept between renders. EffectComposer re-adds its passes
+    // whenever it gets new children, and adding a pass throws on a lost
+    // context, so an unrelated render (the context-lost banner is one) must
+    // not reach it. While the context is lost there is no composer at all;
+    // on restore a new one is built with new render targets.
+    const postEffects = useMemo(() => {
+      if (contextLost || (!ao && !smaa)) return null;
+      const aoEffect = (
+        <N8AO
+          aoRadius={SSAO.aoRadius}
+          intensity={SSAO.intensity}
+          distanceFalloff={SSAO.distanceFalloff}
+          color={SSAO.color}
+          quality={aoQuality}
+        />
+      );
+      if (!ao) {
+        return (
+          <EffectComposer multisampling={0}>
+            <SMAA />
+          </EffectComposer>
+        );
+      }
+      if (!smaa) return <EffectComposer multisampling={0}>{aoEffect}</EffectComposer>;
+      return (
+        <EffectComposer multisampling={0}>
+          {aoEffect}
+          <SMAA />
+        </EffectComposer>
+      );
+    }, [ao, smaa, aoQuality, contextLost]);
 
     useImperativeHandle(ref, () => ({
       homeView: () => {
@@ -378,37 +428,15 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         />
 
         <Suspense fallback={null}>{children}</Suspense>
-        <SceneController controlsRef={controlsRef} autoRotate={autoRotate} backgroundColor={backgroundColor} />
+        <SceneController
+          controlsRef={controlsRef}
+          autoRotate={autoRotate}
+          backgroundColor={backgroundColor}
+          onContextLostChange={setContextLost}
+        />
 
         {/* Post-processing effects - conditional based on molecule size */}
-        {postProcessing.ao && postProcessing.smaa && (
-          <EffectComposer multisampling={0}>
-            <N8AO
-              aoRadius={SSAO.aoRadius}
-              intensity={SSAO.intensity}
-              distanceFalloff={SSAO.distanceFalloff}
-              color={SSAO.color}
-              quality={aoQuality}
-            />
-            <SMAA />
-          </EffectComposer>
-        )}
-        {postProcessing.ao && !postProcessing.smaa && (
-          <EffectComposer multisampling={0}>
-            <N8AO
-              aoRadius={SSAO.aoRadius}
-              intensity={SSAO.intensity}
-              distanceFalloff={SSAO.distanceFalloff}
-              color={SSAO.color}
-              quality={aoQuality}
-            />
-          </EffectComposer>
-        )}
-        {!postProcessing.ao && postProcessing.smaa && (
-          <EffectComposer multisampling={0}>
-            <SMAA />
-          </EffectComposer>
-        )}
+        {postEffects}
       </Canvas>
     );
   }
