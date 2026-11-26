@@ -209,3 +209,19 @@ test.describe('Keyboard Shortcuts', () => {
     });
   });
 });
+
+// Top level: the describe above loads Caffeine before every test.
+test.describe('Keyboard Shortcuts without a structure', () => {
+  test('[KS-19] Ctrl+S with nothing loaded does nothing', async ({ page }) => {
+    const moleculeViewer = new MoleculeViewerPage(page);
+    await moleculeViewer.goto();
+    await expect(moleculeViewer.canvas.emptyState).toBeVisible();
+
+    await moleculeViewer.pressShortcut(['Control'], 's');
+    await page.waitForTimeout(500);
+
+    // No viewer is not an export failure: no banner, and the empty state stays.
+    await expect(moleculeViewer.canvas.errorMessage).toHaveCount(0);
+    await expect(moleculeViewer.canvas.emptyState).toBeVisible();
+  });
+});

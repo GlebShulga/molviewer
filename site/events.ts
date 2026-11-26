@@ -43,13 +43,15 @@ export const EVENT_NAMES = [
   'structure_load_failed',
   'structure_load_cancelled',
   'structure_rendered',
+  // The four WebGL events come from the app and the embed only, not from the
+  // widget: track() sends only CROSS_ORIGIN_EVENTS from another origin.
   'webgl_context_lost',
   // The browser gave the context back (sent before the next draw).
   'webgl_context_restored',
   // A person pressed "Reload viewer" after a loss that wasn't restored.
   'webgl_viewer_reloaded',
   // The browser refused a WebGL context: a failed "Reload viewer", or a first
-  // load in an embed or the widget.
+  // load (rare in the app, which checks for WebGL first).
   'webgl_create_failed',
 ] as const;
 

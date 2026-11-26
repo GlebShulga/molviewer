@@ -279,5 +279,13 @@ test.describe('WebGL context loss', () => {
     // second one means R3F tried again.
     expect(pageErrors).toHaveLength(1);
     expect(pageErrors[0]).toContain('Error creating WebGL context');
+
+    // Model export names the real problem: the old Canvas's emptied scene is
+    // no longer what it reads. Not by role="status": the overlay has it too.
+    await moleculeViewer.openExportPanel();
+    await moleculeViewer.exportPanel.getByRole('button', { name: 'Export GLB' }).click({ force: true });
+    await expect(moleculeViewer.exportPanel.locator('[class*="exportStatus"]')).toContainText(
+      'Viewer is not ready for model export'
+    );
   });
 });

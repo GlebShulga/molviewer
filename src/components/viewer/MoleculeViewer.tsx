@@ -1,7 +1,7 @@
 import { Canvas, useThree, type GLProps, type RootState } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { EffectComposer, N8AO, SMAA } from "@react-three/postprocessing";
-import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, useState, useCallback, type ReactNode } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { CAMERA, LIGHTING, COLORS, ORBIT_CONTROLS, SSAO, MAX_DPR, getQualityPreset } from "../../config";
@@ -93,6 +93,19 @@ function SceneController({ controlsRef, autoRotate, backgroundColor, target, onC
     viewerRefs.gl = gl;
     viewerRefs.scene = scene;
     viewerRefs.camera = camera;
+    viewerRefs.ready = true;
+    // Cleared on unmount, so nothing reads the emptied scene of a Canvas that
+    // is gone. Only while the refs are still this Canvas's: after "Reload
+    // viewer" the old R3F tree can unmount after the new Canvas's onCreated.
+    // StrictMode runs this cleanup and then the effect again, which is why
+    // the effect sets `ready` too.
+    return () => {
+      if (viewerRefs.gl !== gl) return;
+      viewerRefs.gl = null;
+      viewerRefs.scene = null;
+      viewerRefs.camera = null;
+      viewerRefs.ready = false;
+    };
   }, [gl, scene, camera]);
 
   // Handle WebGL context loss/restore
@@ -182,6 +195,13 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
     // The browser can take the WebGL context away (usually from a background
     // tab) and give it back later.
     const [contextLost, setContextLost] = useState(false);
+    // Counts restores; it is the composer's key (see postEffects).
+    const [restores, setRestores] = useState(0);
+    // Stable: SceneController's listener effect depends on it.
+    const handleContextLostChange = useCallback((lost: boolean) => {
+      setContextLost(lost);
+      if (!lost) setRestores((n) => n + 1);
+    }, []);
 
     // "Reload viewer" is the way out when the context doesn't come back: a new
     // key gives a new Canvas, so a new canvas element and a new context. The
@@ -229,8 +249,10 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
 
     // One element, kept between renders. EffectComposer re-adds its passes
     // whenever it gets new children, and adding a pass throws on a lost
-    // context, so any unrelated render must not reach it. While the context is lost there is no composer at all;
-    // on restore a new one is built with new render targets.
+    // context, so any unrelated render must not reach it. While the context is
+    // lost there is no composer at all. A restore always builds a new one with
+    // new render targets (the key), also when the loss and the restore are
+    // batched into one render and contextLost never reads true.
     const postEffects = useMemo(() => {
       if (contextLost || (!ao && !smaa)) return null;
       const aoEffect = (
@@ -244,19 +266,19 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
       );
       if (!ao) {
         return (
-          <EffectComposer multisampling={0}>
+          <EffectComposer key={restores} multisampling={0}>
             <SMAA />
           </EffectComposer>
         );
       }
-      if (!smaa) return <EffectComposer multisampling={0}>{aoEffect}</EffectComposer>;
+      if (!smaa) return <EffectComposer key={restores} multisampling={0}>{aoEffect}</EffectComposer>;
       return (
-        <EffectComposer multisampling={0}>
+        <EffectComposer key={restores} multisampling={0}>
           {aoEffect}
           <SMAA />
         </EffectComposer>
       );
-    }, [ao, smaa, aoQuality, contextLost]);
+    }, [ao, smaa, aoQuality, contextLost, restores]);
 
     useImperativeHandle(ref, () => ({
       homeView: () => {
@@ -383,8 +405,12 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
         const { scene, camera } = viewerRefs;
 
         if (!viewerRefs.gl || !scene || !camera) {
-          console.error("WebGL context not available for export");
-          logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
+          // No renderer is expected, and on screen, after a refused context
+          // and between "Reload viewer" and the new renderer. Otherwise log it.
+          if (!contextLost && !createFailed) {
+            console.error("WebGL context not available for export");
+            logError("WebGL context not available for export", { source: 'MoleculeViewer', op: 'export' });
+          }
           return null;
         }
         // A lost context renders nothing, so the PNG would be blank. A loss is
@@ -454,8 +480,10 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           invalidateRef.current = state.invalidate;
           setFrameloopRef.current = state.setFrameloop;
           // After "Reload viewer": the new context exists, so the overlay goes
-          // and the composer comes back.
-          setContextLost(false);
+          // and the composer comes back. Unless the context is lost already:
+          // SceneController's listener isn't attached yet and would miss that
+          // loss, so the overlay stays until a restore.
+          setContextLost(state.gl.getContext().isContextLost());
         }}
       >
         <PerspectiveCamera
@@ -496,7 +524,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerHandle, MoleculeViewerPro
           autoRotate={autoRotate}
           backgroundColor={backgroundColor}
           target={reload.camera?.target}
-          onContextLostChange={setContextLost}
+          onContextLostChange={handleContextLostChange}
         />
 
         {/* Post-processing effects - conditional based on molecule size */}

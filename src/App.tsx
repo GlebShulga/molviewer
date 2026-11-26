@@ -438,13 +438,18 @@ function AppContent() {
       setExportSettings(options);
     }
     const settings = options || exportSettings;
-    const blob = viewerRef.current?.exportImage({
+    // No viewer (nothing loaded, or it is still loading) is not a failure:
+    // Ctrl+S gets here in that state too.
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    const blob = viewer.exportImage({
       scale: settings.scale,
       background: settings.background,
       watermark: getWatermarkText(),
     });
     if (!blob) {
-      // No renderer, or its context is lost (the browser paused 3D graphics).
+      // A viewer that returned no image: no renderer, or its context is lost
+      // (the browser paused 3D graphics).
       setError('The 3D view is not available right now, so the image was not saved.');
       return;
     }
